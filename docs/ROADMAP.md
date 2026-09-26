@@ -200,6 +200,44 @@ mystery.
 
 `REP_SLOT_TAKEN` no longer exists in `app.js`.
 
+---
+
+## Phase 6 — Student roster validation · ✅ shipped
+
+The last soft edge in the trust chain. Before this, **any** student could sign
+up for any level; the roster recorded who belonged there but nothing consulted
+it.
+
+`api/onboarding.js` · `firestore.rules` · `app.js`
+
+| Matric on `matrics[]` | `rosterStatus` | `rosterReason` |
+| --- | --- | --- |
+| yes | `verified` | `ON_ROSTER` |
+| no, roster exists | `unverified` | `NOT_ON_ROSTER` |
+| no roster imported | `unverified` | `NO_ROSTER` |
+| adviser (no matric) | `null` | `null` |
+
+**Deliberately a check, not a rejection.** Cross-level and service courses (GST)
+legitimately produce students who are not on their programme's roster. Blocking
+them at signup would strand them with no way forward, so they get an account and
+a status that resolves when the adviser re-imports or the rep approves them. The
+sign-up toast names the next step rather than leaving "why isn't my attendance
+counting?" unanswered.
+
+Details worth keeping:
+
+- The roster is read **once** and both the rep grant and the membership check
+  read that same object, so the two can never disagree about which document was
+  consulted.
+- Both decisions come from the **profile's own** institution/department/level,
+  never a request parameter.
+- `rosterStatus`, `rosterReason` and `repGrantedByAdviser` are **server-owned**:
+  `create` forbids a client from asserting `verified` or `true`, and `update`
+  pins all three. Without that, a student could set `rosterStatus: "verified"`
+  from the console and skip the check entirely.
+
+**Next: Phase 7 — pilot dry run** with one real department and 20–40 students.
+
 ### Do these first, before any code
 
 1. **Privacy + retention doc.** NIN data and a selfie are the most sensitive material this

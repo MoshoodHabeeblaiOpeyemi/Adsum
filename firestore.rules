@@ -111,6 +111,11 @@ service cloud.firestore {
         && request.resource.data.get('verificationStatus', 'not_required') in ['not_required', 'pending_email']
         && request.resource.data.get('verifiedAt', null) == null
         && request.resource.data.get('verificationMethod', null) == null
+        // 🔒 Nor roster standing. A client may not create itself as
+        // roster-verified, and the server-owned provenance flags start empty
+        // and are set by api/onboarding.js alone.
+        && request.resource.data.get('rosterStatus', null) in [null, 'unverified']
+        && request.resource.data.get('repGrantedByAdviser', null) in [null, false]
         // `isAdviser` must agree with `role`, so it cannot be used to smuggle
         // adviser-ness onto a student/rep document either.
         && request.resource.data.get('isAdviser', false) == (request.resource.data.get('role', 'student') == 'adviser')
@@ -164,6 +169,13 @@ service cloud.firestore {
         // user out of the settings form. With an explicit default, a legacy
         // document simply compares default-to-default and passes, while any
         // attempt to CHANGE a role field still fails the equality check.
+        // 🔒 ROSTER STANDING IS SERVER-OWNED TOO. A student must not be able to
+        // set `rosterStatus: "verified"` from the client to skip the check, nor
+        // flip `repGrantedByAdviser` to claim a badge. Only api/onboarding.js
+        // writes these, and it decides from the level roster.
+        && request.resource.data.get('rosterStatus', null) == resource.data.get('rosterStatus', null)
+        && request.resource.data.get('rosterReason', null) == resource.data.get('rosterReason', null)
+        && request.resource.data.get('repGrantedByAdviser', null) == resource.data.get('repGrantedByAdviser', null)
         && request.resource.data.get('role', null) == resource.data.get('role', null)
         && request.resource.data.get('isAdviser', false) == resource.data.get('isAdviser', false)
         && request.resource.data.get('verificationStatus', null) == resource.data.get('verificationStatus', null)

@@ -119,51 +119,6 @@ function appendRepLinkChange(existing, entry) {
 }
 
 /**
- * PHASE 5 — the rep is a GRANT, not a claim.
- *
- * The student asked for the rep card. The server decides what they actually
- * get, by checking their matric against `chosenRepMatric` on the roster their
- * own (institution, department, level) points at. A match means the adviser
- * named them; anything else means they join as a regular student.
- *
- * This replaces the old client-side race where whoever signed up first won an
- * empty `departmentReps` slot.
- *
- * 🔒 The roster is looked up by the PROFILE's own fields, never by anything the
- * client sends, so a student cannot nominate a level where someone else is the
- * rep, nor a level with no roster to pass them.
- *
- * @returns {Promise<{granted: boolean, reason: string, detail?: object}>}
- */
-async function decideRepGrant(profile) {
-  const roster = await findRosterFor(db, profile);
-  if (!roster) {
-    return { granted: false, reason: "NO_ROSTER" };
-  }
-  const data = roster.data || {};
-  const chosen = data.chosenRepMatric ? norm(data.chosenRepMatric) : "";
-
-  // No rep named yet — the adviser has not chosen, so the card cannot be honoured.
-  if (!chosen) {
-    return {
-      granted: false,
-      reason: "NO_REP_CHOSEN",
-      detail: { levelExists: true },
-    };
-  }
-
-  if (norm(profile.matric) !== chosen) {
-    return { granted: false, reason: "NOT_THE_CHOSEN_REP" };
-  }
-
-  return {
-    granted: true,
-    reason: "CHOSEN",
-    detail: { rosterId: roster.id, chosenRepMatric: chosen },
-  };
-}
-
-/**
  * Normalise and validate the posted profile. Returns `{ ok: true, profile }` or
  * `{ ok: false, status, error }` so the handler can answer without duplicating
  * the checks. Nothing here trusts a value's TYPE — every field is coerced to a
@@ -307,16 +262,52 @@ async function handleCreateProfile(req, res, decoded) {
       ? db.collection("departmentReps").doc(repSlotId(p.institution, p.department, p.level))
       : null;
 
-    // 🔒 PHASE 5: a rep request is only honoured if the ADVISER named this
-    // student. The client asked for "rep"; this is what they actually get.
-    // A refusal is NOT an error — the account is created, just as a student.
+    // 🔒 PHASE 5 + 6: the rep is a GRANT and roster membership is a CHECK, and
+    // both are decided by the server from the PROFILE's own institution /
+    // department / level — never from a request parameter, so a student cannot
+    // point at a level that would accept them. The client asked for something;
+    // this is what they actually get.
+    //
+    // The roster is fetched ONCE and both decisions read it, so they can never
+    // disagree about which document was consulted.
+    const roster = await findRosterFor(db, p);
+    const rosterData = (roster && roster.data) || {};
+    const rosterMatrics = Array.isArray(rosterData.matrics) ? rosterData.matrics.map(norm) : [];
+
+    // PHASE 5 — the rep. Only the student the adviser NAMED may hold the role.
+    // This replaces the old client-side race where whoever signed up first won
+    // an empty `departmentReps` slot. A refusal is NOT an error: the account is
+    // created as a student, and `repRequest` below says which of the four
+    // cases applied so the client can explain it.
     let repDecision = { granted: false, reason: "NOT_REQUESTED" };
     if (p.isRep) {
-      repDecision = await decideRepGrant(p);
+      const chosen = rosterData.chosenRepMatric ? norm(rosterData.chosenRepMatric) : "";
+      if (!roster) repDecision = { granted: false, reason: "NO_ROSTER" };
+      else if (!chosen) repDecision = { granted: false, reason: "NO_REP_CHOSEN" };
+      else if (norm(p.matric) !== chosen) repDecision = { granted: false, reason: "NOT_THE_CHOSEN_REP" };
+      else repDecision = { granted: true, reason: "CHOSEN" };
     }
     // The role actually written. Never the requested one unless it was granted.
     const effectiveRole = p.isRep && repDecision.granted ? ROLE.REP : ROLE.STUDENT;
     const effectiveIsRep = effectiveRole === ROLE.REP;
+
+    // PHASE 6 — roster membership, for students and reps. Advisers carry no
+    // matric so it does not apply to them.
+    //
+    // Deliberately NOT a hard rejection. Cross-level and service courses (GST)
+    // legitimately produce students who are not on the roster their programme
+    // sits in, and refusing them at signup would strand them with no way
+    // forward. They get an account plus a clear status; it resolves when the
+    // adviser re-imports the roster or the rep approves them.
+    const onRoster = rosterMatrics.includes(norm(p.matric));
+    const rosterStatus = p.isAdviser ? null : onRoster ? "verified" : "unverified";
+    const rosterReason = p.isAdviser
+      ? null
+      : onRoster
+        ? "ON_ROSTER"
+        : roster
+          ? "NOT_ON_ROSTER"
+          : "NO_ROSTER";
 
     // The profile AND the rep-slot claim are written in ONE transaction.
     // Doing them separately would let two simultaneous signups both pass the
@@ -356,6 +347,11 @@ async function handleCreateProfile(req, res, decoded) {
           // A rep was CHOSEN by the adviser, not self-declared, so the fact is
           // recorded rather than re-derived later from a mutable field.
           repGrantedByAdviser: effectiveIsRep,
+          // Phase 6: the student's standing against the level roster. "unverified"
+          // is NOT a block — it is the queue the rep works from, and it resolves
+          // when the adviser re-imports or the rep approves them.
+          rosterStatus,
+          rosterReason,
           verificationStatus: p.isAdviser ? VERIFICATION.PENDING_EMAIL : VERIFICATION.NOT_REQUIRED,
           // Written as explicit nulls (not omitted) so the keys always EXIST:
           // firestore.rules pins them with `get('verifiedAt', null) == ...`, and
@@ -431,22 +427,23 @@ async function handleCreateProfile(req, res, decoded) {
     // 🔒 When a rep IS granted, link the account to the roster so the adviser's
     // dashboard shows a real uid beside the name, and so a later rep change can
     // find and demote this account.
-    if (effectiveIsRep) {
+    //
+    // Reuses the roster read earlier rather than fetching again: one read, one
+    // document, and the rep link cannot end up pointing at a different roster
+    // than the one the grant was decided against.
+    if (effectiveIsRep && roster) {
       try {
-        const roster = await findRosterFor(db, p);
-        if (roster) {
-          await roster.ref.update({
-            chosenRepUid: decoded.uid,
-            chosenRepAt: FieldValue.serverTimestamp(),
-            repChanges: appendRepLinkChange(roster.data.repChanges, {
-              action: "linked",
-              matric: p.matric,
-              name: p.name,
-              at: FieldValue.serverTimestamp(),
-              by: decoded.uid,
-            }),
-          });
-        }
+        await roster.ref.update({
+          chosenRepUid: decoded.uid,
+          chosenRepAt: FieldValue.serverTimestamp(),
+          repChanges: appendRepLinkChange(roster.data.repChanges, {
+            action: "linked",
+            matric: p.matric,
+            name: p.name,
+            at: FieldValue.serverTimestamp(),
+            by: decoded.uid,
+          }),
+        });
       } catch (linkErr) {
         // The account and the role are already committed and correct. Failing to
         // write the convenience pointer must not undo a legitimate signup, so it
@@ -461,6 +458,9 @@ async function handleCreateProfile(req, res, decoded) {
       role: effectiveRole,
       isRep: effectiveIsRep,
       isAdviser: p.isAdviser,
+      // Phase 6: reported so the client can tell a roster-validated student
+      // from one awaiting the rep's approval.
+      ...(rosterStatus ? { rosterStatus, rosterReason } : {}),
       ...(p.isRep && !repDecision.granted ? { repRequest: repDecision } : {}),
       ...(verification ? { verification } : {}),
     });

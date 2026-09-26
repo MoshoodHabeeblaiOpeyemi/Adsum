@@ -1850,6 +1850,21 @@ if (mobileMenuBtn && navLinks) {
               "You're enrolled as a student. Only the rep your Level Adviser chooses gets the rep role.",
             "Enrolled as a student 👨‍🎓",
           );
+        } else if (signup && signup.rosterStatus === "unverified") {
+          // 🔒 PHASE 6: the account is real, but this matric is not on the
+          // level roster the adviser imported. Say so and name the next step —
+          // never leave "why isn't my attendance counting?" unexplained.
+          const why = {
+            NO_ROSTER:
+              "Your Level Adviser hasn't imported this level's roster yet. Ask them to import it and check back.",
+            NOT_ON_ROSTER:
+              "Your matric isn't on the level roster your adviser imported. Ask your course rep to approve you, or ask your adviser to re-import the list.",
+          };
+          toast.info(
+            why[signup.rosterReason] ||
+              "Your matric isn't on the level roster yet. Ask your course rep to approve you.",
+            "Account created — awaiting roster check",
+          );
         } else {
           toast.success(
             "Your account is ready. Welcome to VeriPresenX!",
