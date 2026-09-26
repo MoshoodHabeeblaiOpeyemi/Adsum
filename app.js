@@ -284,8 +284,19 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
 // ============================================================
 const splashScreen = document.getElementById("splashScreen");
 if (splashScreen) {
+  // ⏸ The entrance animation runs 1.1s and the idle float starts at 1.3s.
+  // A tap in the first moment skipped all of it, so the user saw a static
+  // logo. This short lockout guarantees the animation is actually seen without
+  // making anyone wait for it.
+  const SPLASH_MIN_MS = 900;
+  const splashShownAt = Date.now();
   splashScreen.addEventListener("click", () => {
     if (splashScreen.classList.contains("splash-fade-out")) return;
+    const waited = Date.now() - splashShownAt;
+    if (waited < SPLASH_MIN_MS) {
+      setTimeout(() => splashScreen.click(), SPLASH_MIN_MS - waited);
+      return;
+    }
     splashScreen.classList.add("splash-fade-out");
     setTimeout(() => {
       splashScreen.style.display = "none";
@@ -2628,6 +2639,12 @@ if (mobileMenuBtn && navLinks) {
               locationMode: data.locationMode || "no_gps",
               qrMode: data.qrMode === true,
               hallName: data.hallName || null,
+              // 🔄 REFRESH RECOVERY. Duration and rotation interval are read
+              // from the SERVER rather than remembered, so a rep who reloads
+              // mid-class gets the real remaining time and keeps rotating.
+              // The PIN itself arrives separately, from the secret listener.
+              sessionDuration: data.durationSeconds || 300,
+              pinRotationInterval: data.pinRotationInterval || 10,
               anchorAccuracy:
                 typeof data.anchorAccuracy === "number"
                   ? data.anchorAccuracy
@@ -2635,6 +2652,14 @@ if (mobileMenuBtn && navLinks) {
             };
           } else if (activeCourse.activeSession) {
             activeCourse.activeSession.expired = true;
+          }
+          // 🔄 A rep who reloaded has no countdown running, because the
+          // timer lives in memory. Restarting it here returns the PIN panel
+          // to exactly how they left it, instead of a dead 0:00 while
+          // students are still checking in.
+          if (!isSessionTimerRunning) {
+            isSessionTimerRunning = true;
+            startSessionTimer();
           }
         } else if (activeCourse.activeSession) {
           activeCourse.activeSession.expired = true;
@@ -2705,6 +2730,7 @@ if (mobileMenuBtn && navLinks) {
           JSON.stringify(activeCourse.attendanceHistory)
         ) {
           activeCourse.attendanceHistory = newHistory;
+          renderSemesterReport();
           renderPortalState();
         }
       },
@@ -3976,6 +4002,7 @@ if (mobileMenuBtn && navLinks) {
       syncStudentNav();
     }
 
+    syncSemesterReportPanel();
     renderPortalState();
     startAttendanceHistoryListener(courseId);
     startSessionLiveListener(courseId);
@@ -5855,6 +5882,12 @@ if (mobileMenuBtn && navLinks) {
     },
   };
 
+  // Shown on every disabled GPS card so the reason is never a mystery.
+  const GPS_DISABLED_REASON =
+    "🔒 Disabled for the web app — GPS in a browser is too imprecise indoors " +
+    "to tell one hall from the next, so it would reject students who are present. " +
+    "This works properly in the mobile app.";
+
   // 📺 QR DISPLAY CHOICE — projector vs hotspot students. Visible only when
   // the QR + Device Lock mode is selected; choice persists per course.
   function getQrDisplayChoice() {
@@ -5898,6 +5931,7 @@ if (mobileMenuBtn && navLinks) {
     });
   }
   initQrDisplayChoice();
+  initSemesterReport();
 
   function getSelectedAttendanceMode() {
     if (!activeCourse) return "pin_only";
@@ -5924,14 +5958,27 @@ if (mobileMenuBtn && navLinks) {
     const current = getSelectedAttendanceMode();
     grid.innerHTML = "";
     Object.entries(ATTENDANCE_MODES).forEach(([mode, cfg]) => {
-      if (cfg.prototype && !GPS_PROTOTYPE_ENABLED) return; // prototype gate
+      // 🔒 GPS modes are SHOWN, not hidden. A rep should be able to see
+      // they exist and why they are unavailable, rather than meeting a
+      // feature that simply is not there.
+      const locked = cfg.prototype && !GPS_PROTOTYPE_ENABLED;
       const btn = document.createElement("button");
       btn.type = "button";
       const active = mode === current;
       btn.setAttribute("data-mode", mode);
-      btn.style.cssText = `text-align: left; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 0.72rem; border: 1.5px solid ${active ? "var(--teal)" : "var(--border)"}; background: ${active ? "rgba(45, 224, 201, 0.12)" : "var(--bg)"}; color: var(--text); transition: border-color 0.15s ease;`;
-      btn.innerHTML = `<div style="font-weight: 700; margin-bottom: 3px;">${cfg.icon} ${cfg.title}${active ? " ✓" : ""}</div><div style="color: var(--muted);">${cfg.desc}</div>`;
+      btn.style.cssText = `text-align: left; padding: 10px; border-radius: 10px; cursor: ${locked ? "not-allowed" : "pointer"}; font-size: 0.72rem; border: 1.5px solid ${active ? "var(--teal)" : "var(--border)"}; background: ${active ? "rgba(45, 224, 201, 0.12)" : "var(--bg)"}; color: var(--text); opacity: ${locked ? "0.5" : "1"}; transition: border-color 0.15s ease, opacity 0.15s ease;`;
+      btn.innerHTML =
+        `<div style="font-weight: 700; margin-bottom: 3px;">${locked ? "🔒 " : ""}${cfg.icon} ${cfg.title}${active ? " ✓" : ""}</div>` +
+        `<div style="color: var(--muted);">${cfg.desc}</div>` +
+        (locked ? `<div style="color: var(--muted); margin-top: 5px; font-size: 0.68rem; font-style: italic;">Needs the mobile app</div>` : "");
+      if (locked) btn.setAttribute("aria-disabled", "true");
       btn.addEventListener("click", () => {
+        if (locked) {
+          // Explain rather than silently ignore: a button that does nothing
+          // looks broken, whereas one that says why is honest.
+          toast.info(GPS_DISABLED_REASON, "Not available on web");
+          return;
+        }
         localStorage.setItem(`veripresenx_mode_${activeCourse.id}`, mode);
         renderModeCards();
         syncModeUI();
@@ -6533,8 +6580,13 @@ if (mobileMenuBtn && navLinks) {
     renderPortalState();
   }
 
+  // 🔄 True between startSessionTimer() and the countdown ending. Lets
+  // the session listener know a reloaded page needs the timer restarted.
+  let isSessionTimerRunning = false;
+
   function startSessionTimer() {
     if (countdownInterval) clearInterval(countdownInterval);
+    isSessionTimerRunning = true;
 
     if (!activeCourse || !activeCourse.activeSession) return;
 
@@ -8250,3 +8302,146 @@ function syncAdviserDashboard() {
   }
   loadAdviserRoster();
 }
+  // 📋 SEMESTER ATTENDANCE REPORT (Phase 5).
+  //
+  // The maths lives in utils/report.js rather than inline here, because it is
+  // the part that can be silently wrong: a percentage that quietly counts one
+  // session twice still looks perfectly plausible in a table. It is unit-tested
+  // there instead of eyeballed here.
+  // Loaded by index.html as a classic script before app.js runs, because the
+  // app imports Firebase from CDN URLs and so cannot use a bare-specifier
+  // import for a local module. See utils/report.js for the dual export.
+  const { buildSemesterReport, semesterCsv, semesterPrintHtml } = globalThis.VeriReport || {};
+  let lastSemesterReport = null;
+
+  function renderSemesterReport() {
+    const section = document.getElementById("semesterReport");
+    if (!section || !activeCourse) return;
+    const rep = buildSemesterReport(
+      activeCourse.attendanceHistory || [],
+      activeCourse.members || [],
+    );
+    lastSemesterReport = rep;
+
+    const sessionsEl = document.getElementById("reportSessions");
+    const studentsEl = document.getElementById("reportStudents");
+    const avgEl = document.getElementById("reportAverage");
+    const body = document.getElementById("reportBody");
+    const note = document.getElementById("reportNote");
+
+    if (sessionsEl) sessionsEl.textContent = String(rep.sessions);
+    if (studentsEl) studentsEl.textContent = String(rep.rows.length);
+    if (avgEl) {
+      const withClasses = rep.rows.filter((r) => r.total > 0);
+      const avg = withClasses.length
+        ? Math.round(withClasses.reduce((s2, r) => s2 + r.percent, 0) / withClasses.length)
+        : 0;
+      avgEl.textContent = avg + "%";
+    }
+
+    if (body) {
+      if (!rep.rows.length) {
+        body.innerHTML =
+          '<tr><td colspan="4" style="color:var(--text-muted);">No students enrolled yet.</td></tr>';
+      } else {
+        body.innerHTML = rep.rows
+          .map(
+            (r) =>
+              "<tr><td>" + escapeHTML(r.name) + "</td>" +
+              '<td class="num">' + escapeHTML(r.matric) + "</td>" +
+              '<td class="num">' + r.attended + "/" + r.total + "</td>" +
+              '<td class="num"><strong>' + r.percent + "%</strong></td></tr>",
+          )
+          .join("");
+      }
+    }
+    if (note) {
+      note.textContent = rep.sessions
+        ? "A class counts as attended when the student's matric was recorded present for it."
+        : "No classes have been held yet. The report fills in as you run them.";
+    }
+  }
+
+  function downloadTextFile(filename, text, mime) {
+    const blob = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Release the blob so a long session does not leak memory.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function reportFileBase() {
+    const code = (activeCourse && activeCourse.code ? activeCourse.code : "course").replace(
+      /[^A-Za-z0-9]+/g,
+      "_",
+    );
+    return code + "_Attendance_Report";
+  }
+
+  function initSemesterReport() {
+    const csvBtn = document.getElementById("reportCsvBtn");
+    const pdfBtn = document.getElementById("reportPdfBtn");
+    if (csvBtn) {
+      csvBtn.addEventListener("click", () => {
+        if (!lastSemesterReport || !lastSemesterReport.sessions) {
+          toast.warning("Run at least one class before downloading a report.");
+          return;
+        }
+        downloadTextFile(
+          reportFileBase() + ".csv",
+          semesterCsv(lastSemesterReport),
+          "text/csv;charset=utf-8",
+        );
+        toast.success("Report downloaded as CSV. Open it in Excel or Google Sheets.");
+      });
+    }
+    if (pdfBtn) {
+      pdfBtn.addEventListener("click", () => {
+        if (!lastSemesterReport || !lastSemesterReport.sessions) {
+          toast.warning("Run at least one class before downloading a report.");
+          return;
+        }
+        // "PDF" via the browser's own print dialog: no dependency, selectable
+        // text, and it renders correctly on a phone as well as a laptop.
+        const win = window.open("", "_blank");
+        if (!win) {
+          toast.warning("Allow pop-ups for this site to save a PDF, or use Download CSV instead.");
+          return;
+        }
+        win.document.write(semesterPrintHtml(lastSemesterReport, activeCourse || {}));
+        win.document.close();
+        setTimeout(() => {
+          try {
+            win.focus();
+            win.print();
+          } catch (_) {}
+        }, 350);
+      });
+    }
+  }
+
+  // 📋 The report is a staff-only view: it lists every student's percentage,
+  // which is exactly the sort of thing a student must not be able to read from
+  // the client. The data is already gated by the rules, but hiding the panel
+  // too means a student never sees a control they cannot use.
+  function syncSemesterReportPanel() {
+    const panel = document.getElementById("semesterReport");
+    if (!panel) return;
+    const isStaff = Boolean(
+      activeCourse &&
+        currentUser &&
+        (activeCourse.repUid === currentUser.uid ||
+          (activeCourse.members || []).some(
+            (m) =>
+              m.uid === currentUser.uid &&
+              (m.role === "assistant" || m.role === "session_assistant"),
+          )),
+    );
+    panel.classList.toggle("hidden", !isStaff);
+    if (isStaff) renderSemesterReport();
+  }

@@ -891,6 +891,50 @@
 
   </main>
 
+  <!-- SEMESTER ATTENDANCE REPORT (Phase 5) ----------------------------
+       The document a Head of Department actually asks for: every class
+       held so far and each student's percentage. CSV for a spreadsheet,
+       "Save as PDF" for the print-ready version. -->
+  <section id="semesterReport" class="container hidden">
+    <div class="adviser-head">
+      <div>
+        <h2 class="adviser-h2">Semester Attendance Report</h2>
+        <p class="adviser-sub" id="reportSub">Every class held so far, with each student's percentage.</p>
+      </div>
+      <div class="adviser-row">
+        <button type="button" class="btn btn-outline" id="reportCsvBtn">
+          <i data-lucide="table"></i> Download CSV</button>
+        <button type="button" class="btn" id="reportPdfBtn">
+          <i data-lucide="file-text"></i> Save as PDF</button>
+      </div>
+    </div>
+
+    <div class="adviser-stats">
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Classes held</span>
+        <strong class="adviser-stat-value" id="reportSessions">0</strong>
+      </div>
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Students</span>
+        <strong class="adviser-stat-value" id="reportStudents">0</strong>
+      </div>
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Average attendance</span>
+        <strong class="adviser-stat-value" id="reportAverage">0%</strong>
+      </div>
+    </div>
+
+    <div class="adviser-card">
+      <div class="adviser-preview-scroll">
+        <table class="report-table">
+          <thead><tr><th>Student</th><th class="num">Matric</th>
+          <th class="num">Attended</th><th class="num">%</th></tr></thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div>
+      <p class="adviser-foot" id="reportNote"></p>
+    </div>
+  </section>
   <!-- ADVISER DASHBOARD (Phase 4) -------------------------------------
        Deliberately minimal: two actions (import a roster, name the rep) plus a
        read-only summary. An adviser is a gate, not a manager. Hidden by default
@@ -1331,7 +1375,8 @@
     <span id="drawerTabBadge" class="drawer-tab-badge hidden">0</span>
   </button>
 
-  <script type="module" src="app.js"></script>
+    <script src="/utils/report.js"></script>
+<script type="module" src="app.js"></script>
   <script>
     // Initialize Lucide icons across the entire DOM once loaded
     document.addEventListener("DOMContentLoaded", () => {

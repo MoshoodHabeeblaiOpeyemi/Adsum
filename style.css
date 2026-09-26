@@ -299,8 +299,8 @@ html { color-scheme: light; }
   align-items: center;
   gap: 20px;
   animation:
-    splashBrandIn 1.1s var(--ease-out-expo) both,
-    splashBreathe 4.5s 1.3s ease-in-out infinite;
+    splashBrandIn 1.5s var(--ease-out-expo) both,
+    splashBreathe 5.5s 1.9s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -354,7 +354,7 @@ html { color-scheme: light; }
   font-size: 0.95rem;
   color: var(--text-muted);
   animation: splashHintPulse 2s ease-in-out infinite;
-  animation-delay: 1.4s;
+  animation-delay: 1.9s;
   opacity: 0;
 }
 
@@ -1805,3 +1805,12 @@ input:focus::placeholder {
 #repControls.hotspot-view #hotspotsBtn {
   display: none !important;
 }
+/* Semester report table. Shares the card look so the rep screen reads as one surface. */
+.report-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.report-table th, .report-table td {
+  text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--card-border);
+}
+.report-table th { color: var(--text-muted); font-weight: 700; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.8px; }
+.report-table .num { text-align: right; }
+.report-table tbody tr:last-child td { border-bottom: none; }
