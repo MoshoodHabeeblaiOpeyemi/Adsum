@@ -100,6 +100,14 @@ Verified by **identity evidence**, not by a human vouching for a human:
 `adviserSlots/adviser_{INST}_{DEPT}_{LEVEL}` (one-adviser-per-level claim) ·
 `api/verification.js` (7th function; the Hobby cap is 12, so it fits).
 
+`api/onboarding.js` (8th function) completes the loop: the profile write moves
+off the client, so `role` / `isAdviser` / `verificationStatus` are server-owned
+from the very first write rather than merely pinned on update. The endpoint is
+`POST /api/onboarding?action=createProfile`; it claims the rep slot in the SAME
+transaction as the profile (closing the check-then-act race the client had) and,
+for advisers, mints and mails the first 6-digit code so signup is the only step
+the user has to complete.
+
 ### Do these first, before any code
 
 1. **Privacy + retention doc.** NIN data and a selfie are the most sensitive material this

@@ -31,7 +31,7 @@ cached service worker.
 
 | Collection | Doc ID | Written by | Purpose |
 | --- | --- | --- | --- |
-| `users` | `{uid}` | client (self, constrained) | Profile: `uid`, `matric`, `isRep`, `institution`, `department`, `level`, plus `role` / `isAdviser` / `verificationStatus` / `verifiedAt` / `verificationMethod`, which only the backend may ever change |
+| `users` | `{uid}` | **backend only** (`api/onboarding.js`) | Profile: `uid`, `matric`, `isRep`, `institution`, `department`, `level`, plus `role` / `isAdviser` / `verificationStatus` / `verifiedAt` / `verificationMethod`, which only the backend may ever change |
 | `users/{uid}/fcmTokens` | push token | client (self) | Device registrations for emergency alerts |
 | `users/{uid}/notifications` | auto | **backend only** | "Flagged absent — see your Rep" alerts. Client may read, never write |
 | `courses` | `{courseId}` | client (create, `validCourseFields()`) | `code`, `repUid`, `institution`, `department`, `level`, `enrolled[]`, `assistants[]` |
@@ -149,7 +149,7 @@ even if every automated control were defeated.
 | Concern | Where |
 | --- | --- |
 | Serverless functions | `api/*.js` — Vercel, Node runtime |
-| Function count | 7 (`account`, `approval`, `attendance`, `course`, `semester`, `session`, `verification`). Vercel Hobby allows 12, so there is headroom |
+| Function count | 8 (`account`, `approval`, `attendance`, `course`, `onboarding`, `semester`, `session`, `verification`). Vercel Hobby allows 12, so there is headroom |
 | Rules deploy | `.github/workflows/deploy-firestore-rules.yml` → `firestore deploy --only firestore:rules` |
 | Cache policy | `vercel.json` |
 | Env | Vercel project settings — 5 vars, see [`.env.example`](../.env.example) |
