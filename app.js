@@ -6233,38 +6233,16 @@ if (mobileMenuBtn && navLinks) {
     generatePinBtn.addEventListener("click", async () => {
       if (!activeCourse) return;
 
-      // 🔒 The FIRST PIN of a session is also generated server-side.
+      // 🔒 No PIN is generated here.
       //
-      // Rotation moved to the server in Phase 5, but the initial PIN was still
-      // `Math.floor(1000 + Math.random() * 9000)` here — which is not a CSPRNG,
-      // never yields a leading zero, and (because it is client-supplied) would be
-      // trusted by the server exactly like the old rotation timestamp was. The
-      // endpoint returns a fresh 4-digit PIN with serverTimestamp(); we write it
-      // into the secret doc as part of starting the session, and the SERVER
-      // stamps the rotation time.
-      let serverPin = null;
-      try {
-        const idToken = await auth.currentUser.getIdToken();
-        const res = await fetch("/api/session?action=rotatePin", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ courseId: activeCourse.id }),
-        });
-        const data = await res.json();
-        // 403/404 here is expected on the very first click of a brand-new
-        // session (no live session exists yet), so fall back rather than block
-        // the rep from starting a class.
-        if (res.ok && data.pin) serverPin = data.pin;
-      } catch (_) {
-        // Offline or endpoint down: fall through to a local PIN so the rep can
-        // still teach. It will be superseded by the next server rotation, and
-        // the server treats an unreadable rotation time as EXPIRED rather than
-        // trusting it.
-      }
-      const randomPin = serverPin || Math.floor(1000 + Math.random() * 9000).toString();
+      // This handler used to mint the first PIN with
+      // `Math.floor(1000 + Math.random() * 9000)` and pass it down to
+      // createSession(). Not a CSPRNG, no leading zeros, and — worse — it was
+      // a value the SERVER then trusted, which is precisely the hole Phase 5
+      // closed for rotation. An earlier revision asked rotatePin for the first
+      // PIN, but that endpoint needs a live session and so 403s on the opening
+      // click. `createSession` now calls `?action=startSession`, where the
+      // server picks the PIN and stamps the clock for the whole opening move.
       const managerMatric = normalizeMatric(
         currentUser ? currentUser.matric : "REP-001",
       );
@@ -6340,7 +6318,7 @@ if (mobileMenuBtn && navLinks) {
       // No GPS fence. Where the code lives — projector or hotspot students —
       // is the rep's pre-set choice in the setup card.
       if (mode === "qr_mode") {
-        await createSession(randomPin, managerMatric, {
+        await createSession(managerMatric, {
           mode: "no_gps",
           qrMode: true,
         });
@@ -6358,7 +6336,7 @@ if (mobileMenuBtn && navLinks) {
 
       // ⚡ Emergency: PIN + Device Lock, no GPS at all.
       if (mode === "pin_only") {
-        await createSession(randomPin, managerMatric, { mode: "no_gps" });
+        await createSession(managerMatric, { mode: "no_gps" });
         return;
       }
 
@@ -6393,7 +6371,7 @@ if (mobileMenuBtn && navLinks) {
             if (!proceed) return;
           }
 
-          await createSession(randomPin, managerMatric, {
+          await createSession(managerMatric, {
             mode: "live_gps",
             lat: pos.coords.latitude,
             lon: pos.coords.longitude,
@@ -6406,7 +6384,7 @@ if (mobileMenuBtn && navLinks) {
             "Could not lock your live GPS — falling back to PIN-only. Confirm on the next dialog.",
             "GPS Unavailable",
           );
-          await createSession(randomPin, managerMatric, { mode: "no_gps" });
+          await createSession(managerMatric, { mode: "no_gps" });
         } finally {
           generatePinBtn.disabled = false;
           renderPortalState();
@@ -6427,7 +6405,7 @@ if (mobileMenuBtn && navLinks) {
           typeof hall.lat === "number" &&
           typeof hall.lon === "number"
         ) {
-          await createSession(randomPin, managerMatric, {
+          await createSession(managerMatric, {
             mode: "preset_hall",
             name: hall.name,
             lat: hall.lat,
@@ -6449,10 +6427,14 @@ if (mobileMenuBtn && navLinks) {
     });
   }
 
-  async function createSession(pin, managerMatric, locData = {}) {
+  // The PIN is no longer a parameter: the server chooses it in startSession.
+  // Everything passed here is context the server cannot infer for itself.
+  async function createSession(managerMatric, locData = {}) {
     if (!activeCourse || !activeCourse.id) return;
 
     const sessionMode = locData.mode || "no_gps";
+    // The server normalises and re-validates this; it is a hint, not a control.
+    const locationMode = sessionMode;
 
     if (sessionMode === "no_gps") {
       const proceed = await showConfirm({
@@ -6470,83 +6452,85 @@ if (mobileMenuBtn && navLinks) {
       if (!proceed) return;
     }
 
-    const now = getAccurateNow();
-    const sessionDurationSeconds = 300; // 5 minutes total session duration
-    // ⏱️ 10s rotation: a relayed/screenshot code is stale almost instantly —
-    // the whole anti-WhatsApp-relay engine. Grace on the server drops to 2s.
-    const pinRotationIntervalSeconds = 10; // PIN changes every 10 seconds
-    const expiresAt = now + sessionDurationSeconds * 1000;
-    const locationMode = locData.mode || "no_gps";
+    // 🔒 SESSION CREATION IS SERVER-AUTHORITATIVE (Phase 5).
+    //
+    // This used to write `session/live` and `session/secret` from the rep's
+    // browser, including a client-generated PIN and a client-stamped
+    // `pinRotationTime`. That is the same forgeable clock the rotation fix
+    // removed everywhere else, and the FIRST PIN is precisely the one a relay
+    // attacker wants to capture — it is on screen for the first 10 seconds of
+    // every class.
+    //
+    // The server now chooses the PIN with crypto.randomInt and stamps
+    // serverTimestamp(). The client sends only what the server cannot know: the
+    // hall, the mode, and the rep's own matric.
+    //
+    // If the call fails there is deliberately NO local fallback. A session whose
+    // PIN the server never generated is exactly the hole this closes, so failing
+    // loudly is correct: the rep sees an error instead of unknowingly running an
+    // unrotatable class.
+    let started;
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/session?action=startSession", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          courseId: activeCourse.id,
+          managerMatric,
+          lat: typeof locData.lat === "number" ? locData.lat : null,
+          lon: typeof locData.lon === "number" ? locData.lon : null,
+          radius: typeof locData.radius === "number" ? locData.radius : 80,
+          hallName: locData.name || null,
+          durationSeconds: 300,
+          locationMode: locationMode,
+          qrMode: locData.qrMode === true,
+        }),
+      });
+      started = await res.json();
+      if (!res.ok) {
+        throw new Error(started.error || "Could not start the session.");
+      }
+    } catch (error) {
+      console.error("Failed to start session:", error);
+      toast.error(error.message, "Session Not Started");
+      toast.info(
+        "The PIN is generated by the server, so the session cannot start offline. Check your connection and try again.",
+      );
+      renderPortalState();
+      return;
+    }
 
-    const livePayload = {
-      active: true,
-      expiresAt: expiresAt,
-      durationSeconds: sessionDurationSeconds,
-      pinRotationInterval: pinRotationIntervalSeconds,
-      locationMode: locationMode,
-      qrMode: locData.qrMode === true,
-      hallName: locData.name || null,
-      // 🎯 Server-anchored clock: every device receiving this snapshot knows
-      // true server time (write happened "just now"), which re-syncs the
-      // countdown on phones with wrong clocks — no more 1020s countdowns.
-      generatedAt: serverTimestamp(),
-      anchorAccuracy: typeof locData.accuracy === "number" ? locData.accuracy : null,
-    };
-
-    const secretPayload = {
-      pin: pin,
+    // Mirror the server's response into local state for the countdown. Every
+    // value here came from the server — nothing is computed on the client.
+    activeCourse.activeSession = {
+      pin: started.pin,
       previousPin: null,
-      pinRotationTime: now,
-      locationMode: locationMode,
+      pinRotationTime: started.pinRotationTime,
+      expiresAt: started.expiresAt,
+      expired: false,
+      attendees: [started.managerMatric],
+      locationMode: started.locationMode,
       qrMode: locData.qrMode === true,
       lat: typeof locData.lat === "number" ? locData.lat : null,
       lon: typeof locData.lon === "number" ? locData.lon : null,
-      radius: locData.radius || 80,
-      attendees: [managerMatric],
-      // 📡 Transparency: the archive records WHO was auto-marked as the
-      // session creator, so the "Present" list always shows scanned vs
-      // vouched-for.
-      managerMatric: managerMatric,
+      radius: typeof locData.radius === "number" ? locData.radius : 80,
+      hallName: locData.name || null,
+      sessionDuration: started.sessionDuration,
+      pinRotationInterval: started.pinRotationInterval,
     };
 
-    activeCourse.activeSession = {
-      pin: pin,
-      previousPin: null,
-      pinRotationTime: now,
-      expiresAt: expiresAt,
-      expired: false,
-      attendees: [managerMatric],
-      locationMode: locationMode,
-      qrMode: locData.qrMode === true,
-      lat: secretPayload.lat,
-      lon: secretPayload.lon,
-      radius: secretPayload.radius,
-      hallName: locData.name || null,
-      sessionDuration: sessionDurationSeconds,
-      pinRotationInterval: pinRotationIntervalSeconds,
-    };
+    // Keep this device's clock anchored to the server so the countdown is right
+    // even on a phone with a wrong clock.
+    if (typeof started.serverNow === "number") {
+      serverClockSkewMs = started.serverNow - Date.now();
+    }
 
     startSessionTimer();
     renderPortalState();
-
-    try {
-      await Promise.all([
-        setDoc(
-          doc(db, "courses", activeCourse.id, "session", "live"),
-          livePayload,
-        ),
-        setDoc(
-          doc(db, "courses", activeCourse.id, "session", "secret"),
-          secretPayload,
-        ),
-      ]);
-      await updateCourseInFirestore();
-    } catch (error) {
-      console.error("Failed to publish session:", error);
-      toast.error(
-        "PIN is showing on this device, but it may not have reached students. Check your connection and generate again.",
-      );
-    }
   }
 
   function startSessionTimer() {

@@ -268,14 +268,23 @@ service cloud.firestore {
         allow read: if signedIn() && (
           isCourseStaff(courseId) || isCourseMember(courseId)
         );
-        allow create, update, delete: if isCourseStaff(courseId);
+        // 🔒 SESSION DOCS ARE BACKEND-ONLY (Phase 5). The rep used to write both
+        // session documents from the browser - the PIN and a client-stamped
+        // pinRotationTime included, which is the same forgeable clock the
+        // rotation fix removed. The first PIN of a session is the one a relay
+        // attacker most wants. api/session.js?action=startSession creates both
+        // and ?action=rotatePin mints the next one, on the Admin SDK.
+        // Reads are unchanged: students need the PIN and the countdown.
+        allow create, update, delete: if false;
       }
 
       match /session/secret {
         // Assistants need to read the PIN during a live session.
         // Write is rep-only (they generate the session).
         allow read: if isCourseStaff(courseId);
-        allow write: if isCourseRep(courseId);
+        // 🔒 A rep who could write this could set both a PIN of their
+        // choosing and a rotation time of their choosing.
+        allow write: if false;
       }
 
       match /attendance/{attendanceId} {
