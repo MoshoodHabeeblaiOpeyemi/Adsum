@@ -161,6 +161,19 @@ async function handleImportRoster(req, res, decoded) {
       chosenRepUid: repSurvives ? previous.chosenRepUid || null : null,
       chosenRepName: repSurvives ? previous.chosenRepName || null : null,
       chosenRepAt: repSurvives ? previous.chosenRepAt || null : null,
+      // A re-import is a roster change, so it belongs in the same trail. The
+      // rep history survives a re-import — dropping a student is not the same
+      // as forgetting who the rep was.
+      repChanges: appendRepChange(previous?.repChanges, {
+        action: "reimport",
+        previousMatric: previous?.chosenRepMatric || null,
+        previousName: previous?.chosenRepName || null,
+        matric: repSurvives ? previous.chosenRepMatric : null,
+        name: repSurvives ? previous.chosenRepName || null : null,
+        count: newCount,
+        at: FieldValue.serverTimestamp(),
+        by: decoded.uid,
+      }),
       importedAt: now,
       previousCount,
     });
@@ -182,6 +195,17 @@ async function handleImportRoster(req, res, decoded) {
   }
 }
 
+
+/** Cap the rep-change audit trail. Firestore bills by document size, and a
+ *  long-lived roster must not grow without limit. */
+const REP_CHANGE_LIMIT = 50;
+
+/** Append to the audit trail, newest last, trimming the oldest when full. */
+function appendRepChange(existing, entry) {
+  const list = Array.isArray(existing) ? existing.slice() : [];
+  list.push(entry);
+  return list.slice(-REP_CHANGE_LIMIT);
+}
 
 /**
  * Name ONE rep for this level, chosen by the adviser from the imported roster.
@@ -211,11 +235,22 @@ async function handleChooseRep(req, res, decoded) {
         const matrics = Array.isArray(roster.matrics) ? roster.matrics : [];
 
         if (clear) {
+          // Standing the rep down is a CHANGE like any other, so it is logged
+          // the same way — otherwise "who was rep in March?" is unanswerable.
           tx.update(rosterRef, {
             chosenRepMatric: null,
             chosenRepUid: null,
             chosenRepName: null,
             chosenRepAt: null,
+            repChanges: appendRepChange(roster.repChanges, {
+              action: "cleared",
+              previousMatric: roster.chosenRepMatric || null,
+              previousName: roster.chosenRepName || null,
+              matric: null,
+              name: null,
+              at: FieldValue.serverTimestamp(),
+              by: decoded.uid,
+            }),
           });
           return;
         }
@@ -227,12 +262,28 @@ async function handleChooseRep(req, res, decoded) {
         if (!matrics.includes(wanted)) throw new Error("NOT_ON_ROSTER");
 
         const student = (Array.isArray(roster.students) ? roster.students : []).find((s) => s.matric === wanted);
+        const repName = (student && student.name) || roster.chosenRepName || null;
+        // Replacing a rep is allowed but LOGGED, with the outgoing rep named.
+        // The old rep is not edited here: they keep their account and simply
+        // stop being the rep, which is what "becomes a regular student" means.
+        // Their role is demoted by the same transaction via `role: "student"`
+        // in Phase 5 when the account is linked, not here.
+        const isReplacement = Boolean(roster.chosenRepMatric) && roster.chosenRepMatric !== wanted;
         tx.update(rosterRef, {
           chosenRepMatric: wanted,
-          chosenRepName: (student && student.name) || roster.chosenRepName || null,
+          chosenRepName: repName,
           // Stays null until that student signs up; Phase 5 links the account.
           chosenRepUid: null,
           chosenRepAt: FieldValue.serverTimestamp(),
+          repChanges: appendRepChange(roster.repChanges, {
+            action: isReplacement ? "replaced" : roster.chosenRepMatric ? "unchanged" : "chosen",
+            previousMatric: isReplacement ? roster.chosenRepMatric : null,
+            previousName: isReplacement ? roster.chosenRepName || null : null,
+            matric: wanted,
+            name: repName,
+            at: FieldValue.serverTimestamp(),
+            by: decoded.uid,
+          }),
         });
       });
     } catch (txErr) {
@@ -300,6 +351,8 @@ async function handleGetRoster(req, res, decoded) {
       chosenRepMatric: roster.chosenRepMatric || null,
       chosenRepName: roster.chosenRepName || null,
       chosenRepUid: roster.chosenRepUid || null,
+      // The rep-change trail, newest last. Bounded by REP_CHANGE_LIMIT on write.
+      repChanges: Array.isArray(roster.repChanges) ? roster.repChanges.slice(-20) : [],
       lastImportAt: roster.importedAt || null,
     });
   } catch (error) {

@@ -1927,6 +1927,8 @@ if (mobileMenuBtn && navLinks) {
         // G1: seed the server-minted device cookie (fire-and-forget) so
         // check-ins carry an unforgeable identity anchor.
         seedServerDevice();
+        // Phase 4: reveal the roster dashboard only for a VERIFIED adviser.
+        syncAdviserDashboard();
       } else {
         console.warn("Ghost user blocked: No Firestore profile found.");
         toast.error(
@@ -1953,8 +1955,15 @@ if (mobileMenuBtn && navLinks) {
 
       stopCourseListener();
       checkAuth();
+      // Phase 4: the roster dashboard is adviser-only, so it goes on sign-out.
+      syncAdviserDashboard();
     }
   };
+
+  // Phase 4: wire the dashboard's controls once the DOM is available. The
+  // handlers themselves re-check authorisation on every call, so a panel that
+  // is somehow left visible still cannot write anything.
+  initAdviserDashboard();
 
   onAuthStateChanged(auth, (user) => {
     if (isCreatingAccount) return; // 🛑 Ignore during active registration sequence!
@@ -7744,3 +7753,386 @@ if (mobileMenuBtn && navLinks) {
         activeStudentView !== "reports",
       );
   }
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// ADVISER DASHBOARD (Phase 4)
+// ═══════════════════════════════════════════════════════════════════════
+// Two actions, one summary. An adviser is a gate, not a manager.
+//
+// 🔒 The gate below is the WHOLE point of this section. It requires BOTH
+// role: "level_anchor" AND verificationStatus: "verified", mirroring
+// isVerifiedAdviser() in utils/roles.js and api/roster.js. Testing
+// role === "adviser" instead would reveal the roster to every UNVERIFIED
+// applicant, so it must never be written that way.
+
+function isVerifiedAdviser(profile) {
+  return Boolean(
+    profile &&
+      profile.role === "level_anchor" &&
+      profile.verificationStatus === "verified"
+  );
+}
+
+let adviserRoster = null;      // last loaded roster, for the rep <select>
+let adviserPendingCsv = null; // parsed, NOT yet committed to the server
+
+function adviserEls() {
+  return {
+    section: document.getElementById("adviserDashboard"),
+    scope: document.getElementById("adviserScope"),
+    count: document.getElementById("rosterCount"),
+    rep: document.getElementById("rosterRep"),
+    imported: document.getElementById("rosterImported"),
+    file: document.getElementById("rosterFile"),
+    pick: document.getElementById("rosterPickBtn"),
+    confirm: document.getElementById("rosterConfirmBtn"),
+    cancel: document.getElementById("rosterCancelBtn"),
+    msg: document.getElementById("rosterMsg"),
+    preview: document.getElementById("rosterPreview"),
+    repSelect: document.getElementById("repSelect"),
+    repSave: document.getElementById("repSaveBtn"),
+    repClear: document.getElementById("repClearBtn"),
+    logWrap: document.getElementById("repLogWrap"),
+    log: document.getElementById("repLog"),
+  };
+}
+
+function adviserMessage(kind, html) {
+  const el = adviserEls().msg;
+  if (!el) return;
+  el.className = "adviser-msg " + kind;
+  // Callers pass server-supplied strings, so everything is escaped here and
+  // never injected raw.
+  el.innerHTML = html;
+  el.classList.remove("hidden");
+}
+
+function adviserClearMessage() {
+  const el = adviserEls().msg;
+  if (el) { el.classList.add("hidden"); el.innerHTML = ""; }
+}
+
+async function adviserApi(action, body) {
+  if (!auth.currentUser) throw new Error("Not signed in.");
+  const idToken = await auth.currentUser.getIdToken();
+  const res = await fetch(`/api/roster?action=${encodeURIComponent(action)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(body || {}),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (_) { data = {}; }
+  if (!res.ok) {
+    const err = new Error(data.error || "Something went wrong.");
+    err.code = data.code;
+    err.status = res.status;
+    err.payload = data;
+    throw err;
+  }
+  return data;
+}
+
+function renderAdviserLog(changes) {
+  const { log, logWrap } = adviserEls();
+  if (!log || !logWrap) return;
+  if (!Array.isArray(changes) || !changes.length) { logWrap.classList.add("hidden"); return; }
+  // Newest first reads better in a history list.
+  log.innerHTML = changes
+    .slice()
+    .reverse()
+    .map((c) => {
+      const when = c.at ? formatAdviserDate(c.at) : "";
+      const who = c.name || c.matric || "someone";
+      let verb = "Chose";
+      if (c.action === "replaced") verb = "Replaced with";
+      else if (c.action === "cleared") verb = "Removed";
+      else if (c.action === "reimport") verb = "Re-imported roster (rep kept)";
+      if (c.action === "reimport") {
+        return `<li>${when} &mdash; re-imported ${escapeHTML(String(c.count || 0))} students. Rep: <b>${escapeHTML(c.matric || "none")}</b></li>`;
+      }
+      const dropped = c.previousMatric
+        ? ` (was ${escapeHTML(c.previousMatric)})`
+        : "";
+      return `<li>${when} &mdash; ${verb} <b>${escapeHTML(who)}</b>${dropped}</li>`;
+    })
+    .join("");
+  logWrap.classList.remove("hidden");
+}
+
+function formatAdviserDate(value) {
+  try {
+    const d = value && typeof value.toDate === "function" ? value.toDate() : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  } catch (_) {
+    return "";
+  }
+}
+
+function renderAdviserPreview(preview, meta) {
+  const { preview: box } = adviserEls();
+  if (!box) return;
+  if (!preview || !preview.length) {
+    box.classList.add("hidden"); box.innerHTML = ""; return;
+  }
+  // The rows came from a file the adviser uploaded and were echoed back by the
+  // server, so every value is escaped before it reaches the DOM.
+  const rows = preview
+    .slice(0, 50)
+    .map(
+      (st) =>
+        `<tr><td>${escapeHTML(st.matric)}</td><td>${escapeHTML(st.name || "-")}</td>` +
+        `<td>${escapeHTML(st.email || "-")}</td></tr>`
+    )
+    .join("");
+  const more = preview.length > 50 ? `<p class="adviser-foot">+ ${preview.length - 50} more</p>` : "";
+  box.innerHTML =
+    `<div class="adviser-preview-head">Preview &mdash; ${escapeHTML(String(meta.total))} students ready</div>` +
+    `<div class="adviser-preview-scroll"><table><thead><tr><th>Matric</th><th>Name</th><th>Email</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></div>${more}`;
+  box.classList.remove("hidden");
+}
+
+function renderAdviserRoster(data) {
+  const { count, rep, imported, repSelect, repSave, repClear } = adviserEls();
+  adviserRoster = data;
+
+  if (count) count.textContent = String(data.count || 0);
+  if (rep) {
+    rep.textContent = data.chosenRepName
+      ? data.chosenRepName + " (" + data.chosenRepMatric + ")"
+      : data.chosenRepMatric || "Not chosen";
+  }
+  if (imported) {
+    const when = data.lastImportAt ? formatAdviserDate(data.lastImportAt) : "";
+    imported.textContent = when || (data.exists ? "Unknown" : "Never");
+  }
+
+  if (repSelect) {
+    repSelect.innerHTML = "";
+    const students = Array.isArray(data.students) ? data.students : [];
+    if (!students.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = data.exists ? "No students on this roster" : "Import a roster first";
+      repSelect.appendChild(opt);
+      repSelect.disabled = true;
+    } else {
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = "Select a student...";
+      repSelect.appendChild(blank);
+      for (const st of students) {
+        const opt = document.createElement("option");
+        opt.value = st.matric;
+        opt.textContent = (st.name || st.matric) + " - " + st.matric;
+        if (st.matric === data.chosenRepMatric) opt.selected = true;
+        repSelect.appendChild(opt);
+      }
+      repSelect.disabled = false;
+    }
+  }
+  if (repSave) repSave.disabled = true;
+  if (repClear) repClear.classList.toggle("hidden", !data.chosenRepMatric);
+  renderAdviserLog(data.repChanges);
+}
+
+async function loadAdviserRoster() {
+  const el = adviserEls();
+  if (!el.section || el.section.classList.contains("hidden")) return;
+  try {
+    const data = await adviserApi("getRoster", {});
+    renderAdviserRoster(data);
+  } catch (err) {
+    if (err.code === "NOT_VERIFIED_ADVISER") {
+      // The server disagreed with our gate. Hide the panel rather than leave a
+      // dead shell on screen.
+      el.section.classList.add("hidden");
+      return;
+    }
+    adviserMessage("err", escapeHTML(err.message));
+  }
+}
+
+async function handleRosterFileChosen(file) {
+  const el = adviserEls();
+  if (!file) return;
+  adviserClearMessage();
+  if (file.size > 2 * 1024 * 1024) {
+    adviserMessage("err", "That file is larger than 2&nbsp;MB. Please upload a plain CSV.");
+    return;
+  }
+  let csv;
+  try { csv = await file.text(); } catch (_) {
+    adviserMessage("err", "Could not read that file. Please export it as CSV and try again.");
+    return;
+  }
+
+  try {
+    // Dry run: the server parses and counts WITHOUT writing. The adviser sees
+    // the real numbers and confirms. Picking a file saves nothing.
+    const data = await adviserApi("importRoster", { csv });
+    adviserPendingCsv = csv;
+    renderAdviserPreview(data.preview, data);
+    const bits = [data.total + " students found."];
+    if (data.duplicates) bits.push(data.duplicates + " already on the roster");
+    if (data.added) bits.push(data.added + " new");
+    if (data.replaced) bits.push("replacing " + data.replaced);
+    let html = escapeHTML(bits.join(" | ")) + " Nothing is saved yet.";
+    if (Array.isArray(data.warnings) && data.warnings.length) {
+      html += "<ul>" + data.warnings.slice(0, 6).map((w) => "<li>" + escapeHTML(w) + "</li>").join("") + "</ul>";
+    }
+    adviserMessage("ok", html);
+    if (el.confirm) el.confirm.classList.remove("hidden");
+    if (el.cancel) el.cancel.classList.remove("hidden");
+  } catch (err) {
+    adviserPendingCsv = null;
+    if (err.code === "INVALID_CSV" && err.payload) {
+      const items = (err.payload.errors || [])
+        .map((e) => "<li>Line " + e.line + ": " + escapeHTML(e.message) + "</li>")
+        .join("");
+      adviserMessage("err", escapeHTML(err.message) + "<ul>" + items + "</ul>");
+    } else {
+      adviserMessage("err", escapeHTML(err.message));
+    }
+  }
+}
+
+async function confirmRosterImport() {
+  const el = adviserEls();
+  if (!adviserPendingCsv) return;
+  if (el.confirm) {
+    el.confirm.disabled = true;
+    el.confirm.textContent = "Saving...";
+  }
+  try {
+    const data = await adviserApi("importRoster", { csv: adviserPendingCsv, commit: true });
+    adviserPendingCsv = null;
+    if (el.preview) { el.preview.classList.add("hidden"); el.preview.innerHTML = ""; }
+    if (el.confirm) el.confirm.classList.add("hidden");
+    if (el.cancel) el.cancel.classList.add("hidden");
+    if (el.file) el.file.value = "";
+    let msg = data.total + " students imported.";
+    if (data.repDropped) {
+      msg += " Your previous rep is no longer on this roster, so the rep role was cleared. Choose a new rep below.";
+    }
+    adviserMessage("ok", escapeHTML(msg));
+    await loadAdviserRoster();
+  } catch (err) {
+    adviserMessage("err", escapeHTML(err.message));
+  } finally {
+    if (el.confirm) { el.confirm.disabled = false; el.confirm.textContent = "Confirm import"; }
+  }
+}
+
+async function saveChosenRep(matric) {
+  const el = adviserEls();
+  const students = (adviserRoster && adviserRoster.students) || [];
+  const picked = students.find((st) => st.matric === matric);
+  const current = (adviserRoster && adviserRoster.chosenRepMatric) || "";
+  const isReplacement = Boolean(current) && current !== matric;
+  // A rep change is a real act of authority, so it is confirmed explicitly, and
+  // a replacement states plainly who loses the role.
+  const ok = await showConfirm({
+    title: isReplacement ? "Replace the course rep?" : "Name this course rep?",
+    message: isReplacement
+    ? (adviserRoster.chosenRepName || current) +
+      " currently holds the rep role and will go back to being a regular student.",
+    : "Only the student you name can run attendance for this level. Nobody else can claim it by signing up first.",
+    okText: isReplacement ? "Yes, replace the rep" : "Yes, name this rep",
+    cancelText: "Cancel",
+    danger: isReplacement,
+    icon: isReplacement ? "🔄" : "🎓",
+    details: [
+      { label: "Student", value: (picked && (picked.name || picked.matric)) || matric },
+      { label: "Matric", value: matric },
+    ],
+  });
+  if (!ok) {
+    if (el.repSelect) el.repSelect.value = current;
+    if (el.repSave) el.repSave.disabled = true;
+    return;
+  }
+  try {
+    await adviserApi("chooseRep", { matric });
+    adviserMessage("ok", escapeHTML((picked && picked.name) || matric) + " is now the course rep for this level.");
+    await loadAdviserRoster();
+  } catch (err) {
+    adviserMessage("err", escapeHTML(err.message));
+    await loadAdviserRoster();
+  }
+}
+
+async function clearChosenRep() {
+  if (!adviserRoster || !adviserRoster.chosenRepMatric) return;
+  const ok = await showConfirm({
+    title: "Remove the course rep?",
+    message: (adviserRoster.chosenRepName || adviserRoster.chosenRepMatric) +
+      " will no longer be the rep and will go back to being a regular student. No one can run attendance for this level until you name a new rep.",
+    okText: "Yes, remove the rep",
+    cancelText: "Cancel",
+    danger: true,
+    icon: "⚠️",
+  });
+  if (!ok) return;
+  try {
+    await adviserApi("chooseRep", { clear: true });
+    adviserMessage("ok", "The rep role has been removed. Choose a new rep when you are ready.");
+    await loadAdviserRoster();
+  } catch (err) {
+    adviserMessage("err", escapeHTML(err.message));
+  }
+}
+
+function initAdviserDashboard() {
+  const el = adviserEls();
+  if (!el.section || el.section.dataset.wired === "1") return;
+  el.section.dataset.wired = "1";
+  if (el.pick) el.pick.addEventListener("click", () => { if (el.file) el.file.click(); });
+  if (el.file) {
+    el.file.addEventListener("change", (e) => {
+      handleRosterFileChosen(e.target.files && e.target.files[0]);
+    });
+  }
+  if (el.confirm) el.confirm.addEventListener("click", confirmRosterImport);
+  if (el.cancel) {
+    el.cancel.addEventListener("click", () => {
+      adviserPendingCsv = null;
+      if (el.confirm) el.confirm.classList.add("hidden");
+      el.cancel.classList.add("hidden");
+      if (el.preview) el.preview.classList.add("hidden");
+      if (el.msg) el.msg.classList.add("hidden");
+      if (el.file) el.file.value = "";
+    });
+  }
+  if (el.repSelect) {
+    el.repSelect.addEventListener("change", () => {
+      if (el.repSave) el.repSave.disabled = !el.repSelect.value;
+    });
+  }
+  if (el.repSave) {
+    el.repSave.addEventListener("click", () => {
+      if (el.repSelect && el.repSelect.value) saveChosenRep(el.repSelect.value);
+    });
+  }
+  if (el.repClear) el.repClear.addEventListener("click", clearChosenRep);
+}
+
+/** Show the dashboard only to a VERIFIED adviser, and only when signed in. */
+function syncAdviserDashboard() {
+  const el = adviserEls();
+  if (!el.section) return;
+  const show = Boolean(currentUser) && isVerifiedAdviser(currentUser);
+  el.section.classList.toggle("hidden", !show);
+  if (!show) return;
+  if (el.scope) {
+    el.scope.textContent = [currentUser.institution, currentUser.department, currentUser.level]
+      .filter(Boolean)
+      .join(" | ");
+  }
+  loadAdviserRoster();
+}

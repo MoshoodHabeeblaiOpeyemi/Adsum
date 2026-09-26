@@ -12,6 +12,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="role-picker.css">
+  <link rel="stylesheet" href="adviser.css">
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/lucide@1.45.0"></script>
 </head>
@@ -889,6 +890,75 @@
     </div>
 
   </main>
+
+  <!-- ADVISER DASHBOARD (Phase 4) -------------------------------------
+       Deliberately minimal: two actions (import a roster, name the rep) plus a
+       read-only summary. An adviser is a gate, not a manager. Hidden by default
+       and revealed only for a VERIFIED adviser - see isVerifiedAdviser() in
+       app.js, which must never be replaced by a role === "adviser" test. -->
+  <section id="adviserDashboard" class="container hidden">
+    <div class="adviser-head">
+      <div>
+        <h2 class="adviser-h2">Your Level</h2>
+        <p class="adviser-sub" id="adviserScope">-</p>
+      </div>
+      <span class="adviser-badge"><i data-lucide="shield-check"></i> Level Adviser</span>
+    </div>
+
+    <div class="adviser-stats">
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Students imported</span>
+        <strong class="adviser-stat-value" id="rosterCount">0</strong>
+      </div>
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Course Rep</span>
+        <strong class="adviser-stat-value" id="rosterRep">Not chosen</strong>
+      </div>
+      <div class="adviser-stat">
+        <span class="adviser-stat-label">Last import</span>
+        <strong class="adviser-stat-value" id="rosterImported">Never</strong>
+      </div>
+    </div>
+
+    <div class="adviser-card">
+      <h3 class="adviser-card-h3"><i data-lucide="upload"></i> Import Level Roster</h3>
+      <p class="adviser-card-p">Upload your department's list for this level. A column of matric
+        numbers is all we need - we find it whether it is headed "Matric No", "S/No",
+        "S/N" or something else entirely.</p>
+      <input type="file" id="rosterFile" accept=".csv,text/csv,text/plain" class="hidden" />
+      <div class="adviser-row">
+        <button type="button" class="btn btn-outline" id="rosterPickBtn">
+          <i data-lucide="file-spreadsheet"></i> Choose CSV file</button>
+        <button type="button" class="btn hidden" id="rosterConfirmBtn">
+          <i data-lucide="check"></i> Confirm import</button>
+        <button type="button" class="btn btn-outline hidden" id="rosterCancelBtn">Cancel</button>
+      </div>
+      <div class="adviser-msg hidden" id="rosterMsg"></div>
+      <div class="adviser-preview hidden" id="rosterPreview"></div>
+    </div>
+
+    <div class="adviser-card">
+      <h3 class="adviser-card-h3"><i data-lucide="user-check"></i> Select the Course Rep</h3>
+      <p class="adviser-card-p">Name one student from your roster. Only the student you choose here
+        becomes the rep - nobody can claim the role by signing up first.</p>
+      <select id="repSelect" class="adviser-select" disabled>
+        <option value="">Import a roster first</option>
+      </select>
+      <div class="adviser-row">
+        <button type="button" class="btn" id="repSaveBtn" disabled>
+          <i data-lucide="user-check"></i> Name this rep</button>
+        <button type="button" class="btn btn-outline hidden" id="repClearBtn">
+          <i data-lucide="user-x"></i> Remove rep</button>
+      </div>
+      <details class="adviser-log hidden" id="repLogWrap">
+        <summary>Rep change history</summary>
+        <ul class="adviser-log-list" id="repLog"></ul>
+      </details>
+    </div>
+
+    <p class="adviser-foot">Re-import at the start of each semester. Re-importing never erases
+      the rep history.</p>
+  </section>
 
   <!-- MODAL: FORGOT PASSWORD -->
   <div id="forgotModal" class="modal">

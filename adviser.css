@@ -1,0 +1,184 @@
+/* Phase 4 - Adviser dashboard. Deliberately calm: a gate, not a control room.
+   No charts, no dense tables. Two actions and a summary. */
+
+#adviserDashboard {
+  max-width: 900px;
+  margin: 0 auto 60px;
+  padding: 24px 4px 0;
+}
+
+.adviser-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.adviser-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3.2vw, 1.9rem);
+  letter-spacing: -0.5px;
+  margin: 0 0 4px;
+}
+
+.adviser-sub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.adviser-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--teal);
+  background: var(--teal-glow);
+  border: 1.5px solid var(--card-border);
+  padding: 7px 13px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.adviser-badge svg { width: 14px; height: 14px; }
+
+/* --- read-only summary --- */
+.adviser-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.adviser-stat {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 16px;
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.adviser-stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.adviser-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: -0.3px;
+  word-break: break-word;
+}
+
+/* --- the two action cards --- */
+.adviser-card {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 20px;
+  padding: 20px 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.adviser-card-h3 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.adviser-card-h3 svg { width: 18px; height: 18px; color: var(--teal); }
+
+.adviser-card-p {
+  color: var(--text-muted);
+  font-size: 0.87rem;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.adviser-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.adviser-row .btn { width: auto; padding: 10px 16px; }
+
+.adviser-select {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1.5px solid var(--card-border);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  margin-bottom: 14px;
+}
+
+.adviser-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* --- messages --- */
+.adviser-msg {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  border: 1.5px solid var(--card-border);
+  background: var(--bg);
+}
+
+.adviser-msg.ok { border-color: var(--teal); color: var(--teal); }
+.adviser-msg.warn { border-color: #d9a441; color: #b8832a; }
+.adviser-msg.err { border-color: var(--danger); color: var(--danger); }
+
+.adviser-msg ul { margin: 8px 0 0; padding-left: 18px; }
+
+/* --- import preview --- */
+.adviser-preview {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1.5px dashed var(--card-border);
+  font-size: 0.84rem;
+}
+
+.adviser-preview-head { font-weight: 700; margin-bottom: 8px; }
+.adviser-preview-scroll { max-height: 190px; overflow-y: auto; }
+.adviser-preview table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.adviser-preview th,
+.adviser-preview td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--card-border); }
+.adviser-preview th { color: var(--text-muted); font-weight: 700; }
+
+/* --- rep history --- */
+.adviser-log { margin-top: 16px; font-size: 0.83rem; }
+.adviser-log summary { cursor: pointer; font-weight: 700; color: var(--text-muted); }
+.adviser-log-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.adviser-log-list li { color: var(--text-muted); line-height: 1.45; }
+.adviser-log-list b { color: var(--text-primary); }
+
+.adviser-foot {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+  margin-top: 18px;
+}
+
+@media (max-width: 560px) {
+  .adviser-row .btn { width: 100%; }
+}
