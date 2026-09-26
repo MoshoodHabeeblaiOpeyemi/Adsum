@@ -6,6 +6,15 @@
    committed, tested and clean.
 2. **Commit per sub-task**, small and descriptive.
 3. **`node --check` every modified `api/*.js`** before committing.
+
+   > ⚠️ **Never use `node --check` on `app.js`.** It is an ES module, so
+   > `node --check` parses it as CommonJS, throws on the first `import` and
+   > stops — **reporting success on a file that does not parse.** A stray comma
+   > in a ternary shipped through several rounds of review because of exactly
+   > this. Use `npm run check` (or `node --experimental-vm-modules check.js`)
+   > instead, which parses browser files as modules and checks every top-level
+   > function individually. Note `npm` may be blocked by the PowerShell execution
+   > policy on some machines; invoking `node` directly always works.
 4. **Never** change a Firestore collection name or the Firebase project ID.
 5. Every new endpoint verifies the ID token first, reads before writes in a transaction,
    and logs failures without exposing internals.

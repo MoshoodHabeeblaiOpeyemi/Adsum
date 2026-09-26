@@ -154,6 +154,23 @@ Called as `POST /api/<function>?action=<action>` with `Authorization: Bearer <id
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | You need the data model, collection by collection |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | You want to know what is next and why |
 | [PRESENTATION.md](PRESENTATION.md) | You are demoing or writing the launch post |
+
+### Verify before committing
+
+`check.js` parses browser files as **ES modules** — which `node --check` cannot
+do. `node --check app.js` throws on the first `import`, stops, and **reports
+success on a file that does not parse**; a stray comma in a ternary once shipped
+through several rounds of review because of that blind spot.
+
+```bash
+npm run check
+```
+
+If the PowerShell execution policy blocks the `npm` shim, run node directly:
+
+```bash
+node --experimental-vm-modules check.js
+```
 | [brand/README.md](brand/README.md) | You are touching logos or icons |
 
 ---

@@ -37,7 +37,9 @@ import {
   doc,
   setDoc,
   getDoc,
-  runTransaction,
+  // `runTransaction` was imported for the client-side rep-slot race that Phase 5
+  // deleted. The rep role is now granted by the server inside
+  // api/onboarding.js, so the client has no transaction left to run.
   getDocs,
   query,
   where,
