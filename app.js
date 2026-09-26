@@ -8051,10 +8051,13 @@ async function saveChosenRep(matric) {
   // a replacement states plainly who loses the role.
   const ok = await showConfirm({
     title: isReplacement ? "Replace the course rep?" : "Name this course rep?",
+    // NOTE: no trailing comma on the first ternary arm. `a ? x + "y", : z` is a
+    // syntax error — the comma closes the object property early and leaves the
+    // second arm's `:` orphaned.
     message: isReplacement
-    ? (adviserRoster.chosenRepName || current) +
-      " currently holds the rep role and will go back to being a regular student.",
-    : "Only the student you name can run attendance for this level. Nobody else can claim it by signing up first.",
+      ? (adviserRoster.chosenRepName || current) +
+        " currently holds the rep role and will go back to being a regular student."
+      : "Only the student you name can run attendance for this level. Nobody else can claim it by signing up first.",
     okText: isReplacement ? "Yes, replace the rep" : "Yes, name this rep",
     cancelText: "Cancel",
     danger: isReplacement,
