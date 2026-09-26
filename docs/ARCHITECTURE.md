@@ -40,6 +40,7 @@ cached service worker.
 | `devices` | `u_{uid}` | **backend only** | `{uid, matric, lastSeenAt}` — the device lock |
 | `adviserVerifications` | `{uid}` | **backend only** | Transient 6-digit adviser code + `attempts` (max 5) + `expiresAt` (10 min). Deleted on success or lockout |
 | `adviserSlots` | `adviser_{INST}_{DEPT}_{LEVEL}` | **backend only** | The one-adviser-per-level claim. Written in the same transaction that promotes the user to `role: "level_anchor"` |
+| `departmentRosters` | `{INST}_{DEPT}_{LEVEL}` | **backend only** (`api/roster.js`) | The adviser's imported level list: `{institution, department, level, adviserUid, students[], matrics[], count, chosenRepMatric, chosenRepName, chosenRepUid, importedAt}`. Clients may **read** it (only if `isVerifiedAdviser()`) and never write |
 
 ### `users/{uid}` role vocabulary
 
@@ -174,7 +175,7 @@ even if every automated control were defeated.
 | Concern | Where |
 | --- | --- |
 | Serverless functions | `api/*.js` — Vercel, Node runtime |
-| Function count | 8 (`account`, `approval`, `attendance`, `course`, `onboarding`, `semester`, `session`, `verification`). Vercel Hobby allows 12, so there is headroom |
+| Function count | 9 (`account`, `approval`, `attendance`, `course`, `onboarding`, `roster`, `semester`, `session`, `verification`). Vercel Hobby allows 12, so there is headroom |
 | Rules deploy | `.github/workflows/deploy-firestore-rules.yml` → `firestore deploy --only firestore:rules` |
 | Cache policy | `vercel.json` |
 | Env | Vercel project settings — 5 vars, see [`.env.example`](../.env.example) |
@@ -210,9 +211,9 @@ Recorded so the next phases do not have to rediscover it.
 | Canonical institution | Free-text `users.institution` / `courses.institution`, compared with `norm()` | **Phase 4:** `institutions/{id}` with `emailDomains[]`; store the ID alongside the display string |
 | Canonical department | Free-text, `norm()`-compared (`api/course.js:71`) | **Phase 4:** `departments/{id}` with `{institutionId, slug, faculty}` |
 | Level | Free-text string, `norm()`-compared | **Phase 4:** level enum; must match `departmentRosters` keys |
-| Level-wide roster | Does not exist | **Phase 7:** `departmentRosters/{instId\|deptId\|levelCode\|semester}` |
+| Level-wide roster | `departmentRosters/{INST}_{DEPT}_{LEVEL}`, written by `api/roster.js` (Phase 4) — import + adviser-chosen rep, read-only to clients | **Phase 5:** rep signup must match `chosenRepMatric`. **Phase 6:** student join must match `matrics[]` |
 | Adviser role | Two values, never interchangeable: `role: "adviser"` = applied, **unverified** (`verificationStatus: "pending_email"`); `role: "level_anchor"` = **proven staff** (`"verified"`), written only by `api/verification.js`. `firestore.rules` constrains **create** (no client may assert `level_anchor`/`verified`/`verifiedAt`) **and** pins **update** — both halves are required. `utils/roles.js` holds the vocabulary; `isVerifiedAdviser()` is the only correct gate | **Phase 4:** gate the adviser dashboard on `isVerifiedAdviser(profile)` |
-| Rep existence gate | Any user can create a course (`validCourseFields()` only checks field types) | **Phase 6:** rep signup must require an anchor for that (institution, department, level) |
+| Rep existence gate | The rep is still chosen by whoever signs up first (`app.js` does a client-side `REP_SLOT_TAKEN` race). The roster now records `chosenRepMatric`, but nothing consults it yet | **Phase 5:** the server grants `role: "rep"` only when the matric matches `chosenRepMatric`, and the client-side race is deleted |
 
 **⚠️ Phase 7 relaxes a security check deliberately.** `api/course.js:69-74` currently
 returns a hard `403` on institution/department/level mismatch. Allowing cross-level

@@ -108,6 +108,38 @@ transaction as the profile (closing the check-then-act race the client had) and,
 for advisers, mints and mails the first 6-digit code so signup is the only step
 the user has to complete.
 
+---
+
+## Phase 4 — Adviser roster · ✅ backend shipped
+
+The trust chain's gate. An adviser imports the level master list and names ONE
+rep from it, which is what turns the rep badge from *claimed* into *granted*.
+
+`api/roster.js` (9th function) · `utils/csv.js` · `departmentRosters/{INST}_{DEPT}_{LEVEL}`
+
+| Action | Behaviour |
+| --- | --- |
+| `importRoster` | Parses the CSV and reports counts **without writing**; a confirmed `commit: true` stores it. All-or-nothing — a partial import would hide missing students until someone fails to check in |
+| `chooseRep` | The matric must already be on the roster. Runs in a transaction so a concurrent import cannot change the list underneath the check. `clear: true` stands the rep down |
+| `getRoster` | Read-only view: counts, the rep, last import. Capped at 200 entries |
+
+Three decisions worth keeping:
+
+- **Scope comes from the profile, never the body.** There is no
+  `institutionId`/`departmentId`/`levelCode` parameter to tamper with, so one
+  adviser cannot read or write another's roster.
+- **Gated on `isVerifiedAdviser()`**, not `role === "adviser"` — the latter is
+  the value every unverified applicant holds.
+- **Read-only to clients.** `firestore.rules` gives `departmentRosters` no write
+  path at all; the only writer is the Admin SDK.
+
+A re-import that no longer contains the current rep **drops the selection** and
+reports `repDropped`, because a rep who is not on the level roster is exactly
+the state this feature exists to prevent.
+
+**Still outstanding:** the adviser dashboard UI. Phase 5 then makes signup
+consult `chosenRepMatric` and deletes the client-side `REP_SLOT_TAKEN` race.
+
 ### Do these first, before any code
 
 1. **Privacy + retention doc.** NIN data and a selfie are the most sensitive material this

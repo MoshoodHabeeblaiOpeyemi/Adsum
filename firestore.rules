@@ -24,6 +24,28 @@ service cloud.firestore {
         ).data.uid == request.auth.uid;
     }
 
+    // 🔒 THE adviser-authorisation check, mirroring utils/roles.js.
+    //
+    // It requires BOTH `role: "level_anchor"` AND `verificationStatus:
+    // "verified"`. `role: "adviser"` is the value held by every UNVERIFIED
+    // applicant, so testing that instead would hand the roster to anyone who
+    // merely signed up. Requiring both also fails closed on a partial or
+    // legacy profile that has one field but not the other.
+    //
+    // The `.get(key, default)` form is used because documents created before
+    // Phase 3 have no role/verification keys at all, and touching a missing
+    // key in a rules expression raises an ERROR (which denies) rather than
+    // returning null.
+    function isVerifiedAdviser() {
+      return userExists()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.get('role', null) == 'level_anchor'
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.get('verificationStatus', null) == 'verified';
+    }
+
     function isCourseRep(courseId) {
       return signedIn()
         && exists(
@@ -408,6 +430,22 @@ service cloud.firestore {
     // enrollment and claimMatric endpoints handle all checks server-side.
     match /matricRegistry/{registryKey} {
       allow read: if false;
+      allow write: if false;
+    }
+
+    // DEPARTMENT ROSTERS - the adviser's imported level list (Phase 4).
+    //
+    // READ-ONLY TO CLIENTS, WITHOUT EXCEPTION. api/roster.js imports the CSV
+    // and names the rep; it runs on the Admin SDK. There is deliberately no
+    // "adviser writes this" rule here: the read that decides who may import
+    // cannot itself be forged, and no client path can add a student to a
+    // roster or hand the rep badge to itself.
+    //
+    // A roster entry is a matric the ADVISER asserts belongs to the level; it
+    // grants no access to anything. Phase 5 links a chosen rep to a real
+    // account separately.
+    match /departmentRosters/{rosterId} {
+      allow read: if isVerifiedAdviser();
       allow write: if false;
     }
   }
