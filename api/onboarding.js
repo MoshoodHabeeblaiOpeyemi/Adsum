@@ -46,6 +46,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const crypto = require("crypto");
 const verifyAppCheck = require("../utils/appCheck");
+const { ROLE, VERIFICATION, SIGNUP_ROLES, isAdviserTrack } = require("../utils/roles");
 const { isInstitutionDomain } = require("../utils/institutions");
 const { sendVerificationCode } = require("../utils/mailer");
 
@@ -63,10 +64,10 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 // Cryptographically-seeded 6-digit code (Math.random is not for secrets).
 const codeFor = () => String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 
-// The only roles a signup may REQUEST. `level_anchor` and any `verified`
-// status are values this file never accepts from a client — only
-// api/verification.js (Admin SDK) can mint them.
-const SIGNUP_ROLES = ["student", "rep", "adviser"];
+// The only roles a signup may REQUEST, imported from utils/roles.js so this
+// whitelist and the authorisation checks in api/verification.js can never
+// drift apart. `level_anchor` is absent on purpose: it is minted server-side
+// after verification and is never client-selectable.
 
 // Long enough for every real Nigerian institution / department / level string,
 // short enough that a 4 KB "institution" is rejected rather than stored.
@@ -118,8 +119,8 @@ function buildProfile(body, decoded) {
   if (!SIGNUP_ROLES.includes(role)) {
     return fail(400, `role must be one of: ${SIGNUP_ROLES.join(", ")}.`);
   }
-  const isAdviser = role === "adviser";
-  const isRep = role === "rep";
+  const isAdviser = role === ROLE.ADVISER_PENDING;
+  const isRep = role === ROLE.REP;
 
   const institution = clean(body.institution);
   const department = clean(body.department);
@@ -279,11 +280,12 @@ async function handleCreateProfile(req, res, decoded) {
           // 🔒 SERVER-OWNED. Built here, never read from the request body. An
           // adviser starts as role "adviser" + "pending_email" and can ONLY be
           // promoted to "level_anchor" / "verified" by api/verification.js once
-          // the emailed code checks out.
+          // the emailed code checks out. See utils/roles.js for why the two
+          // adviser values are not interchangeable.
           role: p.role,
           isRep: p.isRep,
           isAdviser: p.isAdviser,
-          verificationStatus: p.isAdviser ? "pending_email" : "not_required",
+          verificationStatus: p.isAdviser ? VERIFICATION.PENDING_EMAIL : VERIFICATION.NOT_REQUIRED,
           // Written as explicit nulls (not omitted) so the keys always EXIST:
           // firestore.rules pins them with `get('verifiedAt', null) == ...`, and
           // touching a missing key in a rules expression is an ERROR that would

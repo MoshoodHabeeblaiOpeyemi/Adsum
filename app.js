@@ -1466,7 +1466,17 @@ if (mobileMenuBtn && navLinks) {
   const signupTitle = document.getElementById("signupTitle");
   const signupSubtitle = document.getElementById("signupSubtitle");
 
-  const ROLE_LABEL = { adviser: "Level Adviser", rep: "Course Rep", student: "Regular Student" };
+  // 🔑 A verified adviser holds role "level_anchor", NOT "adviser" (see
+  // utils/roles.js). The old map had no level_anchor key, so every verified
+  // adviser rendered as the raw string "level_anchor" in the header and in the
+  // settings profile. The unverified pending value stays listed so those
+  // applicants see "Level Adviser — verification pending" rather than nothing.
+  const ROLE_LABEL = {
+    student: "Regular Student",
+    rep: "Course Rep",
+    adviser: "Level Adviser (pending)",
+    level_anchor: "Level Adviser",
+  };
   const ROLE_SUB = {
     adviser: "Staff verification first — then import your level roster.",
     rep: "Your adviser must have picked you — otherwise you join as a student.",
@@ -2096,7 +2106,13 @@ if (mobileMenuBtn && navLinks) {
       // we must NOT send it back, because writing `matric: ""` over a stored
       // `null` fails the rules' `matric == resource.data.matric` check and the
       // whole save is rejected with permission-denied.
-      const isAdviserAccount = !currentUser || !currentUser.matric;
+      // ⚠️ This must be the ROLE, never the presence of a matric. Inferring
+      // "adviser" from `!matric` was wrong twice over: a student who somehow
+      // saved a blank matric would be treated as staff, and a verified adviser
+      // (role "level_anchor", no matric) needed the same branch. Role is the
+      // authoritative field — see utils/roles.js.
+      const isAdviserAccount =
+        currentUser && (currentUser.role === "adviser" || currentUser.role === "level_anchor");
       if (!newName || !currentUser || !auth.currentUser) return;
       if (!newMatric && !isAdviserAccount) {
         toast.error("Your matric number is missing. Please contact support.", "Profile Error");

@@ -68,17 +68,48 @@ service cloud.firestore {
 
       // Profile create: students/reps carry a matric string; advisers carry
       // no matric (null) and instead write role/isAdviser/verificationStatus.
+      //
+      // 🔒🔒 SELF-PROMOTION IS BLOCKED HERE, NOT MERELY PINNED ON UPDATE.
+      // Pinning role fields on `update` is necessary but NOT sufficient: a
+      // brand-new document has no prior value to compare against, so a create
+      // rule that only checks `matric is string` lets a tampered client mint
+      // `role: "level_anchor" / verificationStatus: "verified"` outright. The
+      // account would be born an anchor and never pass an email check.
+      //
+      // So a client-created profile is constrained to the unprivileged end of
+      // the model. `level_anchor` / `verified` are absent from these lists on
+      // purpose: they are values only api/verification.js may write, and it
+      // runs on the Admin SDK, which bypasses these rules entirely.
       allow create: if isOwner(userId)
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.isRep is bool
+        // Only the three roles a signup may legitimately request.
+        && request.resource.data.get('role', 'student') in ['student', 'rep', 'adviser']
+        // A client may never assert proof it has not made.
+        && request.resource.data.get('verificationStatus', 'not_required') in ['not_required', 'pending_email']
+        && request.resource.data.get('verifiedAt', null) == null
+        && request.resource.data.get('verificationMethod', null) == null
+        // `isAdviser` must agree with `role`, so it cannot be used to smuggle
+        // adviser-ness onto a student/rep document either.
+        && request.resource.data.get('isAdviser', false) == (request.resource.data.get('role', 'student') == 'adviser')
+        // 🔒 A client-supplied matric identifies a STUDENT. The adviser branch
+        // must require the absence of one, not merely tolerate it — otherwise
+        // the first branch below would let an adviser role ride in WITH a
+        // matric and claim `matricRegistry` like any student.
+        && (request.resource.data.get('role', 'student') == 'adviser'
+            ? !(request.resource.data.matric is string)
+            : (request.resource.data.matric is string && request.resource.data.matric.size() > 0))
         && (
-          (request.resource.data.matric is string && request.resource.data.matric.size() > 0)
-          || (
-            request.resource.data.role == "adviser"
-            && request.resource.data.isAdviser == true
-            && request.resource.data.verificationStatus == "pending_email"
+          (
+            request.resource.data.matric is string
+            && request.resource.data.matric.size() > 0
+            && request.resource.data.get('role', 'student') != 'adviser'
           )
-        )
-        && request.resource.data.isRep is bool;
+          || (
+            request.resource.data.get('role', '') == 'adviser'
+            && request.resource.data.get('verificationStatus', '') == 'pending_email'
+          )
+        );
 
       // 🔒 Identity fields are immutable to the owner. `matric`, `isRep`,
       // `institution` and `department` define who this account IS inside the
@@ -97,6 +128,12 @@ service cloud.firestore {
         // which bypasses firestore.rules. This is what keeps the trust chain
         // "Adviser verifies" honest, and it MUST stay in place before Phase 4
         // starts gating the adviser dashboard on `role`.
+        //
+        // These pins cover UPDATE only. The matching CREATE constraints are
+        // above, and both halves are required: update pins stop an existing
+        // account from climbing, create constraints stop a new one from being
+        // born an anchor. utils/roles.js holds the canonical vocabulary so a
+        // gate can never be written against the wrong value.
         // Each pin uses MapValue.get(key, default) rather than plain
         // `resource.data.x`. Documents created BEFORE Phase 3 have no
         // role/isAdviser/verificationStatus/verifiedAt/verificationMethod keys

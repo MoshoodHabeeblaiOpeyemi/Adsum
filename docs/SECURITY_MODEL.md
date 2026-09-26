@@ -236,6 +236,46 @@ give no consistency guarantee across transaction retries.
 
 ---
 
+## Frozen invariants
+
+Rules that later phases must not regress. Each is enforced in code, not by
+convention.
+
+### An account is never born an authority
+
+`firestore.rules` **constrains `create` and pins `update`**. Both are required:
+
+- `create` — a client may only write the unprivileged end of the role model.
+  `role` must be one of `student` / `rep` / `adviser`; `verificationStatus` only
+  `not_required` / `pending_email`; `verifiedAt` and `verificationMethod` must be
+  `null`; `isAdviser` must agree with `role`; an adviser must not carry a matric.
+- `update` — those same fields are pinned against the existing document, so an
+  account cannot climb after the fact.
+
+> **Why both.** Pinning only `update` looked sufficient and was not. A brand-new
+> document has no prior value to compare against, so a `create` rule that merely
+> checked `matric is string` let a tampered client mint
+> `role: "level_anchor" / verificationStatus: "verified"` outright — an account
+> born an anchor that never passed an email check. Only
+> `api/verification.js` (Admin SDK, bypasses rules) may write those values.
+
+### One vocabulary, one gate
+
+`role: "adviser"` means *applied, unverified*; `role: "level_anchor"` means
+*proven staff*. They are not interchangeable, and the failure mode is silent:
+a gate written as `role === "adviser"` compiles, looks correct, and admits every
+unverified applicant.
+
+`utils/roles.js` therefore owns the values, and `isVerifiedAdviser(profile)` is
+the only correct authorisation test. It requires **both** the minted role and the
+verified status, so any partial state fails closed. Use `isAdviserTrack()` only
+for "may I start verification", never for "may I use adviser powers".
+
+Display strings ("Level Adviser") live separately in `ROLE_LABEL` (`app.js`) so
+UI wording can change without touching stored data.
+
+---
+
 ## Known gaps
 
 Recorded honestly, because each is a candidate for Phase 5.

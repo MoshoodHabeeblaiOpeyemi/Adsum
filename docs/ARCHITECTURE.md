@@ -41,6 +41,31 @@ cached service worker.
 | `adviserVerifications` | `{uid}` | **backend only** | Transient 6-digit adviser code + `attempts` (max 5) + `expiresAt` (10 min). Deleted on success or lockout |
 | `adviserSlots` | `adviser_{INST}_{DEPT}_{LEVEL}` | **backend only** | The one-adviser-per-level claim. Written in the same transaction that promotes the user to `role: "level_anchor"` |
 
+### `users/{uid}` role vocabulary
+
+`utils/roles.js` is the single source of truth. The two adviser values mean
+**different things** and are not interchangeable:
+
+| Value | Meaning | Written by |
+| --- | --- | --- |
+| `role: "adviser"` + `verificationStatus: "pending_email"` | Applied, **unverified**. Adviser tools are locked. | `api/onboarding.js` |
+| `role: "level_anchor"` + `verificationStatus: "verified"` | **Proven staff** — the root of the trust chain. | `api/verification.js` only |
+
+Authorisation uses `isVerifiedAdviser(profile)`, which requires **both** halves
+and so fails closed on any partial state. A gate written as
+`role === "adviser"` is a privilege escalation: it admits every unverified
+applicant.
+
+The UI label ("Level Adviser") is deliberately a display string and is kept in
+`ROLE_LABEL` (`app.js`), separate from the stored values, so the vocabulary can
+be read in one place.
+
+**Both rule halves are load-bearing.** `create` constrains a new profile to the
+unprivileged end of the model (no client may assert `level_anchor`, `verified`,
+`verifiedAt` or `verificationMethod`); `update` pins those fields so an existing
+account cannot climb. Pinning only `update` leaves the document *creatable* in
+an already-promoted state, which is a hole in its own right.
+
 ### `courses/{courseId}` subcollections
 
 | Subcollection | Doc ID | Written by | Shape |
@@ -186,7 +211,7 @@ Recorded so the next phases do not have to rediscover it.
 | Canonical department | Free-text, `norm()`-compared (`api/course.js:71`) | **Phase 4:** `departments/{id}` with `{institutionId, slug, faculty}` |
 | Level | Free-text string, `norm()`-compared | **Phase 4:** level enum; must match `departmentRosters` keys |
 | Level-wide roster | Does not exist | **Phase 7:** `departmentRosters/{instId\|deptId\|levelCode\|semester}` |
-| Adviser role | `role: "adviser"` (unverified) is written by the client at signup; only `api/verification.js` (Admin SDK) can promote it to `role: "level_anchor"` and set `verificationStatus: "verified"`. `firestore.rules` pins every role/verification field on `users` update so a client cannot self-promote | **Phase 4:** gate the adviser dashboard on `role == "level_anchor"` |
+| Adviser role | Two values, never interchangeable: `role: "adviser"` = applied, **unverified** (`verificationStatus: "pending_email"`); `role: "level_anchor"` = **proven staff** (`"verified"`), written only by `api/verification.js`. `firestore.rules` constrains **create** (no client may assert `level_anchor`/`verified`/`verifiedAt`) **and** pins **update** — both halves are required. `utils/roles.js` holds the vocabulary; `isVerifiedAdviser()` is the only correct gate | **Phase 4:** gate the adviser dashboard on `isVerifiedAdviser(profile)` |
 | Rep existence gate | Any user can create a course (`validCourseFields()` only checks field types) | **Phase 6:** rep signup must require an anchor for that (institution, department, level) |
 
 **⚠️ Phase 7 relaxes a security check deliberately.** `api/course.js:69-74` currently

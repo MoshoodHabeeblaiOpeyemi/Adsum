@@ -2,6 +2,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const { ROLE, VERIFICATION, isVerifiedAdviser, isPendingAdviser } = require("../utils/roles");
 
 try {
   if (getApps().length === 0) initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") }) });
@@ -103,11 +104,17 @@ async function handleSendCode(req, res, decoded) {
     // "level_anchor", so testing `role !== "adviser"` first would reject a
     // perfectly valid already-verified adviser with a confusing 403 instead of
     // the friendly idempotent 200.
-    if (profile.verificationStatus === "verified") {
+    // 🔒 `isVerifiedAdviser` (utils/roles.js) is the ONLY correct test here. A
+    // gate written as `role === "adviser"` would accept every UNVERIFIED
+    // applicant, which is the opposite of what this endpoint is for.
+    if (isVerifiedAdviser(profile)) {
       return res.status(200).json({ success: true, alreadyVerified: true });
     }
-    if (profile.role !== "adviser")
+    // Only an account genuinely awaiting a code may request one. This also
+    // stops a student or rep from driving the 6-digit code machinery at all.
+    if (!isPendingAdviser(profile)) {
       return res.status(403).json({ error: "Only Level Adviser accounts use email-code verification." });
+    }
 
     // Domain must be official for THIS institution (universityDomains first,
     // then the institution record — both seed shapes are supported).
@@ -224,8 +231,12 @@ async function handleVerifyCode(req, res, decoded) {
           { merge: true },
         );
         tx.update(db.collection("users").doc(decoded.uid), {
-          role: "level_anchor",
-          verificationStatus: "verified",
+          // 🔒 The promotion. These three values are written ONLY here, on the
+          // Admin SDK, which bypasses firestore.rules. They are the entire
+          // basis of adviser authorisation for the rest of the app, which is
+          // why every gate reads them through utils/roles.js.
+          role: ROLE.LEVEL_ANCHOR,
+          verificationStatus: VERIFICATION.VERIFIED,
           verifiedAt: FieldValue.serverTimestamp(),
           verificationMethod: "university_email",
         });
@@ -242,7 +253,7 @@ async function handleVerifyCode(req, res, decoded) {
     return res.status(200).json({
       success: true,
       message: "Adviser verified.",
-      role: "level_anchor",
+      role: ROLE.LEVEL_ANCHOR,
     });
   } catch (error) {
     console.error("verification verifyCode error:", error);
