@@ -105,7 +105,7 @@ async function handleEnroll(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Enrolled.", courseId: courseRef.id });
   } catch (error) {
     console.error("Enroll error:", error);
-    return res.status(500).json({ error: "Enroll failed: " + error.message });
+    return res.status(500).json({ error: "Unable to join the course. Please try again." });
   }
 }
 
@@ -129,7 +129,7 @@ async function handleLeave(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Left the course." });
   } catch (error) {
     console.error("Leave error:", error);
-    return res.status(500).json({ error: "Leave failed: " + error.message });
+    return res.status(500).json({ error: "Unable to leave the course. Please try again." });
   }
 }
 
@@ -169,7 +169,7 @@ async function handleRemove(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Student removed." });
   } catch (error) {
     console.error("Remove error:", error);
-    return res.status(500).json({ error: "Remove failed: " + error.message });
+    return res.status(500).json({ error: "Unable to remove the student. Please try again." });
   }
 }
 
@@ -205,7 +205,7 @@ async function handleDelete(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Course deleted." });
   } catch (error) {
     console.error("Delete course error:", error);
-    return res.status(500).json({ error: "Unable to delete course: " + error.message });
+    return res.status(500).json({ error: "Unable to delete the course. Please try again." });
   }
 }
 

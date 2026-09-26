@@ -282,11 +282,12 @@ Recorded honestly, because each is a candidate for Phase 5.
 
 | Gap | Impact | Fix |
 | --- | --- | --- |
-| PIN rotation timestamp is client-written (`app.js:6279`) | A rep with devtools could backdate `pinRotationTime` to keep a PIN alive | Write it with `serverTimestamp()`; read it back with `.toMillis()` |
-| Strike counter is client-side | Clearable via devtools | Server-counted strikes |
-| Geofence is a client accuracy gate only | `app.js:702` accepts at `accuracy <= 50`, and `api/attendance.js:88` **stores** `lat`/`lon`/`accuracy` but never validates distance to a hall. A student can spoof GPS | Server-side radius check against a per-hall coordinate |
-| No rate limit on PIN submission | A 4–6 digit PIN could be brute-forced within the freshness window | Per-uid + per-course attempt throttle |
+| PIN rotation timestamp is client-written (`app.js:6279`) | A rep with devtools could backdate `pinRotationTime` to keep a PIN alive | ✅ **Fixed (Phase 5).** `api/session?action=rotatePin` generates the PIN with `crypto.randomInt` and stamps `serverTimestamp()`. The client can neither backdate it nor predict the next PIN |
+| Strike counter is client-side | Clearable via devtools | ✅ **Fixed (Phase 5).** Replaced by `pinAttempts/{uid}_{courseId}`, backend-only, counted in a transaction. The client can neither read nor clear its own count |
+| Geofence is a client accuracy gate only | `app.js:702` accepts at `accuracy <= 50`, and `api/attendance.js:88` **stores** `lat`/`lon`/`accuracy` but never validates distance to a hall. A student can spoof GPS | ✅ **Fixed (Phase 5).** `haversineMetres()` compares submitted coordinates to the hall server-side; `accuracy > 500m` is rejected outright; the check is skipped only for `locationMode: "no_gps"` |
+| No rate limit on PIN submission | A 4–6 digit PIN could be brute-forced within the freshness window | ✅ **Fixed (Phase 5).** 5 misses per uid+course per 30s, incremented **inside a transaction** — a read-then-write limiter has a race, and 50 parallel requests would each read `count: 0` |
 | Screenshot/leave-app signals are advisory | `securityEvents` records attempts but nothing acts on them | Weight them into a risk score |
+| `courses` read is `signedIn()` | Any account can read any course doc, including `enrolled[]` (matric numbers) | Restrict to members/staff, or split the roster into a subcollection. **Not done:** it breaks course discovery, which is how a student joins in the first place |
 
 ---
 

@@ -1,5 +1,5 @@
 // Bump this version string on EVERY deploy so the SW refreshes automatically
-const CACHE_NAME = "veripresenx-static-v35";
+const CACHE_NAME = "veripresenx-static-v36";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

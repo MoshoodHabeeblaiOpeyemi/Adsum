@@ -55,7 +55,7 @@ async function handleDeleteAccount(req, res, decoded) {
     return res.status(200).json({ success: true, coursesLeft, coursesDeleted });
   } catch (error) {
     console.error("Delete account error:", error);
-    return res.status(500).json({ error: "Unable to delete account: " + error.message });
+    return res.status(500).json({ error: "Unable to delete your account. Please try again." });
   }
 }
 
@@ -80,7 +80,7 @@ async function handleClaimMatric(req, res, decoded) {
     return res.status(200).json({ success: true, message: `Matric ${matric} secured.` });
   } catch (error) {
     console.error("Claim matric error:", error);
-    return res.status(500).json({ error: "Unable to claim matric: " + error.message });
+    return res.status(500).json({ error: "Unable to secure that matric number. Please try again." });
   }
 }
 

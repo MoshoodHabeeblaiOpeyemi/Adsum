@@ -85,7 +85,7 @@ async function handleApproveManual(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Request approved." });
   } catch (error) {
     console.error("Approve manual error:", error);
-    return res.status(500).json({ error: "Unable to approve request: " + error.message });
+    return res.status(500).json({ error: "Unable to approve the request. Please try again." });
   }
 }
 
@@ -138,7 +138,7 @@ async function handleGrantHotspot(req, res, decoded) {
     return res.status(200).json({ success: true, message: `${normalizedTarget} granted hotspot access.` });
   } catch (error) {
     console.error("Grant hotspot error:", error);
-    return res.status(500).json({ error: "Unable to grant hotspot: " + error.message });
+    return res.status(500).json({ error: "Unable to grant hotspot power. Please try again." });
   }
 }
 

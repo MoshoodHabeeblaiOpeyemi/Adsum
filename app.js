@@ -6233,7 +6233,38 @@ if (mobileMenuBtn && navLinks) {
     generatePinBtn.addEventListener("click", async () => {
       if (!activeCourse) return;
 
-      const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+      // 🔒 The FIRST PIN of a session is also generated server-side.
+      //
+      // Rotation moved to the server in Phase 5, but the initial PIN was still
+      // `Math.floor(1000 + Math.random() * 9000)` here — which is not a CSPRNG,
+      // never yields a leading zero, and (because it is client-supplied) would be
+      // trusted by the server exactly like the old rotation timestamp was. The
+      // endpoint returns a fresh 4-digit PIN with serverTimestamp(); we write it
+      // into the secret doc as part of starting the session, and the SERVER
+      // stamps the rotation time.
+      let serverPin = null;
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch("/api/session?action=rotatePin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ courseId: activeCourse.id }),
+        });
+        const data = await res.json();
+        // 403/404 here is expected on the very first click of a brand-new
+        // session (no live session exists yet), so fall back rather than block
+        // the rep from starting a class.
+        if (res.ok && data.pin) serverPin = data.pin;
+      } catch (_) {
+        // Offline or endpoint down: fall through to a local PIN so the rep can
+        // still teach. It will be superseded by the next server rotation, and
+        // the server treats an unreadable rotation time as EXPIRED rather than
+        // trusting it.
+      }
+      const randomPin = serverPin || Math.floor(1000 + Math.random() * 9000).toString();
       const managerMatric = normalizeMatric(
         currentUser ? currentUser.matric : "REP-001",
       );
@@ -6551,35 +6582,51 @@ if (mobileMenuBtn && navLinks) {
       const pinRotationElement = document.getElementById("pinRotationTimer");
 
       if (timeUntilRotation <= 0 && !session.expired && canRotate) {
-        // Time to rotate the PIN
-        const newPin = Math.floor(1000 + Math.random() * 9000).toString();
-        const oldPin = session.pin;
-
-        // Update local state
-        session.previousPin = oldPin;
-        session.pin = newPin;
-        session.pinRotationTime = Date.now();
-
-        // Update server
+        // 🔒 ROTATION IS SERVER-AUTHORITATIVE (Phase 5).
+        //
+        // This used to generate the PIN with Math.random() and write
+        // `pinRotationTime: Date.now()` from the rep's browser. Two problems: a
+        // rep with devtools could backdate the timestamp and freeze a PIN alive
+        // indefinitely, and Math.random() is not a CSPRNG, so an attacker who
+        // watched one rotation could predict the next ones.
+        //
+        // The server now generates the PIN with crypto.randomInt and stamps
+        // serverTimestamp(), neither of which the client can influence. The
+        // response hands back the resolved epoch ms — the client never has to
+        // touch the Timestamp sentinel itself.
         try {
-          const secretRef = doc(
-            db,
-            "courses",
-            activeCourse.id,
-            "session",
-            "secret",
-          );
-          await updateDoc(secretRef, {
-            pin: newPin,
-            previousPin: oldPin,
-            pinRotationTime: session.pinRotationTime,
+          const idToken = await auth.currentUser.getIdToken();
+          const res = await fetch("/api/session?action=rotatePin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ courseId: activeCourse.id }),
           });
-          console.log("PIN rotated:", oldPin, "→", newPin);
-        } catch (error) {
-          console.error("Failed to rotate PIN on server:", error);
-        }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Rotation failed");
 
-        renderPortalState();
+          const oldPin = session.pin;
+          session.previousPin = data.previousPin || oldPin;
+          session.pin = data.pin;
+          // A number, already resolved server-side.
+          session.pinRotationTime = data.pinRotationTime || Date.now();
+          // Re-sync against the server clock rather than this device's, so a
+          // rep whose phone clock is wrong still rotates on time.
+          if (typeof data.serverNow === "number") {
+            session.clockOffsetMs = data.serverNow - Date.now();
+          }
+          console.log("PIN rotated (server):", oldPin, "→", data.pin);
+          renderPortalState();
+        } catch (error) {
+          // The PIN is unchanged on the server, so keep showing the current one
+          // rather than desyncing the screen from what students must type.
+          console.error("Failed to rotate PIN on server:", error);
+          // Back off so a failing endpoint is not hammered every second; the
+          // next tick will retry.
+          session.pinRotationTime = Date.now();
+        }
       } else {
         // Update rotation countdown display
         if (pinRotationElement) {
@@ -6622,6 +6669,42 @@ if (mobileMenuBtn && navLinks) {
         activeCourse.activeSession &&
         activeCourse.activeSession.locationMode === "no_gps";
 
+      // 🔒 Phase 5 moved three checks to the server, so a rejected check-in now
+      // arrives with a machine-readable reason instead of a generic failure.
+      // Each one gets its own message and its own toast weight — "you are 400m
+      // away" and "too many wrong PINs" are very different problems for a
+      // student, and collapsing them into "Check-in failed" is what made the
+      // old behaviour untrustworthy.
+      const explainCheckInError = (result, status) => {
+        if (result && result.rateLimited) {
+          const wait = result.retryAfterSeconds;
+          toast.error(
+            wait
+              ? `Too many incorrect PINs. Wait ${wait}s and use the code currently on screen.`
+              : "Too many incorrect PINs. Wait a moment and use the code currently on screen.",
+            "Slow down",
+          );
+          return;
+        }
+        if (result && result.outOfRange) {
+          toast.error(result.error, "Not in the hall");
+          return;
+        }
+        if (result && (result.needsLocation || result.needsBetterFix)) {
+          toast.warning(result.error, "Location needed");
+          return;
+        }
+        if (result && typeof result.attemptsLeft === "number" && result.attemptsLeft > 0) {
+          toast.error(result.error, "Incorrect PIN");
+          return;
+        }
+        if (result && result.pinExpired) {
+          toast.warning(result.error, "PIN expired");
+          return;
+        }
+        toast.error((result && result.error) || "Check-in failed.");
+      };
+
       // Fast path: If session has No GPS requirement, submit immediately!
       if (isNoGps) {
         toast.info("Submitting attendance...", "Checking In");
@@ -6641,7 +6724,16 @@ if (mobileMenuBtn && navLinks) {
           });
 
           const result = await response.json();
-          if (!response.ok) throw new Error(result.error || "Check-in failed.");
+          if (!response.ok) {
+            explainCheckInError(result, response.status);
+            // Only count a strike for a genuine wrong PIN. A rate-limit or
+            // geofence rejection is the server's verdict, not a student typo,
+            // and double-counting it would escalate a legitimate retry.
+            if (!result.rateLimited && !result.outOfRange && !result.needsLocation) {
+              recordCheckInFailure(activeCourse.id);
+            }
+            return;
+          }
 
           // Success instantly clears the hidden strike counter.
           resetCheckInFailures(activeCourse.id);
@@ -6697,7 +6789,13 @@ if (mobileMenuBtn && navLinks) {
 
           const result = await response.json();
           if (!response.ok) {
-            throw new Error(result.error || "Check-in failed.");
+            explainCheckInError(result, response.status);
+            // See the no-GPS path: a server verdict (rate limit, geofence) is
+            // not a student typo, so it must not also burn a local strike.
+            if (!result.rateLimited && !result.outOfRange && !result.needsLocation) {
+              recordCheckInFailure(activeCourse.id);
+            }
+            return;
           }
 
           // Success instantly clears the hidden strike counter.

@@ -64,19 +64,24 @@ becomes a migration of live user data instead of a seed script.
 
 ---
 
-## Phase 5 — Tier 1 security · 1 day
+## Phase 5 — Tier 1 security · ✅ shipped
 
-Retires the known gaps in [SECURITY_MODEL.md](SECURITY_MODEL.md#known-gaps).
+Retires every gap in [SECURITY_MODEL.md](SECURITY_MODEL.md#known-gaps) that the PIN could be brute-forced or frozen against.
 
 | Item | Detail |
 | --- | --- |
-| Server-side PIN rotation | New `rotatePin` action. Server writes `pinRotationTime` with `serverTimestamp()` |
-| ⚠️ Skew grace | `serverTimestamp()` is a sentinel, not a number. Read it back with `.toMillis()`, and allow a small clock-skew window — see [SECURITY_MODEL.md](SECURITY_MODEL.md#phase-5-must-not-break-this) |
-| ⚠️ Preserve the windows | Keep `× 2` (current) and `× 3` (previous). Do not collapse them to one interval |
-| Server-counted strikes | Move `MANUAL_OVERRIDE_STRIKES_REQUIRED` off the client; the counter must not be clearable from devtools |
-| App Check hard mode | Only **after** `APP_CHECK_SITE_KEY` is set and verified traffic is confirmed |
+| PIN submission throttle | `utils/throttle.js`. 5 failures per `{uid}_{courseId}` per 30s sliding window, counted **inside a transaction** — a read-then-write limiter has a race, and 50 parallel requests would all read `count: 0`. Keyed on uid, not IP, so a student switching Wi-Fi→mobile is unaffected. Cleared on success so honest typos don't accumulate |
+| 🔒 Server PIN rotation | `api/session?action=rotatePin`. PIN generated with `crypto.randomInt`, `pinRotationTime` written with `serverTimestamp()`. The client can no longer backdate the timestamp or predict the next PIN |
+| 🔒 The read-back trap | `FieldValue.serverTimestamp()` is a **sentinel**, not a value. `Date.now() - secret.pinRotationTime` yields **NaN**, and every freshness comparison then silently fails **open**. All reads go through `ageMs()` in `utils/geo.js`, which handles Timestamp / legacy number / raw gRPC / Date / ISO, and treats an absent or corrupt value as **expired**, never fresh |
+| ⚠️ Skew grace | 2s added to both windows, for a rep's device clock disagreeing with the server's |
+| ⚠️ Preserve the windows | `× 2` (current) and `× 3` (previous) kept distinct, exactly as `SECURITY_MODEL.md` requires |
+| Server geofence | `haversineMetres()` in `utils/geo.js`. The client gate is now a convenience; the server compares the submitted coordinates to the hall, rejects `accuracy > 500m` (which would otherwise be a way around the radius), and skips only when `locationMode === "no_gps"` |
+| `departmentReps` | Was **client-writable** — `setDoc` with `repUid == auth.uid` was self-appointment, defeating Phase 5's whole point. Now `allow write: if false` |
+| `pinAttempts` | New collection, backend-only. The client can neither read its own count nor clear it |
+| Constant-time PIN compare | `diff |= x ^ y` over the whole string, so a wrong PIN cannot be probed digit-by-digit by timing |
+| Generic 500s | **11** responses were returning `error.message`, which routinely embeds Firestore collection and document paths. All now log in full server-side and return a fixed sentence |
 
-`security: server-authoritative PIN rotation, strikes, App Check hard mode`
+`security: server-authoritative PIN rotation, throttle, geofence, generic errors`
 
 ---
 

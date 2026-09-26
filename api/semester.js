@@ -34,7 +34,7 @@ async function handleEndSemester(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Semester ended. All session data cleared." });
   } catch (error) {
     console.error("End semester error:", error);
-    return res.status(500).json({ error: "Unable to end semester: " + error.message });
+    return res.status(500).json({ error: "Unable to end the semester. Please try again." });
   }
 }
 

@@ -2,6 +2,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const { toMillis, generatePin } = require("../utils/geo");
 
 try {
   if (getApps().length === 0) {
@@ -18,6 +19,100 @@ function readCookie(header, name) {
   try { return decodeURIComponent(raw); } catch (_) { return raw; }
 }
 
+
+/**
+ * 🔒 Rotate the session PIN — SERVER-AUTHORITATIVE.
+ *
+ * Until Phase 5 this ran entirely in the rep's browser: `app.js` generated the
+ * new PIN with `Math.random()` and wrote `pinRotationTime: Date.now()` to
+ * Firestore. The server then trusted that timestamp when deciding whether a PIN
+ * was still fresh. Two separate failures followed from that:
+ *
+ *   1. A rep with devtools could backdate `pinRotationTime` and freeze a PIN
+ *      alive indefinitely, defeating the entire anti-relay mechanism.
+ *   2. `Math.random()` is not a CSPRNG. Its output is predictable from a few
+ *      observed values, so an attacker watching one rotation could predict the
+ *      next ones and pre-compute a valid submission.
+ *
+ * Both are now impossible from the client: the PIN is generated here with
+ * `crypto.randomInt`, and the timestamp is `serverTimestamp()`, which the
+ * rep's browser cannot forge.
+ *
+ * ⚠️ THE READ-BACK TRAP — this is the part that bites.
+ * `FieldValue.serverTimestamp()` is a SENTINEL, not a value. It only becomes a
+ * real Timestamp when the document is read back. Any code doing arithmetic on
+ * the field must call `.toMillis()`:
+ *
+ *     const age = Date.now() - secret.pinRotationTime;   // ❌ NaN
+ *     const age = Date.now() - secret.pinRotationTime.toMillis();  // ✅
+ *
+ * A NaN age makes every freshness comparison silently FALSE, which fails OPEN
+ * on the next check. api/attendance.js reads this field ONLY through
+ * `ageMs()` in utils/geo.js, which handles the Timestamp, a legacy number, and
+ * the "absent/corrupt → treat as expired" case.
+ */
+async function handleRotatePin(req, res, decoded) {
+  try {
+    const { courseId } = req.body || {};
+    if (!courseId || typeof courseId !== "string")
+      return res.status(400).json({ error: "Course ID is required." });
+
+    const courseRef = db.collection("courses").doc(courseId);
+    const courseSnap = await courseRef.get();
+    if (!courseSnap.exists) return res.status(404).json({ error: "Course not found." });
+
+    const courseData = courseSnap.data();
+    const memberSnap = await courseRef.collection("members").doc(decoded.uid).get();
+    const isRep = courseData.repUid === decoded.uid;
+    const isAssistant = memberSnap.exists && memberSnap.data().role === "assistant";
+    if (!isRep && !isAssistant)
+      return res.status(403).json({ error: "Only course staff can rotate the PIN." });
+
+    const liveRef = courseRef.collection("session").doc("live");
+    const liveSnap = await liveRef.get();
+    if (!liveSnap.exists) return res.status(403).json({ error: "No live session." });
+    const live = liveSnap.data();
+    if (live.expiresAt && Date.now() > live.expiresAt)
+      return res.status(403).json({ error: "Session expired." });
+
+    const secretRef = courseRef.collection("session").doc("secret");
+
+    // Read + write in ONE transaction so two rotations racing (two rep devices,
+    // or a double-tap) cannot interleave and lose one of the two updates.
+    let newPin = null;
+    await db.runTransaction(async (tx) => {
+      const secretSnap = await tx.get(secretRef);
+      const secret = secretSnap.exists ? secretSnap.data() : {};
+      const next = generatePin(4);
+      tx.set(secretRef, {
+        pin: next,
+        previousPin: secret.pin || null,
+        // 🔒 Server clock. The client cannot backdate this.
+        pinRotationTime: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      newPin = next;
+    });
+
+    // Read the written timestamp back so the caller gets a real value, not the
+    // sentinel. This is the only correct way to hand a time to the client.
+    const after = await secretRef.get();
+    const afterData = after.exists ? after.data() : {};
+    const millis = toMillis(afterData.pinRotationTime);
+
+    return res.status(200).json({
+      success: true,
+      pin: newPin,
+      previousPin: afterData.previousPin || null,
+      // Returned as epoch ms so the client does not have to guess the shape.
+      pinRotationTime: millis === null ? Date.now() : millis,
+      serverNow: Date.now(),
+      pinRotationInterval: live.pinRotationInterval || 10,
+    });
+  } catch (error) {
+    console.error("Rotate PIN error:", error);
+    return res.status(500).json({ error: "Unable to rotate the PIN." });
+  }
+}
 
 async function handleClose(req, res, decoded) {
   try {
@@ -101,8 +196,9 @@ async function handleClose(req, res, decoded) {
 
     return res.status(200).json({ success: true, sessionKey, attendeesCount: attendees.length, revokedSessionAssistants: sessionAssistants.length });
   } catch (error) {
+    // 🔒 Generic message — error.message from Firestore embeds document paths.
     console.error("Close session error:", error);
-    return res.status(500).json({ error: "Unable to close session: " + error.message });
+    return res.status(500).json({ error: "Unable to close the session. Please try again." });
   }
 }
 
@@ -144,7 +240,8 @@ module.exports = async (req, res) => {
     const decoded = await getAuth().verifyIdToken(header.slice(7));
     switch (action) {
       case "close": return handleClose(req, res, decoded);
-      default: return res.status(400).json({ error: "Invalid action. Use: close, registerDevice" });
+      case "rotatePin": return handleRotatePin(req, res, decoded);
+      default: return res.status(400).json({ error: "Invalid action. Use: close, registerDevice, rotatePin" });
     }
   } catch (error) {
     console.error("Session API error:", error);

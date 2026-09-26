@@ -197,11 +197,21 @@ service cloud.firestore {
       }
     }
 
+    // 🔒 DEPARTMENT REPS — BACKEND-ONLY. This used to allow a client to
+    // `setDoc` its own document with `repUid == request.auth.uid`, which was
+    // self-appointment: the whole point of Phase 5 is that the ADVISER grants
+    // the rep role, and a client-writable slot defeats that on its own.
+    //
+    // Phase 5 removed the client's claim, but left this rule in place — so the
+    // hole stayed open to anyone with devtools. The rep is now written by
+    // api/onboarding.js (when the server grants it) and by api/roster.js
+    // (chosenRepUid on the roster), both on the Admin SDK.
+    //
+    // Reads stay open to signed-in users: the rep directory is how a student
+    // finds who to ask.
     match /departmentReps/{repId} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.repUid == request.auth.uid;
-      allow update, delete: if isOwner(repId);
+      allow write: if false;
     }
 
     match /courses/{courseId} {
@@ -445,7 +455,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // DEPARTMENT ROSTERS - the adviser's imported level list (Phase 4).
+    // 🛑 PIN ATTEMPT COUNTERS — backend-only. The client must not be able to
+    // read its own strike count (to learn the exact limit) nor clear it
+    // (which is the same localStorage-clearing bypass this replaced, one layer
+    // down). Keyed `{uid}_{courseId}`; only utils/throttle.js writes, on the
+    // Admin SDK.
+    match /pinAttempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    // DEPARTMENT ROSTERS — the adviser's imported level list (Phase 4).
     //
     // READ-ONLY TO CLIENTS, WITHOUT EXCEPTION. api/roster.js imports the CSV
     // and names the rep; it runs on the Admin SDK. There is deliberately no
