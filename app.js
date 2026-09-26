@@ -1750,60 +1750,56 @@ if (mobileMenuBtn && navLinks) {
         );
         const uid = userCredential.user.uid;
 
-        if (isRep) {
-          const cleanInst = institution.replace(/[^a-zA-Z0-9]/g, "_");
-          const cleanDept = department
-            .replace(/[^a-zA-Z0-9]/g, "_")
-            .toLowerCase();
-          const cleanLevel = level.replace(/[^a-zA-Z0-9]/g, "_");
-          const repSlotId = `rep_${cleanInst}_${cleanDept}_${cleanLevel}`;
-          const repSlotRef = doc(db, "departmentReps", repSlotId);
-
-          // Claim the rep slot ATOMICALLY. A plain getDoc→setDoc lets two
-          // simultaneous signups both pass the existence check and both
-          // claim the slot (classic check-then-act race).
-          try {
-            await runTransaction(db, async (tx) => {
-              if ((await tx.get(repSlotRef)).exists())
-                throw new Error("REP_SLOT_TAKEN");
-              tx.set(repSlotRef, { repUid: uid, registeredAt: Date.now() });
-            });
-          } catch (slotErr) {
-            if (slotErr.message === "REP_SLOT_TAKEN") {
-              await userCredential.user.delete();
-              throw new Error(
-                `A department representative already exists for ${institution} - ${department} (${level}).`,
-              );
-            }
-            throw slotErr;
+        // 🔒 PHASE 5: the profile is written by the SERVER, not here.
+        //
+        // This used to claim `departmentReps/{rep_INST_DEPT_LEVEL}` on the
+        // client and then setDoc the profile, which meant the rep badge was won
+        // by whoever signed up first — a race, not a decision. The server now
+        // checks this matric against `chosenRepMatric` on the level roster and
+        // writes whatever role is actually warranted, so the client's request
+        // is a REQUEST and never a grant.
+        //
+        // A rep refusal is NOT a failure: the account is created as a student
+        // and the response says so.
+        let signup = null;
+        try {
+          const idToken = await userCredential.user.getIdToken();
+          const res = await fetch("/api/onboarding?action=createProfile", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              role: signedRole,
+              name,
+              firstName: firstName || "",
+              middleName: middleName || "",
+              lastName: lastName || "",
+              matric: matric || "",
+              institution,
+              department,
+              level,
+              email,
+            }),
+          });
+          signup = await res.json();
+          if (!res.ok) {
+            throw new Error(
+              (signup && signup.error) || "Unable to create your account profile.",
+            );
           }
+        } catch (apiErr) {
+          // The Auth account exists but has no profile, and a profile-less
+          // account is a "ghost" that handleAuthState() refuses. Removing the
+          // Auth user keeps the two in step.
+          try {
+            await userCredential.user.delete();
+          } catch (_) {
+            /* best effort — the ghost is also caught on next sign-in */
+          }
+          throw apiErr;
         }
-
-        await setDoc(doc(db, "users", uid), {
-          uid,
-          name,
-          firstName: firstName || "",
-          middleName: middleName || "",
-          lastName: lastName || "",
-          matric: matric || null,
-          email,
-          role: signedRole,
-          isRep,
-          isAdviser: isAdviserSignup,
-          institution,
-          department,
-          level,
-          // Phase 3 verification: adviser email-code flow fills these in.
-          verificationStatus: isAdviserSignup ? "pending_email" : "not_required",
-          verifiedAt: null,
-          // Written explicitly as null (rather than omitted) so the field always
-          // EXISTS on the document. firestore.rules pins it with
-          // `request.resource.data.X == resource.data.X`, and referencing a
-          // missing key in a rules expression is an ERROR that denies the whole
-          // update — which would break every later profile edit.
-          verificationMethod: null,
-          createdAt: serverTimestamp(),
-        });
 
         // 🛑 The account is real and the profile is on disk. THIS flag is what
         // the `finally` block below needs to re-run handleAuthState() by hand:
@@ -1836,6 +1832,22 @@ if (mobileMenuBtn && navLinks) {
               "Check your inbox",
             );
           }
+        } else if (signup && signup.repRequest) {
+          // 🔒 PHASE 5: they asked for the rep card and the server said no.
+          // Say exactly why, so "why am I not the rep?" is never a mystery.
+          const why = {
+            NO_ROSTER:
+              "Your Level Adviser has not imported this level's roster yet. Ask them to import it, then sign in again.",
+            NO_REP_CHOSEN:
+              "Your Level Adviser has not chosen a course rep for this level yet. Ask them to pick one, then sign in again.",
+            NOT_THE_CHOSEN_REP:
+              "You're enrolled as a student. Your Level Adviser hasn't selected you as the course rep — only the student they name gets that role.",
+          };
+          toast.info(
+            why[signup.repRequest.reason] ||
+              "You're enrolled as a student. Only the rep your Level Adviser chooses gets the rep role.",
+            "Enrolled as a student 👨‍🎓",
+          );
         } else {
           toast.success(
             "Your account is ready. Welcome to VeriPresenX!",

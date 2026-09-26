@@ -28,7 +28,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
-const { isVerifiedAdviser } = require("../utils/roles");
+const { isVerifiedAdviser, ROLE } = require("../utils/roles");
 const { parseRosterCsv } = require("../utils/csv");
 
 try {
@@ -72,12 +72,11 @@ async function loadAdviserScope(uid) {
 
 
 /**
- * The roster document id. Segments are normalised the same way everywhere else
- * so Phase 5/6 can recompute it from a student's own profile and be certain it
- * addresses the same document the adviser wrote.
+ * The roster document id. Delegated to utils/rosters.js so this writer and
+ * api/onboarding.js's Phase 5 reader can never derive different ids for the
+ * same level — a mismatch would make a taken rep look free.
  */
-const rosterDocId = (institution, department, level) =>
-  `${institution}_${department}_${level}`.replace(/[^A-Z0-9_]/g, "_");
+const { rosterDocId } = require("../utils/rosters");
 
 /**
  * Import (or re-import) the level master list.
@@ -269,6 +268,17 @@ async function handleChooseRep(req, res, decoded) {
         // Their role is demoted by the same transaction via `role: "student"`
         // in Phase 5 when the account is linked, not here.
         const isReplacement = Boolean(roster.chosenRepMatric) && roster.chosenRepMatric !== wanted;
+        // 🔒 The outgoing rep may already have an account. "Old rep becomes a
+        // regular student" is only true if their profile actually says so, so
+        // the demotion happens here rather than being assumed. A null
+        // `chosenRepUid` means they never signed up, so there is nothing to do.
+        if (isReplacement && roster.chosenRepUid) {
+          tx.update(db.collection("users").doc(roster.chosenRepUid), {
+            role: ROLE.STUDENT,
+            isRep: false,
+            repGrantedByAdviser: false,
+          });
+        }
         tx.update(rosterRef, {
           chosenRepMatric: wanted,
           chosenRepName: repName,

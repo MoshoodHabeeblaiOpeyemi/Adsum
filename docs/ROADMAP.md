@@ -110,7 +110,7 @@ the user has to complete.
 
 ---
 
-## Phase 4 — Adviser roster · ✅ backend shipped
+## Phase 4 — Adviser roster · ✅ shipped (backend + UI)
 
 The trust chain's gate. An adviser imports the level master list and names ONE
 rep from it, which is what turns the rep badge from *claimed* into *granted*.
@@ -137,8 +137,59 @@ A re-import that no longer contains the current rep **drops the selection** and
 reports `repDropped`, because a rep who is not on the level roster is exactly
 the state this feature exists to prevent.
 
-**Still outstanding:** the adviser dashboard UI. Phase 5 then makes signup
-consult `chosenRepMatric` and deletes the client-side `REP_SLOT_TAKEN` race.
+**CSV format.** We do not get to specify it — the adviser exports whatever
+their department uses. `utils/csv.js` therefore matches a generous set of
+headings (`Matric`, `Matric No`, `S/No`, `S/N`, `Reg No`, `Student No`,
+`Index No`…), joins **Surname + Other Names** into one name, and when the
+headings are unhelpful it **detects the column from the shape of its values**
+(`24/56SV002` and variants) — warning the adviser when it does so. It survives a
+missing header row and a title banner above it. Only a broken identity is an
+error; everything else is a warning.
+
+**Rep changes are logged.** Every choose, replace, clear and re-import appends to
+`repChanges[]` with the outgoing rep named (bounded at 50 entries). Replacing asks
+for explicit confirmation and states plainly that the old rep becomes a regular
+student; the same is true of clearing. A re-import never erases the history.
+
+**Next:** Phase 6 makes student signup consult `matrics[]` for roster validation.
+
+---
+
+## Phase 5 — Rep is granted, not claimed · ✅ shipped
+
+The rep badge used to be won by arriving first: the client raced two signups for
+an empty `departmentReps` slot. It is now a decision the adviser makes and the
+server records.
+
+`utils/rosters.js` · `api/onboarding.js` · `api/roster.js` · `app.js`
+
+| Requested | Server finds | Result |
+| --- | --- | --- |
+| `rep` | matric === `chosenRepMatric` | `role: "rep"`, roster linked to the account |
+| `rep` | roster exists, no rep chosen | `role: "student"` + `NO_REP_CHOSEN` |
+| `rep` | roster exists, someone else chosen | `role: "student"` + `NOT_THE_CHOSEN_REP` |
+| `rep` | no roster for this level | `role: "student"` + `NO_ROSTER` |
+
+A refusal is **not** an error — the account is created, and the toast says
+exactly which of the four happened, so "why am I not the rep?" is never a
+mystery.
+
+- The roster is found from the **profile's own** institution/department/level,
+  never from a request parameter, so a student cannot point at a level where
+  someone else is the rep.
+- The client no longer writes its own profile; it posts to
+  `/api/onboarding?action=createProfile` and deletes the Auth account if the
+  profile write fails, so a ghost account cannot be left behind.
+- **Replacing a rep demotes them for real** — the outgoing rep's profile is
+  updated to `role: "student"`, `isRep: false` inside the same transaction.
+  "The old rep becomes a regular student" is now true rather than assumed.
+- `utils/rosters.js` owns the roster id so the writer and the reader cannot
+  derive different documents. Its `normSegment()` collapses `"200L"`, `"200 L"`
+  and `"200-L"` to one level — without it, an adviser who typed `200 L` and a
+  student who typed `200L` would address different rosters and the rep check
+  would silently find nothing.
+
+`REP_SLOT_TAKEN` no longer exists in `app.js`.
 
 ### Do these first, before any code
 

@@ -47,6 +47,8 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const crypto = require("crypto");
 const verifyAppCheck = require("../utils/appCheck");
 const { ROLE, VERIFICATION, SIGNUP_ROLES, isAdviserTrack } = require("../utils/roles");
+// `norm` is already declared locally above; only the roster lookup is imported.
+const { findRosterFor } = require("../utils/rosters");
 const { isInstitutionDomain } = require("../utils/institutions");
 const { sendVerificationCode } = require("../utils/mailer");
 
@@ -105,6 +107,61 @@ const repSlotId = (institution, department, level) => {
   return `rep_${inst}_${dept}_${lvl}`;
 };
 
+
+/** Cap the rep-change trail, matching api/roster.js. */
+const REP_CHANGE_LIMIT = 50;
+
+/** Append a "the rep's account has now signed up" entry to the trail. */
+function appendRepLinkChange(existing, entry) {
+  const list = Array.isArray(existing) ? existing.slice() : [];
+  list.push(entry);
+  return list.slice(-REP_CHANGE_LIMIT);
+}
+
+/**
+ * PHASE 5 — the rep is a GRANT, not a claim.
+ *
+ * The student asked for the rep card. The server decides what they actually
+ * get, by checking their matric against `chosenRepMatric` on the roster their
+ * own (institution, department, level) points at. A match means the adviser
+ * named them; anything else means they join as a regular student.
+ *
+ * This replaces the old client-side race where whoever signed up first won an
+ * empty `departmentReps` slot.
+ *
+ * 🔒 The roster is looked up by the PROFILE's own fields, never by anything the
+ * client sends, so a student cannot nominate a level where someone else is the
+ * rep, nor a level with no roster to pass them.
+ *
+ * @returns {Promise<{granted: boolean, reason: string, detail?: object}>}
+ */
+async function decideRepGrant(profile) {
+  const roster = await findRosterFor(db, profile);
+  if (!roster) {
+    return { granted: false, reason: "NO_ROSTER" };
+  }
+  const data = roster.data || {};
+  const chosen = data.chosenRepMatric ? norm(data.chosenRepMatric) : "";
+
+  // No rep named yet — the adviser has not chosen, so the card cannot be honoured.
+  if (!chosen) {
+    return {
+      granted: false,
+      reason: "NO_REP_CHOSEN",
+      detail: { levelExists: true },
+    };
+  }
+
+  if (norm(profile.matric) !== chosen) {
+    return { granted: false, reason: "NOT_THE_CHOSEN_REP" };
+  }
+
+  return {
+    granted: true,
+    reason: "CHOSEN",
+    detail: { rosterId: roster.id, chosenRepMatric: chosen },
+  };
+}
 
 /**
  * Normalise and validate the posted profile. Returns `{ ok: true, profile }` or
@@ -250,18 +307,29 @@ async function handleCreateProfile(req, res, decoded) {
       ? db.collection("departmentReps").doc(repSlotId(p.institution, p.department, p.level))
       : null;
 
-    // 🔒 The profile AND the rep-slot claim are written in ONE transaction.
-    // Doing them separately would let two simultaneous rep signups both pass the
-    // existence check and both believe they are the rep — the classic
-    // check-then-act race that app.js previously handled on the client, where a
-    // dropped connection could leave the slot claimed with no profile behind it.
+    // 🔒 PHASE 5: a rep request is only honoured if the ADVISER named this
+    // student. The client asked for "rep"; this is what they actually get.
+    // A refusal is NOT an error — the account is created, just as a student.
+    let repDecision = { granted: false, reason: "NOT_REQUESTED" };
+    if (p.isRep) {
+      repDecision = await decideRepGrant(p);
+    }
+    // The role actually written. Never the requested one unless it was granted.
+    const effectiveRole = p.isRep && repDecision.granted ? ROLE.REP : ROLE.STUDENT;
+    const effectiveIsRep = effectiveRole === ROLE.REP;
+
+    // The profile AND the rep-slot claim are written in ONE transaction.
+    // Doing them separately would let two simultaneous signups both pass the
+    // existence check — the classic check-then-act race that app.js previously
+    // handled on the client, where a dropped connection could leave the slot
+    // claimed with no profile behind it.
     try {
       await db.runTransaction(async (tx) => {
         const existing = await tx.get(profileRef);
         // Idempotent: a retried request must not wipe a profile the user has
         // since edited. 409 tells the client to treat it as "already done".
         if (existing.exists) throw new Error("PROFILE_EXISTS");
-        if (repSlotRef) {
+        if (repSlotRef && effectiveIsRep) {
           const slot = await tx.get(repSlotRef);
           if (slot.exists) throw new Error("REP_SLOT_TAKEN");
           tx.set(repSlotRef, { repUid: decoded.uid, registeredAt: FieldValue.serverTimestamp() });
@@ -282,9 +350,12 @@ async function handleCreateProfile(req, res, decoded) {
           // promoted to "level_anchor" / "verified" by api/verification.js once
           // the emailed code checks out. See utils/roles.js for why the two
           // adviser values are not interchangeable.
-          role: p.role,
-          isRep: p.isRep,
+          role: effectiveRole,
+          isRep: effectiveIsRep,
           isAdviser: p.isAdviser,
+          // A rep was CHOSEN by the adviser, not self-declared, so the fact is
+          // recorded rather than re-derived later from a mutable field.
+          repGrantedByAdviser: effectiveIsRep,
           verificationStatus: p.isAdviser ? VERIFICATION.PENDING_EMAIL : VERIFICATION.NOT_REQUIRED,
           // Written as explicit nulls (not omitted) so the keys always EXIST:
           // firestore.rules pins them with `get('verifiedAt', null) == ...`, and
@@ -357,11 +428,40 @@ async function handleCreateProfile(req, res, decoded) {
       }
     }
 
+    // 🔒 When a rep IS granted, link the account to the roster so the adviser's
+    // dashboard shows a real uid beside the name, and so a later rep change can
+    // find and demote this account.
+    if (effectiveIsRep) {
+      try {
+        const roster = await findRosterFor(db, p);
+        if (roster) {
+          await roster.ref.update({
+            chosenRepUid: decoded.uid,
+            chosenRepAt: FieldValue.serverTimestamp(),
+            repChanges: appendRepLinkChange(roster.data.repChanges, {
+              action: "linked",
+              matric: p.matric,
+              name: p.name,
+              at: FieldValue.serverTimestamp(),
+              by: decoded.uid,
+            }),
+          });
+        }
+      } catch (linkErr) {
+        // The account and the role are already committed and correct. Failing to
+        // write the convenience pointer must not undo a legitimate signup, so it
+        // is logged and the user simply does not appear in the history yet.
+        console.error("onboarding: rep link failed for", decoded.uid, linkErr.message);
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      role: p.role,
-      isRep: p.isRep,
+      // 🔒 The role actually granted, which is NOT always the one requested.
+      role: effectiveRole,
+      isRep: effectiveIsRep,
       isAdviser: p.isAdviser,
+      ...(p.isRep && !repDecision.granted ? { repRequest: repDecision } : {}),
       ...(verification ? { verification } : {}),
     });
   } catch (error) {
