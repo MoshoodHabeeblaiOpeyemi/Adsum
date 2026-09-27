@@ -1491,10 +1491,16 @@ if (mobileMenuBtn && navLinks) {
   // adviser rendered as the raw string "level_anchor" in the header and in the
   // settings profile. The unverified pending value stays listed so those
   // applicants see "Level Adviser — verification pending" rather than nothing.
+  // 🔑 The displayed role is NOT the stored one. `role: "adviser"` means
+  // APPLIED AND UNVERIFIED (see utils/roles.js), and a verified adviser is
+  // promoted to "level_anchor". Showing the raw value made a pending adviser
+  // read "Regular Student", because a dashboard with no role badge at all is
+  // more alarming than an honest one. The label now says exactly where they
+  // are: applied -> pending, verified -> full powers.
   const ROLE_LABEL = {
     student: "Regular Student",
     rep: "Course Rep",
-    adviser: "Level Adviser (pending)",
+    adviser: "Pending Adviser",
     level_anchor: "Level Adviser",
   };
   const ROLE_SUB = {
@@ -1849,17 +1855,29 @@ if (mobileMenuBtn && navLinks) {
           // verified nothing. The 6-digit code is the path the rest of the
           // trust chain actually uses, so it is the only one we send.
           //
-          // The message still comes from the server where possible: it knows
-          // whether mail was really delivered, and the spam-folder warning only
-          // makes sense when it was.
-          toast.info(
-            (signup && signup.verification && signup.verification.message) ||
-              "We sent a 6-digit code to " + email + ". If it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools unlock once you enter the code.",
-            "Check your school email 📧",
-            // 15s: this message carries an instruction the user must act on
-            // (open the email, find a 6-digit number). 3.5s is unreadable.
-            15000
-          );
+          // 🔒 A MODAL, NOT A TOAST. The spam-folder warning is the single most
+          // important thing a first-time recipient needs, and a 15s toast
+          // disappears while they are still hunting for the email. They
+          // acknowledge, and only then is the code field offered — so the order
+          // of the two screens is the order of the two instructions.
+          //
+          // If mail was NOT delivered (keys unset, or Resend failed) there is no
+          // code to chase, so we fall back to a toast and go straight to the
+          // field where "Resend code" is one click away.
+          const serverMsg = signup && signup.verification && signup.verification.message;
+          const wasDelivered =
+            !signup || !signup.verification || signup.verification.delivery === "email";
+
+          if (wasDelivered) {
+            openCodeSentModal(email);
+          } else {
+            toast.warning(
+              serverMsg || "Account created, but the code could not be emailed. Use Resend code to try again.",
+              "Verify your email",
+              12000,
+            );
+            setTimeout(openAdviserVerifyModal, 600);
+          }
         } else if (signup && signup.rosterStatus === "unverified") {
           // 🔒 PHASE 6: the account is real, but this matric is not on the
           // level roster the adviser imported. Say so and name the next step —
@@ -1974,6 +1992,9 @@ if (mobileMenuBtn && navLinks) {
         const stillPending = syncAdviserVerificationUI();
         if (stillPending && !adviserVerifyModalShownThisSession) {
           adviserVerifyModalShownThisSession = true;
+          // Returning to the app mid-flow: they have already read the warning,
+          // so go straight to the code field rather than making them dismiss
+          // the same notice twice.
           setTimeout(openAdviserVerifyModal, 400);
         }
       } else {
@@ -8493,11 +8514,47 @@ function syncAdviserDashboard() {
     );
   }
 
+  /**
+   * Step 1 of verification: "we sent a code, here's the trap you will hit."
+   *
+   * This is a MODAL, not a toast. On a brand-new sending domain the code lands
+   * in Spam almost every time, and that warning is the difference between the
+   * adviser finding the code and believing the system is broken. A toast
+   * disappears while they are still looking for their inbox, so the guidance
+   * has to be something they dismiss deliberately.
+   *
+   * Acknowledging it is what reveals the code field, so the order of the two
+   * screens matches the order of the two instructions.
+   */
+  function openCodeSentModal(email) {
+    const modal = document.getElementById("codeSentModal");
+    if (!modal) {
+      // Never leave the user with no way forward if the modal is missing.
+      openAdviserVerifyModal();
+      return;
+    }
+    const emailEl = document.getElementById("codeSentEmail");
+    if (emailEl) emailEl.textContent = email || (currentUser && currentUser.email) || "your school email";
+    modal.classList.add("show");
+    setTimeout(() => {
+      const btn = document.getElementById("codeSentAckBtn");
+      if (btn) btn.focus();
+    }, 260);
+  }
+
+  function closeCodeSentModal() {
+    const modal = document.getElementById("codeSentModal");
+    if (modal) modal.classList.remove("show");
+  }
+
   function openAdviserVerifyModal() {
     const modal = document.getElementById("adviserVerifyModal");
     const input = document.getElementById("adviserCodeInput");
     const emailEl = document.getElementById("adviserVerifyEmail");
     if (!modal) return;
+    // Never stack the two modals: acknowledging moves to the code field, so
+    // the first must be gone before the second appears.
+    closeCodeSentModal();
     if (emailEl) {
       emailEl.textContent = (currentUser && currentUser.email) || "your school email";
     }
@@ -8663,6 +8720,28 @@ function syncAdviserDashboard() {
     if (resend) resend.addEventListener("click", resendAdviserCode);
     if (later) later.addEventListener("click", closeAdviserVerifyModal);
     if (bannerBtn) bannerBtn.addEventListener("click", openAdviserVerifyModal);
+    // 🆕 Acknowledging the "code sent" notice is what reveals the code field.
+    const ack = document.getElementById("codeSentAckBtn");
+    if (ack) {
+      ack.addEventListener("click", () => {
+        closeCodeSentModal();
+        openAdviserVerifyModal();
+      });
+    }
+    // Escape closes whichever is open, newest first. A modal with no escape
+    // hatch is a trap, and the code field is always reachable from the banner.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const sent = document.getElementById("codeSentModal");
+      const verify = document.getElementById("adviserVerifyModal");
+      if (sent && sent.classList.contains("show")) {
+        // Do NOT fall through to the code field here — the user has not
+        // acknowledged the warning yet, and the two are sequential.
+        closeCodeSentModal();
+      } else if (verify && verify.classList.contains("show")) {
+        closeAdviserVerifyModal();
+      }
+    });
     if (input) {
       // Strip non-digits as they are typed: a pasted "829 801" or "829-801"
       // should just work rather than being rejected after a round trip.

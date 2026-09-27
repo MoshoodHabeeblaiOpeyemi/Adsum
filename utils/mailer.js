@@ -37,15 +37,7 @@ async function sendVerificationCode({ to, code, institutionId, level, department
           `It expires in 10 minutes. Enter it in the app to activate your\n` +
           `Level Adviser account.\n\n` +
           `If you did not request this, ignore this email — nothing happens\n` +
-          `until the code is entered.\n\n` +
-          // 💡 A brand-new sending domain has no sender reputation yet, so the
-          // first few codes land in Spam almost every time. Without this the
-          // adviser concludes the code never sent and gives up on verification.
-          // Marking it "Not spam" teaches their provider to deliver the rest
-          // to the inbox, so this one line saves every future message.
-          `P.S. First time hearing from us? The code may be in your Spam or\n` +
-          `Promotions folder — check there, and mark this email "Not Spam" so\n` +
-          `future codes land straight in your inbox.`,
+          `until the code is entered.`,
       }),
     });
 

@@ -1,0 +1,34 @@
+feat(adviser): fix invisible verification UI, Pending Adviser label, 24h prune
+
+The code-entry UI existed and worked, but NONE of it rendered. The modal,
+the banner and the entire adviser dashboard had been inserted AFTER
+</main>, outside the auth container - so an adviser had no button to
+enter their code, because the button was not on the page. That was the
+root cause of the reported symptom, and the sections are now inside
+<main> again.
+
+Role now reads "Pending Adviser" rather than the stored role, which
+made an unverified applicant look like a plain student with no role at
+all. After the code is accepted it becomes "Level Adviser", because
+currentUser is re-read and the label follows it.
+
+The "we sent a code" notice is a MODAL the user acknowledges, not a 15s
+toast. On a brand-new sending domain the spam-folder warning is the
+single most important thing a first-time recipient reads, and a toast
+disappears while they are still hunting for the email. Acknowledging it
+is what reveals the code field, so the screens appear in the order of
+the instructions. If mail was NOT delivered there is no code to chase,
+so that case skips straight to the field. The email P.S. moved into
+this modal where it cannot be skimmed past.
+
+api/prune-advisers.js reclaims unverified applications: warning at 12h,
+full deletion at 24h including the Firebase Auth user, so the address is
+free to re-apply. This matters because one adviser per level is a
+denial-of-service target - an unverified application otherwise locks out
+the department's real adviser permanently. An unverified adviser holds
+no adviserSlots row, no courses and no roster, so pruning one cannot
+orphan anything, and the query is pinned to role + verificationStatus
+so nothing else is ever swept up. It requires CRON_SECRET, so it
+cannot become a public delete endpoint.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

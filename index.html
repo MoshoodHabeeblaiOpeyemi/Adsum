@@ -889,8 +889,6 @@
       </div>
     </div>
 
-  </main>
-
   <!-- SEMESTER ATTENDANCE REPORT (Phase 5) ----------------------------
        The document a Head of Department actually asks for: every class
        held so far and each student's percentage. CSV for a spreadsheet,
@@ -935,6 +933,50 @@
       <p class="adviser-foot" id="reportNote"></p>
     </div>
   </section>
+  <!-- CODE SENT ACKNOWLEDGEMENT ------------------------------------------
+       The adviser must ACKNOWLEDGE that a code is on its way before the
+       code-entry field appears. Deliberately a modal, not a toast: a 15-second
+       toast vanishes while the user is still looking for their inbox, and on a
+       brand-new sending domain the spam-folder note is the single most
+       important thing they will read. It now lives here rather than at the
+       foot of the email, so it cannot be skimmed past. -->
+  <div id="codeSentModal" class="modal" role="dialog" aria-modal="true"
+       aria-labelledby="codeSentTitle">
+    <div class="modal-card" style="max-width: 420px;">
+      <div style="text-align:center; margin-bottom:6px;">
+        <span style="font-size:2rem;">📧</span>
+      </div>
+      <h3 id="codeSentTitle" style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 10px; text-align:center;">
+        Check your email
+      </h3>
+      <p style="font-size:0.88rem; color:var(--text-muted); margin:0 0 10px; line-height:1.55; text-align:center;">
+        We sent a 6-digit code to
+        <strong id="codeSentEmail" style="color:var(--text-primary); word-break:break-all;">your school email</strong>.
+      </p>
+
+      <div style="margin:14px 0; padding:12px 14px; border-radius:12px;
+                  border:1.5px solid #d9a441; background:rgba(217,164,65,0.08);">
+        <strong style="display:block; font-size:0.83rem; margin-bottom:5px; color:#d9a441;">
+          Can't see it? Check your spam folder.
+        </strong>
+        <span style="font-size:0.79rem; color:var(--text-muted); line-height:1.55;">
+          VeriPresenX sends from a new email address, so the code often lands in
+          <strong>Spam</strong> or <strong>Promotions</strong>. Open that folder,
+          find the email from us, and mark it <strong>"Not Spam"</strong> —
+          otherwise every future code goes there too.
+        </span>
+      </div>
+
+      <p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 4px; line-height:1.5; text-align:center;">
+        The code expires in 10 minutes. You can request a new one at any time.
+      </p>
+
+      <button type="button" class="btn" id="codeSentAckBtn" style="width:100%; margin-top:16px;">
+        <i data-lucide="check"></i> I understand — enter my code
+      </button>
+    </div>
+  </div>
+
   <!-- ADVISER CODE VERIFICATION (Phase 3 UX) -------------------------------
        The 6-digit code is the ONLY verification path. Firebase's own
        verification email was removed because it duplicated this one and its
@@ -1004,13 +1046,14 @@
               display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
     <span style="font-size:1.1rem;">🔒</span>
     <div style="flex:1; min-width:200px;">
-      <strong style="display:block; font-size:0.87rem;">Your adviser account is not verified yet</strong>
+      <strong style="display:block; font-size:0.87rem;">You're a Pending Adviser</strong>
       <span style="font-size:0.78rem; color:var(--text-muted);">
-        Enter the 6-digit code we emailed you to unlock your roster tools.
+        Enter the 6-digit code we emailed you to unlock your roster tools. This
+        account is removed automatically if it isn't verified within 24 hours.
       </span>
     </div>
     <button type="button" class="btn" id="adviserBannerVerifyBtn" style="width:auto; padding:9px 16px;">
-      Verify now
+      <i data-lucide="shield-check"></i> Enter code
     </button>
   </div>
 
@@ -1082,6 +1125,9 @@
     <p class="adviser-foot">Re-import at the start of each semester. Re-importing never erases
       the rep history.</p>
   </section>
+
+  </main>
+
 
   <!-- MODAL: FORGOT PASSWORD -->
   <div id="forgotModal" class="modal">
