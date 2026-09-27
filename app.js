@@ -1834,8 +1834,20 @@ if (mobileMenuBtn && navLinks) {
         if (isAdviserSignup) {
           try {
             await sendEmailVerification(userCredential.user);
+            // 🔗 The SERVER owns this wording.
+            //
+            // api/onboarding.js knows whether the 6-digit code actually went
+            // out, and its message is the one that matches reality - including
+            // the spam-folder warning, which only matters when mail really was
+            // delivered. A hardcoded string here had to guess, and when the
+            // wording changed the copy here silently went stale.
+            //
+            // The fallback below is only reached if the response carried no
+            // verification object at all, which should not happen for an
+            // adviser - but a hard blank toast would be worse than a stale one.
             toast.info(
-              "Account created. Check your school email for the verification link — if it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools stay locked until verification passes.",
+              (signup && signup.verification && signup.verification.message) ||
+                "Account created. Check your school email for the verification link — if it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools stay locked until verification passes.",
               "Verify your school email 📧",
             );
           } catch (verifyErr) {
