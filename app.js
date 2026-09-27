@@ -1835,7 +1835,7 @@ if (mobileMenuBtn && navLinks) {
           try {
             await sendEmailVerification(userCredential.user);
             toast.info(
-              "Account created. We sent a verification link to your school email — click it to prove the address is yours. Adviser tools stay locked until that check passes.",
+              "Account created. Check your school email for the verification link — if it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools stay locked until verification passes.",
               "Verify your school email 📧",
             );
           } catch (verifyErr) {

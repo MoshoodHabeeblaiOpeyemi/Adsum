@@ -168,7 +168,7 @@ async function handleSendCode(req, res, decoded) {
     return res.status(200).json({
       success: true,
       message: mail.delivered
-        ? "A 6-digit code is on its way to your school email."
+        ? "A 6-digit code is on its way to your school email. If you don't see it within a minute, check your Spam folder and mark it as 'Not Spam'."
         : "Code created. Email delivery is not configured yet on this deployment.",
       delivery: mail.delivered ? "email" : "not_configured",
       expiresInSeconds: CODE_TTL_MS / 1000,

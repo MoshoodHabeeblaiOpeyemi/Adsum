@@ -407,7 +407,7 @@ async function handleCreateProfile(req, res, decoded) {
           required: true,
           delivery: mail.delivered ? "email" : "not_configured",
           message: mail.delivered
-            ? "A 6-digit code is on its way to your school email."
+            ? "A 6-digit code is on its way to your school email. If you don't see it within a minute, check your Spam folder and mark it as 'Not Spam'."
             : "Account created. Email delivery is not configured on this deployment yet — use \"Resend verification\" once an administrator sets it up.",
           expiresInSeconds: CODE_TTL_MS / 1000,
         };
