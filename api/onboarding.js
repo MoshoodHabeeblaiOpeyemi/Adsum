@@ -287,8 +287,32 @@ async function handleCreateProfile(req, res, decoded) {
       else if (norm(p.matric) !== chosen) repDecision = { granted: false, reason: "NOT_THE_CHOSEN_REP" };
       else repDecision = { granted: true, reason: "CHOSEN" };
     }
-    // The role actually written. Never the requested one unless it was granted.
-    const effectiveRole = p.isRep && repDecision.granted ? ROLE.REP : ROLE.STUDENT;
+    // 🔒 The role actually written to the profile.
+    //
+    // This ternary used to be two-way only:
+    //
+    //     p.isRep && repDecision.granted ? ROLE.REP : ROLE.STUDENT
+    //
+    // which silently persisted EVERY non-rep as "student" — including
+    // advisers. The damage was invisible at signup because the profile was
+    // written correctly-looking, but downstream everything disagreed:
+    // needsAdviserVerification() needs role === "adviser" so the reopen
+    // banner never appeared, and ROLE_LABEL["student"] rendered "Regular
+    // Student" beside a Level Adviser's name. Meanwhile
+    // verificationStatus was correctly "pending_email", so the code modal
+    // still opened — which is why it looked like a UI problem rather than a
+    // data one.
+    //
+    // Three cases, and only the rep one is conditional:
+    //   adviser -> ADVISER_PENDING, always (it is later promoted to
+    //              level_anchor by api/verification.js, never here)
+    //   rep     -> only when the ADVISER named them
+    //   student -> otherwise
+    const effectiveRole = p.isAdviser
+      ? ROLE.ADVISER_PENDING
+      : p.isRep && repDecision.granted
+        ? ROLE.REP
+        : ROLE.STUDENT;
     const effectiveIsRep = effectiveRole === ROLE.REP;
 
     // PHASE 6 — roster membership, for students and reps. Advisers carry no
