@@ -2047,7 +2047,17 @@ if (mobileMenuBtn && navLinks) {
 
           if (!response.ok) {
             const result = await response.json().catch(() => ({}));
-            throw new Error(result.error || "Server error during deletion.");
+            // Say what actually happened. "Check your connection" was actively
+            // misleading: a missing Firestore index or a server fault is not
+            // the user's network, and telling them so sent them debugging the
+            // wrong thing entirely.
+            const hint =
+              result.code === "INDEX_NOT_DEPLOYED"
+                ? "This is a server-side issue, not your connection. Please try again shortly."
+                : response.status >= 500
+                  ? "Something went wrong on our side, not your connection. Please try again."
+                  : result.error || "Server error during deletion.";
+            throw new Error(hint);
           }
 
           localStorage.removeItem("veripresenx_device_uuid");
@@ -2069,7 +2079,8 @@ if (mobileMenuBtn && navLinks) {
         } catch (error) {
           console.error("Delete account error:", error);
           toast.error(
-            "Something went wrong while deleting your account. Please check your connection.",
+            error.message ||
+              "Something went wrong while deleting your account. Please try again.",
             "Delete Failed",
           );
         }

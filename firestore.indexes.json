@@ -1,0 +1,14 @@
+{
+  "//": "Firestore indexes. Deployed alongside the rules by the GitHub workflow.",
+  "//account-js": "api/account.js deleteAccount runs db.collectionGroup('members').where('uid','==',uid). A collection-group query ALWAYS needs an explicit index - Firestore cannot serve one without it, and the call fails with 9 FAILED_PRECONDITION (instantly, not on a timeout). This index is what makes account deletion work at all.",
+  "indexes": [
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,15 +1,20 @@
-name: Deploy Firestore Rules
+name: Deploy Firestore Rules & Indexes
 
-# Auto-ships firestore.rules to the live Firebase project whenever it changes
-# on main. Also runnable manually: Actions tab → Deploy Firestore Rules →
-# "Run workflow". Nothing else in this repo is deployed here — Vercel handles
-# the app + API functions; this job ONLY keeps Firestore rules in sync.
+# Auto-ships firestore.rules AND firestore.indexes.json to the live Firebase
+# project whenever they change on main. Also runnable manually: Actions tab ->
+# Deploy Firestore Rules & Indexes -> "Run workflow". Nothing else in this repo is
+# deployed here - Vercel handles the app + API functions; this job keeps the
+# database access layer in sync.
+#
+# Indexes are not optional: firestore.indexes.json carries the collection-group
+# index that account deletion queries. Without it, deleteAccount fails.
 
 on:
   push:
     branches: [main]
     paths:
       - "firestore.rules"
+      - "firestore.indexes.json"
   workflow_dispatch:
 
 jobs:
@@ -69,7 +74,7 @@ jobs:
             echo "⚠️ No service-account secrets set — will try FIREBASE_TOKEN in the deploy step."
           fi
 
-      - name: Deploy Firestore rules
+      - name: Deploy Firestore rules and indexes
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
@@ -81,4 +86,8 @@ jobs:
             echo "::error::No Firebase credentials found. Add a GitHub secret named FIREBASE_SERVICE_ACCOUNT (paste the full service-account JSON from Firebase console), or FIREBASE_TOKEN, then re-run this workflow from the Actions tab."
             exit 1
           fi
-          firebase deploy --only firestore:rules --project "attendify-4c93d" --non-interactive
+          # Indexes are NOT optional. firestore.indexes.json carries the
+          # collection-group index api/account.js deleteAccount needs; without
+          # it the query fails with 9 FAILED_PRECONDITION and deletion is dead.
+          # Rules alone leave account deletion broken.
+          firebase deploy --only firestore:rules,firestore:indexes --project "attendify-4c93d" --non-interactive

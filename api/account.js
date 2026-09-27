@@ -29,7 +29,35 @@ async function handleDeleteAccount(req, res, decoded) {
     if (!profileSnap.exists) return res.status(404).json({ error: "Profile not found." });
     const profile = profileSnap.data();
     const matric = norm(profile.matric), institution = norm(profile.institution) || "UNKNOWN";
-    const memberships = await db.collectionGroup("members").where("uid","==",uid).get();
+
+    // 🔍 WHICH COURSES IS THIS USER IN?
+    //
+    // A collection-group query needs an explicit Firestore index — there is no
+    // automatic one. Without firestore.indexes.json this throws
+    // 9 FAILED_PRECONDITION INSTANTLY, which the browser then reports as
+    // "Network Error" and the user blames their connection.
+    //
+    // It used to sit in the generic catch below, where it vanished into a
+    // generic "please try again". An operational fault deserves its own log
+    // line and its own status code, so it is separated here.
+    let memberships;
+    try {
+      memberships = await db.collectionGroup("members").where("uid", "==", uid).get();
+    } catch (queryErr) {
+      const code = queryErr && queryErr.code;
+      if (code === 9 || /FAILED_PRECONDITION|requires an index/i.test(String(queryErr && queryErr.message))) {
+        console.error(
+          "deleteAccount: Firestore index missing. Deploy it with: firebase deploy --only firestore:indexes",
+          queryErr.message,
+        );
+        return res.status(503).json({
+          error: "Account deletion is temporarily unavailable. Please try again shortly.",
+          code: "INDEX_NOT_DEPLOYED",
+        });
+      }
+      throw queryErr;
+    }
+
     const courseIds = new Set(); memberships.docs.forEach(d => courseIds.add(d.ref.parent.parent.id));
     let coursesLeft = 0, coursesDeleted = 0;
     for (const courseId of courseIds) {
