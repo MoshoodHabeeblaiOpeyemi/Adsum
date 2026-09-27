@@ -258,11 +258,39 @@
 
     <!-- MAIN DASHBOARD -->
     <section id="dashboardSection" class="hidden">
+  <!-- PERSISTENT BANNER — shown on the dashboard while an adviser is still
+       unverified, so dismissing the modal never leaves them without a way back
+       in. This is the difference between "a nag" and "a dead end". -->
+  <div id="adviserVerifyBanner" class="hidden"
+       style="position:sticky; top:0; z-index:70; margin:0 0 16px; padding:12px 16px;
+              border-radius:12px; border:1.5px solid #d9a441; background:var(--card-bg);
+              display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <span style="font-size:1.1rem;">🔒</span>
+    <div style="flex:1; min-width:200px;">
+      <strong style="display:block; font-size:0.87rem;">You're a Pending Adviser</strong>
+      <span style="font-size:0.78rem; color:var(--text-muted);">
+        Enter the 6-digit code we emailed you to unlock your roster tools. This
+        account is removed automatically if it isn't verified within 24 hours.
+      </span>
+    </div>
+    <button type="button" class="btn" id="adviserBannerVerifyBtn" style="width:auto; padding:9px 16px;">
+      <i data-lucide="shield-check"></i> Enter code
+    </button>
+  </div>
       <div class="dashboard-header">
         <h2><i data-lucide="hand-metal"></i> Hey, <span id="displayName">Student</span>!</h2>
         <p style="margin-bottom: 5px;">
           <span style="font-weight: bold; color: var(--navy);" id="displayMatricLabel">Matric No:</span> <strong
             id="displayMatric">---</strong>
+        </p>
+        <!-- 🔑 The role is ALWAYS shown, not swapped for the matric.
+             Previously the role was rendered only when the profile had NO
+             matric, so an account that had one could never display its role at
+             all. That is how a Pending Adviser ended up reading "Regular
+             Student" beside their name. Matric and role are different facts and
+             both belong on screen. -->
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 4px;">
+          Role: <strong id="displayRole" style="color: var(--navy);">---</strong>
         </p>
         <p style="font-size: 0.9rem; font-weight: 600; color: var(--teal); margin-bottom: 10px;" id="displaySchoolInfo">
           ---
@@ -1037,25 +1065,6 @@
     </div>
   </div>
 
-  <!-- PERSISTENT BANNER — shown on the dashboard while an adviser is still
-       unverified, so dismissing the modal never leaves them without a way back
-       in. This is the difference between "a nag" and "a dead end". -->
-  <div id="adviserVerifyBanner" class="hidden"
-       style="position:sticky; top:0; z-index:70; margin:0 0 16px; padding:12px 16px;
-              border-radius:12px; border:1.5px solid #d9a441; background:var(--card-bg);
-              display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-    <span style="font-size:1.1rem;">🔒</span>
-    <div style="flex:1; min-width:200px;">
-      <strong style="display:block; font-size:0.87rem;">You're a Pending Adviser</strong>
-      <span style="font-size:0.78rem; color:var(--text-muted);">
-        Enter the 6-digit code we emailed you to unlock your roster tools. This
-        account is removed automatically if it isn't verified within 24 hours.
-      </span>
-    </div>
-    <button type="button" class="btn" id="adviserBannerVerifyBtn" style="width:auto; padding:9px 16px;">
-      <i data-lucide="shield-check"></i> Enter code
-    </button>
-  </div>
 
   <!-- ADVISER DASHBOARD (Phase 4) -------------------------------------
        Deliberately minimal: two actions (import a roster, name the rep) plus a
@@ -1127,7 +1136,6 @@
   </section>
 
   </main>
-
 
   <!-- MODAL: FORGOT PASSWORD -->
   <div id="forgotModal" class="modal">

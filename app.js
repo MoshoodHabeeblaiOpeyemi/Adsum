@@ -1615,18 +1615,37 @@ if (mobileMenuBtn && navLinks) {
       if (openSettingsBtn) openSettingsBtn.classList.remove("hidden");
 
       displayName.textContent = currentUser.name;
-      // Advisers have NO matric — the trust chain keys them on
-      // institution/department/level, not a student number. Assigning the raw
-      // `null` to textContent renders the literal string "null" in the
-      // dashboard greeting, so branch on it and show the role instead.
-      if (displayMatric) {
-        const hasMatric = Boolean(currentUser.matric);
-        displayMatric.textContent = hasMatric
-          ? currentUser.matric
+
+      // 🔑 Role and matric are SEPARATE facts, so show both.
+      //
+      // The old code showed the role ONLY when the profile had no matric:
+      //
+      //   hasMatric ? currentUser.matric : ROLE_LABEL[currentUser.role]
+      //
+      // So an account with a matric never displayed its role at all, and a
+      // Pending Adviser read "Regular Student" beside their name. The role line
+      // is now populated unconditionally, and the matric/role block below only
+      // handles the matric.
+      const roleEl = document.getElementById("displayRole");
+      if (roleEl) {
+        // 🔒 A pending adviser is NOT an anchor, and the label must say so.
+        // needsAdviserVerification() reads the two server-owned fields rather
+        // than the display string, so this can never be spoofed by a client
+        // that renames its own role.
+        roleEl.textContent = needsAdviserVerification(currentUser)
+          ? "Pending Adviser (unverified)"
           : ROLE_LABEL[currentUser.role] || "Member";
+      }
+
+      if (displayMatric) {
+        // Advisers have NO matric — the trust chain keys them on
+        // institution/department/level, not a student number. Showing "null"
+        // would be worse than showing nothing, so the label says why.
+        const hasMatric = Boolean(currentUser.matric);
+        displayMatric.textContent = hasMatric ? currentUser.matric : "—";
         const matricLabel = document.getElementById("displayMatricLabel");
         if (matricLabel) {
-          matricLabel.textContent = hasMatric ? "Matric No:" : "Role:";
+          matricLabel.textContent = hasMatric ? "Matric No:" : "Matric:";
         }
       }
 
