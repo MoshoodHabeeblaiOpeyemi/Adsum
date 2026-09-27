@@ -26,7 +26,6 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
-  sendEmailVerification,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 import {
   getFirestore,
@@ -66,7 +65,7 @@ function refreshIcons() {
 // ============================================================
 // TOAST NOTIFICATION SYSTEM
 // ============================================================
-function showToast(message, type = "info", title = "") {
+function showToast(message, type = "info", title = "", durationMs) {
   const container = document.getElementById("toast-container");
   if (!container) {
     console.warn(message);
@@ -111,7 +110,15 @@ function showToast(message, type = "info", title = "") {
 
   container.appendChild(toast);
 
-  const duration = type === "error" ? 5000 : 3500;
+  // Optional 4th argument lets an important message (e.g. the adviser
+  // verification code, which the user must act on) outlive the default.
+  // Omitting it keeps the previous timings exactly.
+  const duration =
+    typeof durationMs === "number" && durationMs > 0
+      ? durationMs
+      : type === "error"
+        ? 5000
+        : 3500;
   setTimeout(() => {
     toast.classList.add("toast-exit");
     toast.addEventListener("animationend", () => toast.remove(), {
@@ -125,7 +132,7 @@ const toast = {
   success: (msg, title) => showToast(msg, "success", title),
   error: (msg, title) => showToast(msg, "error", title),
   warning: (msg, title) => showToast(msg, "warning", title),
-  info: (msg, title) => showToast(msg, "info", title),
+  info: (msg, title, durationMs) => showToast(msg, "info", title, durationMs),
 };
 
 // ============================================================
@@ -1822,56 +1829,36 @@ if (mobileMenuBtn && navLinks) {
         signupSucceeded = true;
         signupForm.reset();
 
-        // --- PHASE 3: ADVISER EMAIL VERIFICATION (Firebase built-in link) ---
-        // Pilot path: the adviser signs up with their school email and we send
-        // Firebase's own verification link. The link only proves INBOX OWNERSHIP.
+        // --- ADVISER VERIFICATION: 6-DIGIT CODE ONLY -------------------------
+        // The code was already minted and emailed by api/onboarding.js during
+        // signup. This branch only tells the user about it.
+        //
         // It does NOT promote the account: `role` stays "adviser" and
-        // `verificationStatus` stays "pending_email" until api/verification.js
-        // runs the 6-digit code check, claims the adviserSlots row and writes
-        // role: "level_anchor". So we must NOT tell the user their access has
-        // unlocked here — that promise was never backed by any code.
+        // `verificationStatus` stays "pending_email" until they enter the code
+        // and api/verification.js claims the adviserSlots row and writes
+        // role: "level_anchor". So we must NOT say their access has unlocked.
         // NIN stays a disabled placeholder (index.html) until after the pilot.
         if (isAdviserSignup) {
-          try {
-            await sendEmailVerification(userCredential.user);
-            // 🔗 The SERVER owns this wording.
-            //
-            // api/onboarding.js knows whether the 6-digit code actually went
-            // out, and its message is the one that matches reality - including
-            // the spam-folder warning, which only matters when mail really was
-            // delivered. A hardcoded string here had to guess, and when the
-            // wording changed the copy here silently went stale.
-            //
-            // The fallback below is only reached if the response carried no
-            // verification object at all, which should not happen for an
-            // adviser - but a hard blank toast would be worse than a stale one.
-            toast.info(
-              (signup && signup.verification && signup.verification.message) ||
-                "Account created. Check your school email for the verification link — if it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools stay locked until verification passes.",
-              "Verify your school email 📧",
-            );
-          } catch (verifyErr) {
-            console.warn("Adviser verification email failed:", verifyErr);
-            toast.warning(
-              "Account created, but the verification email could not be sent. Log in later and use \"Resend verification\".",
-              "Check your inbox",
-            );
-          }
-        } else if (signup && signup.repRequest) {
-          // 🔒 PHASE 5: they asked for the rep card and the server said no.
-          // Say exactly why, so "why am I not the rep?" is never a mystery.
-          const why = {
-            NO_ROSTER:
-              "Your Level Adviser has not imported this level's roster yet. Ask them to import it, then sign in again.",
-            NO_REP_CHOSEN:
-              "Your Level Adviser has not chosen a course rep for this level yet. Ask them to pick one, then sign in again.",
-            NOT_THE_CHOSEN_REP:
-              "You're enrolled as a student. Your Level Adviser hasn't selected you as the course rep — only the student they name gets that role.",
-          };
+          // 📧 ONE email, not two.
+          //
+          // This used to call Firebase's sendEmailVerification() as well as the
+          // custom 6-digit code, so every adviser received two emails. The
+          // Firebase one was worse than merely redundant: its action link
+          // points at <project>.firebaseapp.com, and this project has no
+          // Hosting, so the link led to "This site can't be reached" and
+          // verified nothing. The 6-digit code is the path the rest of the
+          // trust chain actually uses, so it is the only one we send.
+          //
+          // The message still comes from the server where possible: it knows
+          // whether mail was really delivered, and the spam-folder warning only
+          // makes sense when it was.
           toast.info(
-            why[signup.repRequest.reason] ||
-              "You're enrolled as a student. Only the rep your Level Adviser chooses gets the rep role.",
-            "Enrolled as a student 👨‍🎓",
+            (signup && signup.verification && signup.verification.message) ||
+              "We sent a 6-digit code to " + email + ". If it's not in your inbox within a minute, check your Spam folder and mark it 'Not Spam'. Adviser tools unlock once you enter the code.",
+            "Check your school email 📧",
+            // 15s: this message carries an instruction the user must act on
+            // (open the email, find a 6-digit number). 3.5s is unreadable.
+            15000
           );
         } else if (signup && signup.rosterStatus === "unverified") {
           // 🔒 PHASE 6: the account is real, but this matric is not on the
@@ -1981,6 +1968,14 @@ if (mobileMenuBtn && navLinks) {
         seedServerDevice();
         // Phase 4: reveal the roster dashboard only for a VERIFIED adviser.
         syncAdviserDashboard();
+        // Phase 3 UX: a pending adviser has no other way in, so surface the
+        // code field on arrival \u2014 once per session, not on every auth event,
+        // which would trap them in a modal they cannot dismiss.
+        const stillPending = syncAdviserVerificationUI();
+        if (stillPending && !adviserVerifyModalShownThisSession) {
+          adviserVerifyModalShownThisSession = true;
+          setTimeout(openAdviserVerifyModal, 400);
+        }
       } else {
         console.warn("Ghost user blocked: No Firestore profile found.");
         toast.error(
@@ -2009,6 +2004,9 @@ if (mobileMenuBtn && navLinks) {
       checkAuth();
       // Phase 4: the roster dashboard is adviser-only, so it goes on sign-out.
       syncAdviserDashboard();
+      syncAdviserVerificationUI();
+      // Next sign-in by a pending adviser should offer the code field again.
+      adviserVerifyModalShownThisSession = false;
     }
   };
 
@@ -2016,6 +2014,7 @@ if (mobileMenuBtn && navLinks) {
   // handlers themselves re-check authorisation on every call, so a panel that
   // is somehow left visible still cannot write anything.
   initAdviserDashboard();
+  initAdviserVerificationUI();
 
   onAuthStateChanged(auth, (user) => {
     if (isCreatingAccount) return; // 🛑 Ignore during active registration sequence!
@@ -8456,4 +8455,208 @@ function syncAdviserDashboard() {
     );
     panel.classList.toggle("hidden", !isStaff);
     if (isStaff) renderSemesterReport();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ADVISER CODE ENTRY (Phase 3 UX)
+  // ═══════════════════════════════════════════════════════════════════════
+  // Until this existed, a pending adviser had NO WAY to verify: the API
+  // endpoint worked, but nothing in the app called it. They signed up, got a
+  // code, and sat at "pending" forever with no explanation and no field.
+  //
+  // The modal opens automatically on load and the banner stays until they
+  // verify, so dismissing the modal is never a dead end.
+
+  // Guards the automatic modal so it appears once per session rather than on
+  // every auth-state event.
+  let adviserVerifyModalShownThisSession = false;
+
+  function needsAdviserVerification(profile) {
+    // 🔒 Mirrors utils/roles.js: "adviser" means APPLIED and UNVERIFIED.
+    // A verified adviser is promoted to "level_anchor", so this goes false on
+    // its own once api/verification.js succeeds.
+    return Boolean(
+      profile &&
+        profile.role === "adviser" &&
+        profile.verificationStatus === "pending_email",
+    );
+  }
+
+  function openAdviserVerifyModal() {
+    const modal = document.getElementById("adviserVerifyModal");
+    const input = document.getElementById("adviserCodeInput");
+    const emailEl = document.getElementById("adviserVerifyEmail");
+    if (!modal) return;
+    if (emailEl) {
+      emailEl.textContent = (currentUser && currentUser.email) || "your school email";
+    }
+    if (input) input.value = "";
+    setAdviserVerifyMsg("");
+    modal.classList.add("show");
+    // Focus after the transition, or the keyboard pops up over a modal that
+    // is not yet visible.
+    setTimeout(() => {
+      if (input) input.focus();
+    }, 260);
+  }
+
+  function closeAdviserVerifyModal() {
+    const modal = document.getElementById("adviserVerifyModal");
+    if (modal) modal.classList.remove("show");
+  }
+
+  function setAdviserVerifyMsg(text, kind) {
+    const el = document.getElementById("adviserVerifyMsg");
+    if (!el) return;
+    if (!text) {
+      el.classList.add("hidden");
+      el.textContent = "";
+      return;
+    }
+    // textContent, never innerHTML: nothing user-supplied is parsed as markup.
+    el.textContent = text;
+    el.classList.remove("hidden");
+    el.style.borderColor = kind === "err" ? "var(--danger)" : "var(--teal)";
+    el.style.color = kind === "err" ? "var(--danger)" : "var(--text-primary)";
+  }
+
+  function setAdviserVerifyBusy(busy) {
+    const btn = document.getElementById("adviserVerifyBtn");
+    const resend = document.getElementById("adviserResendBtn");
+    if (btn) {
+      btn.disabled = busy;
+      btn.innerHTML = busy
+        ? '<i data-lucide="loader" class="lucide-spin"></i> Checking\u2026'
+        : '<i data-lucide="shield-check"></i> Verify code';
+    }
+    if (resend) resend.disabled = busy;
+    if (typeof refreshIcons === "function") refreshIcons();
+  }
+
+  /**
+   * Show the banner while an adviser is unverified, hide it the moment they are
+   * not. Both derive from currentUser, so a successful verification clears it
+   * with no extra bookkeeping.
+   */
+  function syncAdviserVerificationUI() {
+    const banner = document.getElementById("adviserVerifyBanner");
+    if (!banner) return false;
+    const pending = needsAdviserVerification(currentUser);
+    banner.classList.toggle("hidden", !pending);
+    return pending;
+  }
+
+  async function submitAdviserCode() {
+    const input = document.getElementById("adviserCodeInput");
+    const code = input ? String(input.value || "").trim() : "";
+    if (!/^\d{6}$/.test(code)) {
+      setAdviserVerifyMsg("Enter the 6-digit code from your email \u2014 digits only.", "err");
+      return;
+    }
+    if (!auth.currentUser) return;
+    setAdviserVerifyBusy(true);
+    setAdviserVerifyMsg("Checking your code\u2026", "");
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/verification?action=verifyCode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // The modal STAYS OPEN so a wrong code can be retried in place, and
+        // the server message already explains the attempts remaining.
+        setAdviserVerifyMsg(data.error || "That code is not right. Try again.", "err");
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+        return;
+      }
+      // 🔒 Re-read the profile rather than trusting the response: the role
+      // promotion is server-side, and currentUser drives every gate in the app
+      // including the adviser dashboard.
+      const snap = await getDoc(doc(db, "users", auth.currentUser.uid));
+      if (snap.exists()) currentUser = snap.data();
+      closeAdviserVerifyModal();
+      // Hides the banner AND reveals the dashboard, both from currentUser.
+      syncAdviserVerificationUI();
+      syncAdviserDashboard();
+      toast.success(
+        "Your account is verified. You can now import your level roster and choose a rep.",
+        "Verified \u2705",
+      );
+    } catch (err) {
+      console.error("Adviser verify error:", err);
+      setAdviserVerifyMsg("Could not reach the server. Check your connection and try again.", "err");
+    } finally {
+      setAdviserVerifyBusy(false);
+    }
+  }
+
+  async function resendAdviserCode() {
+    if (!auth.currentUser || !currentUser) return;
+    setAdviserVerifyBusy(true);
+    setAdviserVerifyMsg("Sending a new code\u2026", "");
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch("/api/verification?action=sendCode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          institutionId: currentUser.institution,
+          email: currentUser.email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // 429 is the 60-second cooldown: a wait, not a failure, so it is shown
+        // inline rather than as an alarming error toast.
+        setAdviserVerifyMsg(
+          data.error || "Please wait a minute before requesting another code.",
+          res.status === 429 ? "" : "err",
+        );
+        return;
+      }
+      setAdviserVerifyMsg(
+        data.message || "A new code is on its way. Check your inbox and spam folder.",
+        "",
+      );
+    } catch (err) {
+      console.error("Adviser resend error:", err);
+      setAdviserVerifyMsg("Could not reach the server. Try again in a moment.", "err");
+    } finally {
+      setAdviserVerifyBusy(false);
+    }
+  }
+
+  function initAdviserVerificationUI() {
+    const form = document.getElementById("adviserVerifyForm");
+    const later = document.getElementById("adviserVerifyLaterBtn");
+    const bannerBtn = document.getElementById("adviserBannerVerifyBtn");
+    const resend = document.getElementById("adviserResendBtn");
+    const input = document.getElementById("adviserCodeInput");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        submitAdviserCode();
+      });
+    }
+    if (resend) resend.addEventListener("click", resendAdviserCode);
+    if (later) later.addEventListener("click", closeAdviserVerifyModal);
+    if (bannerBtn) bannerBtn.addEventListener("click", openAdviserVerifyModal);
+    if (input) {
+      // Strip non-digits as they are typed: a pasted "829 801" or "829-801"
+      // should just work rather than being rejected after a round trip.
+      input.addEventListener("input", () => {
+        input.value = input.value.replace(/\D/g, "").slice(0, 6);
+      });
+    }
   }
