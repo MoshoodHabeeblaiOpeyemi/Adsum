@@ -182,3 +182,108 @@
 @media (max-width: 560px) {
   .adviser-row .btn { width: 100%; }
 }
+
+/* ── ADVISER HERO (Phase 5 UX) ────────────────────────────────────────────
+   A verified adviser is the trust root for one level, not a student with a
+   course list. This replaces the "Hey, <name>!" greeting entirely so the
+   adviser never sees a dashboard that implies they are enrolled somewhere. */
+.adviser-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1.5px solid var(--card-border);
+  background: var(--card-bg);
+  padding: 28px 26px 24px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.adviser-hero-glow {
+  position: absolute;
+  inset: -60% -30% auto -30%;
+  height: 150%;
+  background: radial-gradient(
+    60% 60% at 30% 0%,
+    rgba(124, 108, 240, 0.28),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.adviser-hero > * { position: relative; z-index: 1; }
+.adviser-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.adviser-badge-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(135deg, var(--violet), #4f46e5);
+  padding: 7px 14px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px -8px rgba(124, 108, 240, 0.9);
+}
+.adviser-badge-lg svg { width: 14px; height: 14px; }
+.adviser-scope {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--teal);
+  letter-spacing: 0.4px;
+}
+.adviser-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4.2vw, 2.3rem);
+  letter-spacing: -0.8px;
+  line-height: 1.1;
+  margin: 0 0 4px;
+}
+.adviser-hero-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+.adviser-hero-sub {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+  max-width: 56ch;
+}
+
+/* ── LOCKED (pending) ADVISER ─────────────────────────────────────────────
+   An unverified adviser can do exactly ONE thing, so the screen says so and
+   offers only that. The course buttons below are disabled in JS as well —
+   hidden alone would not stop the modals behind them. */
+#adviserVerifyBanner {
+  background: linear-gradient(180deg, rgba(217, 164, 65, 0.12), var(--card-bg) 70%);
+}
+#adviserVerifyBanner .btn {
+  background: linear-gradient(135deg, #d9a441, #b8832a);
+  border-color: transparent;
+  color: #10131c;
+  font-weight: 700;
+}
+#adviserVerifyBanner .btn:hover { filter: brightness(1.06); }
+
+/* A disabled course button must not look merely "off" — it should read as
+   deliberately unavailable while the account is locked. */
+#dashboardSection .btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  transform: none;
+}
+
+@media (max-width: 560px) {
+  .adviser-hero { padding: 22px 18px 20px; border-radius: 20px; }
+  #adviserVerifyBanner { flex-direction: column; align-items: flex-start; }
+  #adviserVerifyBanner .btn { width: 100%; }
+}

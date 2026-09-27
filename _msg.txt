@@ -1,0 +1,31 @@
+feat(adviser-ui): resend cooldown, locked pending state, own dashboard
+
+Three UX changes, and one of them fixes a bug the previous screenshot
+exposed: a verified adviser saw the student dashboard AND the adviser
+dashboard at once, which implied they were enrolled somewhere as well.
+
+1. RESEND COOLDOWN. The button was live between sends, so a second click
+   invalidated the code the user had just received - the single most
+   frustrating thing this flow can do. It now counts down the server's own
+   60s window, disables itself, and says why. On a 429 the client adopts
+   the server's remaining time rather than trusting its own clock, and an
+   in-flight request never cancels a live countdown.
+
+2. A PENDING ADVISER CAN DO EXACTLY ONE THING. Join and Create Course are
+   disabled, and - the part that actually matters - their handlers refuse
+   and reopen the code field. A disabled attribute is presentation only:
+   the element and its handler stay in the DOM, so anything re-enabling
+   the button would otherwise open the modal. The three surfaces are now
+   a single decision table (locked / adviser / student) rather than
+   scattered classList calls, which is how they came to disagree.
+
+3. THE ADVISER GETS THEIR OWN DASHBOARD. The student greeting is replaced
+   by a hero carrying the "Adviser Dashboard" title, the adviser's name
+   and their level scope. They are the trust root for one level, not a
+   student with a course list, and showing them a course grid said
+   otherwise. The two surfaces are now mutually exclusive, and all three
+   are torn down on sign-out - previously the adviser dashboard survived
+   for a signed-out visitor and the disabled buttons carried over to
+   whoever signed in next.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

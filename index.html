@@ -1072,12 +1072,23 @@
        and revealed only for a VERIFIED adviser - see isVerifiedAdviser() in
        app.js, which must never be replaced by a role === "adviser" test. -->
   <section id="adviserDashboard" class="container hidden">
-    <div class="adviser-head">
-      <div>
-        <h2 class="adviser-h2">Your Level</h2>
-        <p class="adviser-sub" id="adviserScope">-</p>
+    <!-- 🌟 ADVISER DASHBOARD HEADER
+         A verified adviser does not use the student dashboard. They are not a
+         student with a course list, they are the trust root for ONE level, so
+         the two surfaces are separate and mutually exclusive. This header
+         replaces the "Hey, <name>!" greeting entirely. -->
+    <div class="adviser-hero">
+      <div class="adviser-hero-glow" aria-hidden="true"></div>
+      <div class="adviser-hero-top">
+        <span class="adviser-badge-lg"><i data-lucide="shield-check"></i> Level Adviser</span>
+        <span class="adviser-scope" id="adviserScope">-</span>
       </div>
-      <span class="adviser-badge"><i data-lucide="shield-check"></i> Level Adviser</span>
+      <h1 class="adviser-hero-title">Adviser Dashboard</h1>
+      <p class="adviser-hero-name" id="adviserName">-</p>
+      <p class="adviser-hero-sub">
+        You are the verified anchor for this level. Import the roster, then name
+        one course rep. Nothing else is needed.
+      </p>
     </div>
 
     <div class="adviser-stats">

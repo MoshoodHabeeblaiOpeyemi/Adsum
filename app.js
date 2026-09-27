@@ -2008,6 +2008,11 @@ if (mobileMenuBtn && navLinks) {
         // Phase 3 UX: a pending adviser has no other way in, so surface the
         // code field on arrival \u2014 once per session, not on every auth event,
         // which would trap them in a modal they cannot dismiss.
+        // 🔒 syncAdviserSurfaces() decides which of the THREE dashboards is
+        // visible (locked / adviser / student) and disables the course actions
+        // for a locked adviser, so it must run on EVERY auth state, not just at
+        // signup - otherwise a refresh would leave the wrong screen up.
+        syncAdviserSurfaces();
         const stillPending = syncAdviserVerificationUI();
         if (stillPending && !adviserVerifyModalShownThisSession) {
           adviserVerifyModalShownThisSession = true;
@@ -2045,8 +2050,14 @@ if (mobileMenuBtn && navLinks) {
       // Phase 4: the roster dashboard is adviser-only, so it goes on sign-out.
       syncAdviserDashboard();
       syncAdviserVerificationUI();
+      // 🔒 All three surfaces must go on sign-out. Without this the adviser
+      // dashboard stays on screen for a signed-OUT visitor, and the course
+      // buttons stay disabled for whoever signs in next.
+      syncAdviserSurfaces();
       // Next sign-in by a pending adviser should offer the code field again.
       adviserVerifyModalShownThisSession = false;
+      // The resend countdown must not survive into the next account's session.
+      stopResendCooldown();
     }
   };
 
@@ -2139,6 +2150,17 @@ if (mobileMenuBtn && navLinks) {
   const openCreateModalBtn = document.getElementById("openCreateModal");
   if (openCreateModalBtn) {
     openCreateModalBtn.addEventListener("click", () => {
+      // 🔒 A PENDING ADVISER MUST NOT CREATE A COURSE.
+      //
+      // Disabling the button in syncAdviserSurfaces() is the visible half; this
+      // is the real one. A disabled attribute is presentation — the element and
+      // its handler stay in the DOM, so anything that re-enables the button (or
+      // a click dispatched directly) would otherwise open the modal. The check
+      // is repeated here so the modal cannot be reached by any route.
+      if (adviserSurface() === "locked") {
+        openAdviserVerifyModal();
+        return;
+      }
       if (createModal) createModal.classList.add("show");
     });
   }
@@ -2146,6 +2168,11 @@ if (mobileMenuBtn && navLinks) {
   const openJoinModalBtn = document.getElementById("openJoinModal");
   if (openJoinModalBtn) {
     openJoinModalBtn.addEventListener("click", () => {
+      // 🔒 Same guard for joining — see the create handler above.
+      if (adviserSurface() === "locked") {
+        openAdviserVerifyModal();
+        return;
+      }
       if (joinModal) joinModal.classList.add("show");
     });
   }
@@ -8351,18 +8378,90 @@ function initAdviserDashboard() {
 }
 
 /** Show the dashboard only to a VERIFIED adviser, and only when signed in. */
+// ═══════════════════════════════════════════════════════════════════════
+// ADVISER DASHBOARD PRESENTATION (Phase 5 UX)
+// ═══════════════════════════════════════════════════════════════════════
+// A verified adviser does NOT use the student dashboard. They are not a
+// student with a course list: they are the trust root for one level, and the
+// two dashboards have nothing in common. Showing both at once (as this did)
+// implied the adviser was also enrolled somewhere, which is both wrong and
+// confusing.
+//
+// So the three surfaces are mutually exclusive:
+//   pending  -> a single locked state, nothing else reachable
+//   adviser  -> the adviser dashboard alone
+//   other    -> the student/rep dashboard, unchanged
+//
+// The gate is a decision table rather than scattered classList calls, because
+// getting it wrong in ONE place is how the old "both visible" bug happened.
+
+/** Which dashboard should this account see? */
+function adviserSurface() {
+  if (!currentUser) return "none";
+  if (isPendingAdviser(currentUser)) return "locked";
+  if (isVerifiedAdviser(currentUser)) return "adviser";
+  return "student";
+}
+
+/**
+ * Show exactly one surface, and disable the actions a locked adviser must not
+ * reach. Hiding a button is not enough on its own — the modal it opens is
+ * still in the DOM — so the guards below also block the handlers themselves.
+ */
+function syncAdviserSurfaces() {
+  const surface = adviserSurface();
+
+  const dash = document.getElementById("dashboardSection");
+  const adv = document.getElementById("adviserDashboard");
+  const banner = document.getElementById("adviserVerifyBanner");
+
+  if (dash) dash.classList.toggle("hidden", surface !== "student");
+  if (adv) adv.classList.toggle("hidden", surface !== "adviser");
+  if (banner) banner.classList.toggle("hidden", surface !== "locked");
+
+  // A locked adviser gets no course actions at all. The buttons stay visible
+  // but disabled, so the screen does not look broken — they are told why.
+  if (surface === "locked") {
+    const join = document.getElementById("openJoinModal");
+    const create = document.getElementById("openCreateModal");
+    if (join) { join.disabled = true; join.title = "Verify your adviser account first."; }
+    if (create) { create.disabled = true; create.title = "Verify your adviser account first."; }
+  } else {
+    const join = document.getElementById("openJoinModal");
+    const create = document.getElementById("openCreateModal");
+    if (join) { join.disabled = false; join.removeAttribute("title"); }
+    if (create) { create.disabled = false; create.removeAttribute("title"); }
+  }
+
+  return surface;
+}
+
 function syncAdviserDashboard() {
   const el = adviserEls();
   if (!el.section) return;
   const show = Boolean(currentUser) && isVerifiedAdviser(currentUser);
   el.section.classList.toggle("hidden", !show);
   if (!show) return;
-  if (el.scope) {
-    el.scope.textContent = [currentUser.institution, currentUser.department, currentUser.level]
-      .filter(Boolean)
-      .join(" | ");
-  }
+  renderAdviserIdentity();
   loadAdviserRoster();
+}
+
+/** Populate the adviser's own details in the dashboard header. */
+function renderAdviserIdentity() {
+  const nameEl = document.getElementById("adviserName");
+  const scope = document.getElementById("adviserScope");
+  if (nameEl) nameEl.textContent = (currentUser && currentUser.name) || "Level Adviser";
+  if (scope) {
+    scope.textContent = [currentUser.institution, currentUser.department, currentUser.level]
+      .filter(Boolean)
+      .join("  ·  ");
+  }
+  // 🔒 A locked adviser must not be able to act. Both the panel and the
+  // handlers re-check isVerifiedAdviser(), so a panel left visible by a bug
+  // still cannot write anything.
+  if (currentUser) {
+    currentUser.verified = isVerifiedAdviser(currentUser);
+  }
 }
   // 📋 SEMESTER ATTENDANCE REPORT (Phase 5).
   //
@@ -8533,6 +8632,12 @@ function syncAdviserDashboard() {
     );
   }
 
+  // 🔒 The SAME test the server uses to build the locked screen. Both halves are
+  // required, so a profile holding one without the other is NOT treated as
+  // pending — a half-state fails closed to the normal dashboard rather than
+  // stranding an account in a lock it cannot leave.
+  const isPendingAdviser = needsAdviserVerification;
+
   /**
    * Step 1 of verification: "we sent a code, here's the trap you will hit."
    *
@@ -8607,16 +8712,82 @@ function syncAdviserDashboard() {
     el.style.color = kind === "err" ? "var(--danger)" : "var(--text-primary)";
   }
 
+  // ⏱️ RESEND COOLDOWN
+  //
+  // The server enforces 60s (RESEND_COOLDOWN_MS) and answers 429. Showing the
+  // button as live and letting the user discover that by clicking is poor: they
+  // learn the rule by hitting it. So the client counts down the same window,
+  // disables the control, and says why.
+  //
+  // The server stays the authority — this is a courtesy timer, not a lock. If
+  // the two ever disagree, the 429 branch below corrects the countdown from the
+  // server's retryAfterSeconds rather than arguing with it.
+  const RESEND_COOLDOWN_SEC = 60;
+  let resendTimer = null;
+  let resendUntil = 0;
+
+  function setResendButtonState() {
+    const btn = document.getElementById("adviserResendBtn");
+    if (!btn) return;
+    const remaining = Math.max(0, Math.ceil((resendUntil - Date.now()) / 1000));
+    if (remaining > 0) {
+      btn.disabled = true;
+      btn.innerHTML =
+        '<i data-lucide="clock"></i> Resend in ' + remaining + "s";
+      if (typeof refreshIcons === "function") refreshIcons();
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="send"></i> Resend code';
+      if (typeof refreshIcons === "function") refreshIcons();
+    }
+  }
+
+  function startResendCooldown(seconds) {
+    resendUntil = Date.now() + (Number(seconds) || RESEND_COOLDOWN_SEC) * 1000;
+    setResendButtonState();
+    if (resendTimer) clearInterval(resendTimer);
+    resendTimer = setInterval(() => {
+      if (Date.now() >= resendUntil) {
+        clearInterval(resendTimer);
+        resendTimer = null;
+        resendUntil = 0;
+        setResendButtonState();
+        return;
+      }
+      setResendButtonState();
+    }, 1000);
+  }
+
+  /** Any successful send starts the clock, so the button is never double-pressed. */
+  function noteCodeWasSent() {
+    startResendCooldown(RESEND_COOLDOWN_SEC);
+  }
+
+  /** Clear any countdown — used on sign-out and after a successful verify. */
+  function stopResendCooldown() {
+    if (resendTimer) {
+      clearInterval(resendTimer);
+      resendTimer = null;
+    }
+    resendUntil = 0;
+    setResendButtonState();
+  }
+
+  /**
+   * Busy state for an in-flight request. Deliberately does NOT re-enable the
+   * resend button: a cooldown in progress must survive the request finishing, so
+   * a user cannot burn two codes by clicking during the network round trip.
+   */
   function setAdviserVerifyBusy(busy) {
     const btn = document.getElementById("adviserVerifyBtn");
-    const resend = document.getElementById("adviserResendBtn");
     if (btn) {
       btn.disabled = busy;
       btn.innerHTML = busy
         ? '<i data-lucide="loader" class="lucide-spin"></i> Checking\u2026'
         : '<i data-lucide="shield-check"></i> Verify code';
     }
-    if (resend) resend.disabled = busy;
+    const resend = document.getElementById("adviserResendBtn");
+    if (resend) resend.disabled = busy || resendUntil > Date.now();
     if (typeof refreshIcons === "function") refreshIcons();
   }
 
@@ -8671,8 +8842,14 @@ function syncAdviserDashboard() {
       if (snap.exists()) currentUser = snap.data();
       closeAdviserVerifyModal();
       // Hides the banner AND reveals the dashboard, both from currentUser.
+      // syncAdviserSurfaces() runs too because verification is the exact moment
+      // the adviser crosses from "locked" to "adviser" — without it the student
+      // dashboard would stay hidden and the screen would be momentarily empty.
       syncAdviserVerificationUI();
+      syncAdviserSurfaces();
       syncAdviserDashboard();
+      stopResendCooldown();
+      setAdviserVerifyMsg("");
       toast.success(
         "Your account is verified. You can now import your level roster and choose a rep.",
         "Verified \u2705",
@@ -8705,13 +8882,22 @@ function syncAdviserDashboard() {
       const data = await res.json();
       if (!res.ok) {
         // 429 is the 60-second cooldown: a wait, not a failure, so it is shown
-        // inline rather than as an alarming error toast.
+        // inline rather than as an alarming error toast. The server is the
+        // authority on the window, so adopt ITS remaining time rather than
+        // assuming our own clock agrees.
+        if (res.status === 429) {
+          startResendCooldown(data.retryAfterSeconds || RESEND_COOLDOWN_SEC);
+        }
         setAdviserVerifyMsg(
           data.error || "Please wait a minute before requesting another code.",
           res.status === 429 ? "" : "err",
         );
         return;
       }
+      // 🛑 Any successful send starts the cooldown. Without this the button
+      // stays live and a second click invalidates the code they just received,
+      // which is the single most frustrating thing this flow can do.
+      noteCodeWasSent();
       setAdviserVerifyMsg(
         data.message || "A new code is on its way. Check your inbox and spam folder.",
         "",
