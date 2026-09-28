@@ -183,7 +183,23 @@
   .adviser-row .btn { width: 100%; }
 }
 
-/* ── ADVISER HERO (Phase 5 UX) ────────────────────────────────────────────
+/* --- PASSWORD CORRELATION HINT ---------------------------------------
+   A mismatch is a mistake, not an accusation, so the copy says what to do
+   rather than just "does not match". aria-live announces the change for a
+   screen reader without stealing focus. */
+.pw-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.pw-hint.ok { color: var(--teal); }
+.pw-hint.err { color: var(--danger); }
+.pw-hint svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* --- ADVISER HERO (Phase 5 UX) -------------------------------------------
    A verified adviser is the trust root for one level, not a student with a
    course list. This replaces the "Hey, <name>!" greeting entirely so the
    adviser never sees a dashboard that implies they are enrolled somewhere. */

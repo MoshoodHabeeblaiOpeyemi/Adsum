@@ -1640,7 +1640,21 @@ if (mobileMenuBtn && navLinks) {
       authContainer.classList.add("hidden");
       dashboardSection.classList.remove("hidden");
       logoutBtn.classList.remove("hidden");
-      if (openSettingsBtn) openSettingsBtn.classList.remove("hidden");
+      // 🔒 ADVISERS GET NO PROFILE SETTINGS. They are identified by
+      // institution / department / level, not by a matric, so the settings form
+      // would show an empty readonly matric field and invite the question of
+      // what it is for. It is also pinned immutable server-side, so the gear
+      // would lead to a form nobody can change.
+      //
+      // A PENDING adviser is the same: roster tools are locked, and so is this.
+      // Their only action is entering the code, reached from the banner.
+      const isAdviserAccount = Boolean(
+        currentUser &&
+        (currentUser.role === "adviser" || currentUser.role === "level_anchor"),
+      );
+      if (openSettingsBtn) {
+        openSettingsBtn.classList.toggle("hidden", isAdviserAccount);
+      }
 
       displayName.textContent = currentUser.name;
 
@@ -1716,7 +1730,77 @@ if (mobileMenuBtn && navLinks) {
 
   // --- FIREBASE AUTHENTICATION LOGIC ---
   const signupForm = document.getElementById("signupForm");
+
+  /**
+   * 🔘 RESTORE THE SUBMIT BUTTON TO NORMAL.
+   *
+   * It used to be restored only in the handler `finally`, which covers the
+   * request but NOT the path where the user dismisses the details confirm
+   * dialog. That return happened before the try block, so the button stayed
+   * showing "Creating Account..." with a spinner that never resolved, and the
+   * form looked permanently busy after a single Cancel.
+   *
+   * One helper, called from every exit path, so a new early return cannot
+   * reintroduce the bug. The label is role-aware, so it is rebuilt through the
+   * same function that sets it.
+   */
+  function resetSignupButton() {
+    const btn = signupForm && signupForm.querySelector('button[type="submit"]');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.innerHTML =
+      '<i data-lucide="user-check"></i> <span id="signupSubmitLabel">Sign Up</span>';
+    if (typeof refreshIcons === "function") refreshIcons();
+    if (typeof applyRoleToForm === "function") applyRoleToForm();
+    // A password mismatch must keep it disabled; renderPasswordMatch decides.
+    if (typeof renderPasswordMatch === "function") renderPasswordMatch();
+  }
+
   if (signupForm) {
+    // 🔗 LIVE PASSWORD CORRELATION
+    //
+    // Firebase rejects a mismatched retyped password only AFTER a network
+    // round trip, as a generic invalid-credential that says nothing about
+    // which field is wrong. Checking as they type moves that feedback before
+    // submission, where it is actionable.
+    //
+    // It watches BOTH fields: retyping the first password can turn a match
+    // into a mismatch, so watching only the confirm field would leave a
+    // stale green tick lying on screen.
+    const pwField = document.getElementById("signupPassword");
+    const pwConfirm = document.getElementById("signupPasswordConfirm");
+    const pwHint = document.getElementById("passwordMatchHint");
+    const pwSubmit = signupForm.querySelector('button[type="submit"]');
+
+    function renderPasswordMatch() {
+      if (!pwHint || !pwField || !pwConfirm) return true;
+      const a = pwField.value || "";
+      const b = pwConfirm.value || "";
+      // Nothing typed yet: no opinion, and never block the form.
+      if (!b) {
+        pwHint.hidden = true;
+        pwHint.textContent = "";
+        if (pwSubmit) pwSubmit.disabled = false;
+        return true;
+      }
+      const match = a === b;
+      pwHint.hidden = false;
+      pwHint.className = "pw-hint " + (match ? "ok" : "err");
+      pwHint.innerHTML = match
+        ? '<i data-lucide="check"></i> Passwords match'
+        : '<i data-lucide="alert-circle"></i> Passwords do not match — retype it exactly';
+      if (typeof refreshIcons === "function") refreshIcons();
+      // 🔒 Block submission on a known mismatch, so the form is never
+      // sent in a state Firebase will only reject.
+      if (pwSubmit) pwSubmit.disabled = !match;
+      return match;
+    }
+
+    if (pwField) pwField.addEventListener("input", renderPasswordMatch);
+    if (pwConfirm) pwConfirm.addEventListener("input", renderPasswordMatch);
+    // aria-live so a screen reader hears the change without focus moving.
+    if (pwHint) pwHint.setAttribute("aria-live", "polite");
+
     signupForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const submitBtn = signupForm.querySelector("button[type='submit']");
@@ -1810,7 +1894,12 @@ if (mobileMenuBtn && navLinks) {
         icon: "📝",
         details: confirmDetails,
       });
-      if (!confirmed) return; // form stays filled so they can correct and retry
+      // 🔘 A dismissed confirm dialog happens BEFORE the try/finally, so the
+      // button must be restored here too or it stays stuck on the spinner.
+      if (!confirmed) {
+        resetSignupButton();
+        return; // form stays filled so they can correct and retry
+      }
 
       isCreatingAccount = true; // 🔒 LOCK THE BLOCKER
       let signupSucceeded = false;
@@ -1972,6 +2061,10 @@ if (mobileMenuBtn && navLinks) {
         }
         if (submitBtn) {
           submitBtn.disabled = false;
+          // 🔘 One helper, so the role-aware label and the password-match
+          // gate are restored together. Assigning innerHTML here directly is
+          // what let a stale label survive in the first place.
+          resetSignupButton();
           // Re-apply the role context instead of hardcoding a label: the previous
           // `'...> Sign Up'` reset every role-specific field visibility and
           // clobbered the "Join as Course Rep" button text.
@@ -2017,6 +2110,25 @@ if (mobileMenuBtn && navLinks) {
   // 🛡️ v0 Logout Fix: Let onAuthStateChanged handle UI updates cleanly
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
+      // 🚪 CONFIRM BEFORE SIGNING OUT.
+      //
+      // Signing out is easy to do by accident and awkward to recover from: a rep
+      // mid-class loses the screen they were working in. It also strands a
+      // PENDING ADVISER, who is told a code was emailed and then finds the app
+      // back at the sign-in with nothing pending - so the wording says what is
+      // actually preserved.
+      const pending = needsAdviserVerification(currentUser);
+      const ok = await showConfirm({
+        title: "Log out?",
+        message: pending
+          ? "You have not entered your verification code yet. Sign back in on this device and you can pick up where you left off."
+          : "You will need your email and password to sign back in.",
+        okText: "Log out",
+        cancelText: "Stay",
+        danger: true,
+        icon: "🚪",
+      });
+      if (!ok) return;
       try {
         await signOut(auth);
       } catch (error) {
@@ -2104,14 +2216,91 @@ if (mobileMenuBtn && navLinks) {
   // is somehow left visible still cannot write anything.
   initAdviserDashboard();
   initAdviserVerificationUI();
+  // 🔗 Tidy the signup fields as the user leaves them.
+  applyInputFormatting();
+
+// 🔒 SIGNUP INPUT FORMATTING
+//
+// A student types "aDebAyO" and an adviser imports "Adebayo". They do not
+// match, the student never appears on the roster, and the reason is invisible.
+// Normalising at input removes most of that class of mismatch before it starts.
+//
+// Applied on BLUR, not per keystroke: reformatting mid-word fights the caret and
+// makes typing feel broken. By the time they move to the next field the value
+// is already tidy.
+//
+// 🔒 This reduces mismatches; it does not eliminate them. The real guarantee
+// is the roster check at signup, which reports any matric the adviser never
+// imported. Formatting is a courtesy to the user, the roster is the control.
+function applyInputFormatting() {
+  // Title Case for names. Handles hyphenated and apostrophised names, so
+  // "adebayo-fashola" becomes "Adebayo-Fashola" and "o'brien" stays
+  // "O'Brien" rather than becoming "O'brien".
+  const titleCase = (v) =>
+    String(v || "")
+      .trim()
+      .toLowerCase()
+      .replace(/(^|[\s\-'\u2019])([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
+
+  // Only the NAME fields are title-cased. Department gets it too, but
+  // institution is left alone: the suggestion list holds codes like UNILORIN
+  // as well as formal names, and forcing case would mangle half of it.
+  const titleFields = [
+    "adviserFirstName",
+    "adviserLastName",
+    "signupFirstName",
+    "signupMiddleName",
+    "signupLastName",
+    "signupDepartment",
+  ];
+  for (const id of titleFields) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("blur", () => { el.value = titleCase(el.value); });
+  }
+
+  // Level is a CODE ("200L"), so upper-case it. This matches
+  // normalizeMatric(), which already upper-cases the matric - so what the user
+  // sees is what gets stored and compared.
+  const levelEl = document.getElementById("signupLevel");
+  if (levelEl) {
+    levelEl.addEventListener("blur", () => {
+      levelEl.value = levelEl.value.trim().toUpperCase();
+    });
+  }
+
+  // The matric field: trim and upper-case so the typed value matches the roster
+  // entry, which the parser also upper-cases.
+  const matricEl = document.getElementById("signupMatric");
+  if (matricEl) {
+    matricEl.addEventListener("blur", () => {
+      matricEl.value = normalizeMatric(matricEl.value);
+    });
+  }
+
+  // The email is lower-cased: the ID token and the server both treat it
+  // case-insensitively, and a stray capital here is a confusing "wrong email".
+  const emailEl = document.getElementById("signupEmail");
+  if (emailEl) {
+    emailEl.addEventListener("blur", () => {
+      emailEl.value = emailEl.value.trim().toLowerCase();
+    });
+  }
+}
+
 
   onAuthStateChanged(auth, (user) => {
     if (isCreatingAccount) return; // 🛑 Ignore during active registration sequence!
     handleAuthState(user);
   });
 
-  if (deleteAccountBtn) {
-    deleteAccountBtn.addEventListener("click", async () => {
+  // 🗑 DELETE ACCOUNT — wired for BOTH surfaces.
+  //
+  // The student dashboard has #deleteAccountBtn; the adviser dashboard has a
+  // [data-delete-account] button, because hiding the settings gear for advisers
+  // also hides the only copy of this control they could reach. Both routes run
+  // the same handler so the two can never drift apart.
+  document.querySelectorAll("#deleteAccountBtn, [data-delete-account]").forEach((deleteBtn) => {
+    deleteBtn.addEventListener("click", async () => {
       if (
         await showConfirm({
           title: "Delete Account",
@@ -2179,7 +2368,7 @@ if (mobileMenuBtn && navLinks) {
         }
       }
     });
-  }
+  });
 
   // --- MODALS & CLOSE HANDLERS ---
   const createModal = document.getElementById("createModal");
