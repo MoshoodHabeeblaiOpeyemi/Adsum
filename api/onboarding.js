@@ -43,7 +43,7 @@
 
 const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const crypto = require("crypto");
 const verifyAppCheck = require("../utils/appCheck");
 const { ROLE, VERIFICATION, SIGNUP_ROLES, isAdviserTrack } = require("../utils/roles");
@@ -464,7 +464,7 @@ async function handleCreateProfile(req, res, decoded) {
             action: "linked",
             matric: p.matric,
             name: p.name,
-            at: FieldValue.serverTimestamp(),
+            at: Timestamp.now(),
             by: decoded.uid,
           }),
         });

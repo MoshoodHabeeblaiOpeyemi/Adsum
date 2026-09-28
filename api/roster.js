@@ -26,7 +26,7 @@
 
 const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
 const { isVerifiedAdviser, ROLE } = require("../utils/roles");
 const { parseRosterCsv } = require("../utils/csv");
@@ -170,7 +170,7 @@ async function handleImportRoster(req, res, decoded) {
         matric: repSurvives ? previous.chosenRepMatric : null,
         name: repSurvives ? previous.chosenRepName || null : null,
         count: newCount,
-        at: FieldValue.serverTimestamp(),
+        at: Timestamp.now(),
         by: decoded.uid,
       }),
       importedAt: now,
@@ -286,7 +286,7 @@ async function handleChooseRep(req, res, decoded) {
               previousName: roster.chosenRepName || null,
               matric: null,
               name: null,
-              at: FieldValue.serverTimestamp(),
+              at: Timestamp.now(),
               by: decoded.uid,
             }),
           });
@@ -330,7 +330,7 @@ async function handleChooseRep(req, res, decoded) {
             previousName: isReplacement ? roster.chosenRepName || null : null,
             matric: wanted,
             name: repName,
-            at: FieldValue.serverTimestamp(),
+            at: Timestamp.now(),
             by: decoded.uid,
           }),
         });
