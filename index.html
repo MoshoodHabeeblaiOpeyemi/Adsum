@@ -1236,8 +1236,39 @@
       <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 14px;">Everything you need to know — in about two minutes. Pick your lane below.</p>
 
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-        <span class="guide-badge">🎓 I'm a Student</span>
-        <span class="guide-badge">👔 I'm a Course Rep</span>
+        <span class="guide-badge">🎓 Student</span>
+        <span class="guide-badge">👔 Course Rep</span>
+        <span class="guide-badge">🏛️ Level Adviser</span>
+      </div>
+
+      <!-- ① THE ONE DECISION EVERYONE MAKES -->
+      <div class="guide-section" style="border: 1.5px solid var(--violet);">
+        <strong style="color: var(--violet);"><i data-lucide="mouse-pointer-click"></i> First: Pick Who You Are</strong>
+        <div style="font-size: 0.85rem; color: var(--text-primary); margin-top: 8px; line-height: 1.6;">
+          Your first screen asks whether you are a <strong>Level Adviser</strong>, a
+          <strong>Course Rep</strong>, or a <strong>Regular Student</strong>. That choice is
+          <strong>permanent</strong> — it is not a setting you can change later. The only
+          way to pick differently is to delete your account and start over.
+        </div>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-top: 8px;">
+          💡 Already have an account on this device? You'll land on
+          <strong>Sign in</strong> instead — the picker only appears the first time.
+        </div>
+      </div>
+
+      <!-- ② ADVISER — the trust root -->
+      <div class="guide-section" style="border: 1.5px solid var(--violet);">
+        <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Level Advisers: Verify, Then Roster, Then Rep</strong>
+        <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
+          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Sign up with your school email.</strong> Your institution, department and level are locked in when you register.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Enter the 6-digit code.</strong> We email it to you. ⚠️ <strong>Check your Spam folder</strong> the first time — our sending address is new, so it usually lands there until you mark it "Not Spam".</span></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Import your level roster.</strong> Upload your department's CSV. All we need is a column of matric numbers — we find it whether it's headed "Matric No", "S/No", "S/N", or something else. You'll see a preview before anything is saved.</span></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Name one Course Rep.</strong> Choose one student from the roster. Only that student becomes the rep — nobody can claim the role by signing up first.</span></div>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">
+          ⏳ <strong>Not verified yet?</strong> You can't do anything else in the app, and the
+          account is deleted automatically after 24 hours. Re-apply any time with the same email.
+        </p>
       </div>
 
       <!-- FOR STUDENTS -->
@@ -1245,23 +1276,30 @@
         <strong style="color: var(--teal);"><i data-lucide="graduation-cap"></i> For Students: Checking In</strong>
         <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
           <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Join &amp; show up.</strong> Your Rep shares a class code — join once, then simply walk into the lecture hall for every session.</span></div>
-          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Watch the screen.</strong> The Rep shows a <strong>live 30-second PIN</strong> (or a rotating QR code). You must be <strong>inside the lecture geofence</strong> to check in.</span></div>
-          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Type it (or scan it).</strong> Enter the code on your phone — or point your camera at the QR. Your device is verified, your location is verified, your code is verified — all in one second.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Watch the screen.</strong> The Rep shows a <strong>PIN that changes every 10 seconds</strong>, or a rotating QR code. A screenshot is already expired by the time it reaches anyone else.</span></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Type it (or scan it).</strong> Enter the code on your phone, or point your camera at the QR. One second, done.</span></div>
           <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>See the ✅.</strong> You're on the live roster instantly. No paper, no queue, no "did he see my name?"</span></div>
           <div class="guide-step"><span class="guide-step-num">5</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Track your semester.</strong> The analytics tab shows your attendance %, your excused days 🛡️, and exactly how many classes stand between you and the 70% exam threshold.</span></div>
         </div>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">💡 <strong>GPS or network glitching?</strong> After 3 silent failed attempts, a hidden <em>"Request Manual Verification"</em> button appears. Send it, raise your hand — your Rep approves you with a glance. No one ever sees the failure counter; it exists only to stop spammers.</p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">
+          🎓 <strong>Asked to be a Rep?</strong> You only become one if your Level Adviser
+          picks you. If they haven't yet, you join as a student and the app will say so.
+        </p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 8px;">
+          💡 <strong>Locked out?</strong> After a few wrong codes, or if your network drops,
+          a <em>"Request Manual Verification"</em> option appears. Send it, raise your hand,
+          your Rep approves you. Real problems always have a way out.
+        </p>
       </div>
 
       <!-- FOR REPS -->
       <div class="guide-section" style="border: 1.5px solid var(--violet);">
         <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Course Reps: Run a Lecture in 60 Seconds</strong>
         <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
-          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Pin your location.</strong> Pick a saved hall or tap <em>"Set Current Location"</em> once. That becomes the invisible wall students must be inside.</span></div>
-          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Pick an attendance mode.</strong> Full combo (PIN + location + device), PIN + Device only (no GPS), Live GPS anchor, or QR projector mode for big halls.</span></div>
-          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Hit "Generate PIN."</strong> The class reads it off your screen or scans your projector QR. Watch the roster fill live.</span></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Optional headcount.</strong> Tap <em>"Conduct Physical Presence Check"</em> and type the number of bodies you see. The app flags the difference — no ghost check-ins.</span></div>
-          <div class="guide-step"><span class="guide-step-num">5</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Approve &amp; close.</strong> One-tap approve the manual requests you can physically see, then <em>"Close Class &amp; Save"</em>. Records archive forever — CSV export anytime.</span></div>
+          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Pick an attendance mode.</strong> <strong>QR + Device Lock</strong> (students scan a rotating code) or <strong>PIN + Device Lock</strong> (they type a changing 4-digit code). Both work without GPS.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Hit "Generate PIN".</strong> The class reads it off your screen, or you show the QR on the projector. Watch the roster fill live.</span></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Optional headcount.</strong> Tap <em>"Conduct Physical Presence Check"</em> and type the number of bodies you actually see. The app flags the difference — no ghost check-ins.</span></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Approve &amp; close.</strong> One-tap approve the manual requests you can physically see, then <em>"Close Class &amp; Save"</em>. Records archive forever — download them as CSV or PDF any time, with a percentage per student.</span></div>
         </div>
         <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">🚩 <strong>Empty seat linked to a check-in?</strong> You can't delete a student mid-session (that's the law). Tap <strong>Flag Absent</strong> instead — it instantly alerts the student, and the incident is logged permanently.</p>
       </div>
@@ -1270,9 +1308,11 @@
       <div class="guide-section" style="border: 1.5px solid var(--border);">
         <strong style="color: var(--navy);"><i data-lucide="shield"></i> The Invisible Shield — Why You Can Trust the Numbers</strong>
         <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <div><span class="guide-check">⏱️</span> <strong>Rotating PIN</strong> — the code dies every 10s, so a WhatsApp screenshot is already expired by the time it lands.</div>
-          <div><span class="guide-check">🔒</span> <strong>Device Lock</strong> — the first phone you use is bound to your matric forever. One phone, one student.</div>
-          <div><span class="guide-check">📍</span> <strong>Geofence</strong> — check-ins only count inside the hall area. No hostel check-ins, no "I'm on my way."</div>
+          <div><span class="guide-check">⏱️</span> <strong>Rotating PIN</strong> — the code changes every 10 seconds, so a screenshot is already expired by the time it lands. It's generated on the server, so a Rep can't freeze one open.</div>
+          <div><span class="guide-check">🛑</span> <strong>Wrong-PIN lockout</strong> — five wrong codes and you're paused for 30 seconds. Nobody can guess their way in.</div>
+          <div><span class="guide-check">🔒</span> <strong>Device Lock</strong> — the first phone you use is bound to your account. One phone, one student; anything else is flagged to the Rep.</div>
+          <div><span class="guide-check">📍</span> <strong>Location (coming)</strong> — hall geofencing is built but switched <strong>off in the web app</strong>, because a browser can't tell one hall from the next precisely enough. It switches on in the mobile app.</div>
+          <div><span class="guide-check">📊</span> <strong>Your records are yours</strong> — download attendance as CSV or PDF, with a percentage for every student, any time.</div>
           <div><span class="guide-check">🤝</span> <strong>Fail-Safe override</strong> — real problems (dead GPS, dropped network) get a human rescue hatch. Never a dead end.</div>
           <div><span class="guide-check">🚩</span> <strong>Anti-beef system</strong> — no silent deletions; every removal, flag, and approval is permanent and visible.</div>
           <div><span class="guide-check">👁️</span> <strong>Watchdog</strong> — screenshot attempts and app-switching mid-session are logged for the Rep to review.</div>
