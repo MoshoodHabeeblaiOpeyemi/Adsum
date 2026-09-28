@@ -8384,7 +8384,17 @@ function renderAdviserRoster(data) {
   const { count, rep, imported, repSelect, repSave, repClear } = adviserEls();
   adviserRoster = data;
 
-  if (count) count.textContent = String(data.count || 0);
+  if (count) {
+    // 📍 The roster id this screen is actually reading. Shown only when the
+    // numbers look wrong (0 students, or no import date), because that is the
+    // one case where knowing WHICH document was read settles the question
+    // immediately. Hidden on a healthy roster so it costs no clutter.
+    const looksWrong = !data.count || !data.lastImportAt;
+    count.textContent = String(data.count || 0);
+    count.title = looksWrong && data.rosterId
+      ? "Reading roster: " + data.rosterId + " (0 students, no import date — this is the document the server found)"
+      : "";
+  }
   if (rep) {
     rep.textContent = data.chosenRepName
       ? data.chosenRepName + " (" + data.chosenRepMatric + ")"

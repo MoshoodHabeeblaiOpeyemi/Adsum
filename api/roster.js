@@ -388,8 +388,25 @@ async function handleGetRoster(req, res, decoded) {
 
     const roster = snap.data();
     const students = Array.isArray(roster.students) ? roster.students : [];
+    const matrics = Array.isArray(roster.matrics) ? roster.matrics : [];
+    // 🔎 DIAGNOSTIC. The dashboard showed 0 students and an unknown import date
+    // after a reported success. The write and the read are provably the same
+    // document id, so the only way to settle it is to report what is ACTUALLY
+    // stored. These are counts and the doc id, not user data, and they make the
+    // next failure self-describing instead of another guessing round.
+    console.log("roster get:", JSON.stringify({
+      id: rosterRef.id,
+      countField: typeof roster.count,
+      count: roster.count,
+      studentsLen: students.length,
+      matricsLen: matrics.length,
+      hasImportedAt: Boolean(roster.importedAt),
+      repChangesLen: Array.isArray(roster.repChanges) ? roster.repChanges.length : 0,
+    }));
     return res.status(200).json({
       exists: true,
+      // The id actually read, so a mismatch is visible instead of inferred.
+      rosterId: rosterRef.id,
       institution: roster.institution,
       department: roster.department,
       level: roster.level,
