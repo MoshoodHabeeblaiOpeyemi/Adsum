@@ -189,32 +189,46 @@ async function handleImportRoster(req, res, decoded) {
       warnings: parsed.warnings,
     });
   } catch (error) {
-    // 🔎 The adviser used to see "Unable to import the roster." and nothing
-    // else, which made a wrong-column file, a permissions problem and a quota
-    // limit look identical. The full cause is logged server-side; the client
-    // now gets a retryable message plus the code, so the adviser can screenshot
-    // it and we can diagnose without guessing.
+    // 🔎 Why this exists: the adviser saw "Unable to import the roster." for
+    // EVERY failure, so a wrong-column file, a rules problem and a quota limit
+    // were indistinguishable. Worse, when the code below guessed wrong it told
+    // them to "check your connection" for a server fault that retrying could
+    // never fix.
+    //
+    // The Firestore status CODE is safe to return — it is a fixed enum
+    // ("permission-denied", "unavailable", "not-found"…), not a document path.
+    // The MESSAGE is never returned, because it embeds collection names and
+    // document ids, which is a free schema map for an attacker.
+    const code = (error && error.code) || null;
+    const msg = String((error && error.message) || "");
     console.error("roster import error:", error);
-    if (error && error.code) console.error("  firestore code:", error.code);
-    if (/permission|insufficient/i.test(String(error && error.message))) {
-      console.error("  -> rules/permission problem on the roster document");
-    }
-    if (/exceed|quota|rate/i.test(String(error && error.message))) {
-      console.error("  -> quota or rate limit; retry shortly");
-    }
-    if (/invalid|undefined|unsupported/i.test(String(error && error.message))) {
-      console.error("  -> a field value Firestore cannot store");
-    }
+    console.error("  firestore code:", code, "| message:", msg);
+
+    const isPermission = code === 7 || /permission|insufficient/i.test(msg);
+    const isQuota = /exceed|quota|rate|resource-exhausted/i.test(msg) || code === 8;
+    const isBadValue = /invalid|undefined|unsupported|out of range/i.test(msg) || code === 3;
+    const isUnavailable = code === 14 || /unavailable|deadline|network|ECONN/i.test(msg);
+
+    if (isPermission) console.error("  -> rules/permission problem on the roster document");
+    if (isQuota) console.error("  -> quota or rate limit");
+    if (isBadValue) console.error("  -> a field value Firestore cannot store");
+    if (isUnavailable) console.error("  -> Firestore unreachable from this function");
+
     return res.status(500).json({
-      error: "Unable to save the roster. Your file was read fine — nothing has been saved. Please try again.",
+      error: "Unable to save the roster. Your file was read fine — nothing has been saved.",
       code: "IMPORT_WRITE_FAILED",
-      // Echoed only for the two known-benign cases, so the adviser is not told
-      // to retry something that cannot work.
-      reason: /quota|rate/i.test(String(error && error.message))
-        ? "The server is busy. Wait a moment and press Confirm again."
-        : /permission|insufficient/i.test(String(error && error.message))
-          ? "The server rejected the write. An administrator needs to check the database rules."
-          : "Check your connection and press Confirm again.",
+      // The raw status, so the client can show something specific. Safe: a fixed
+      // enum, not a path.
+      firestoreCode: code,
+      reason: isPermission
+        ? "The database rejected the write. An administrator needs to check the Firestore rules."
+        : isQuota
+          ? "The server is busy. Wait a moment, then press Confirm again."
+          : isBadValue
+            ? "The server could not store the roster data. An administrator needs to look at this."
+            : isUnavailable
+              ? "The server could not reach the database. Check the connection and press Confirm again."
+              : "Unexpected server error. An administrator needs to check the logs.",
     });
   }
 }

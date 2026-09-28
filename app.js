@@ -8513,9 +8513,15 @@ async function confirmRosterImport() {
     // The CSV is deliberately NOT cleared and the preview is kept, so
     // Confirm can be pressed again without re-picking the file.
     const reason = err.payload && err.payload.reason;
+    // The Firestore status code is a fixed enum, so it is safe to show and it
+    // turns "something went wrong" into a single decisive answer. Quote it in
+    // the screenshot.
+    const fsCode = err.payload && err.payload.firestoreCode;
     adviserMessage(
       "err",
-      escapeHTML(err.message) + (reason ? " " + escapeHTML(reason) : ""),
+      escapeHTML(err.message) +
+        (reason ? " " + escapeHTML(reason) : "") +
+        (fsCode ? ` (Firestore: ${escapeHTML(fsCode)})` : ""),
     );
     if (el.preview) el.preview.classList.remove("hidden");
   } finally {
