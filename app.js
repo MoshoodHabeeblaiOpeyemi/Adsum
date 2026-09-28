@@ -1455,6 +1455,34 @@ if (mobileMenuBtn && navLinks) {
   const openSettingsBtn = document.getElementById("openSettingsBtn");
   const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 
+  // 🧭 ONCE AN ACCOUNT EXISTS, THE ROLE PICKER IS NOT THE DEFAULT.
+  //
+  // "Who are you joining as?" is a FIRST-TIME question. Once this device has
+  // created an account, answering it again is friction on every later visit —
+  // and worse, it invites a returning user to re-pick a role they already have,
+  // which reads as if their role were negotiable. It is not: role is written once
+  // by the server and can only change by deleting the account.
+  //
+  // So the picker is the default ONLY for a device that has never created an
+  // account. Returning users land on Sign in, and the picker stays reachable
+  // behind "Sign up" for the genuinely new case (a second person on a shared
+  // laptop, a student who also wants to try the rep flow).
+  //
+  // 🔒 This is a DISPLAY preference stored per device. It grants nothing: the
+  // role actually stored on any account is decided server-side, so hiding the
+  // picker cannot change anyone's privileges.
+  const ACCOUNT_EXISTS_KEY = "veripresenx_account_created";
+  const accountWasCreated = () => {
+    try { return localStorage.getItem(ACCOUNT_EXISTS_KEY) === "1"; } catch (_) { return false; }
+  };
+  const noteAccountCreated = () => {
+    try { localStorage.setItem(ACCOUNT_EXISTS_KEY, "1"); } catch (_) { /* private mode */ }
+  };
+  // Cleared on sign-out? NO — deliberately. The flag means "this device has
+  // created an account", which stays true after signing out, so the next visit
+  // still goes to Sign in rather than the picker. It is removed only by
+  // "Delete My Account", which untracks the device and starts clean.
+
   const showLoginBtn = document.getElementById("showLogin");
   if (showLoginBtn) {
     showLoginBtn.addEventListener("click", (e) => {
@@ -1672,10 +1700,17 @@ if (mobileMenuBtn && navLinks) {
       dashboardSection.classList.add("hidden");
       logoutBtn.classList.add("hidden");
       if (openSettingsBtn) openSettingsBtn.classList.add("hidden");
-      // Default landing for logged-out users is the role picker (browse free).
-      // Login/signup are one tap away; nothing locks until signup succeeds.
-      if (typeof showAuthView === "function") showAuthView("picker");
-      else { signupCard.classList.add("hidden"); loginCard.classList.add("hidden"); if (rolePicker) rolePicker.classList.remove("hidden"); }
+      // 🧭 Logged-out landing. The role picker is the default ONLY for a device
+      // that has never created an account; otherwise go to Sign in, because the
+      // picker is a first-time question and re-asking it implies a role can be
+      // re-chosen. It remains one tap away behind "Sign up".
+      const landingView = accountWasCreated() ? "login" : "picker";
+      if (typeof showAuthView === "function") showAuthView(landingView);
+      else {
+        signupCard.classList.add("hidden");
+        loginCard.classList.toggle("hidden", landingView !== "login");
+        if (rolePicker) rolePicker.classList.toggle("hidden", landingView !== "picker");
+      }
     }
   }
 
@@ -1853,6 +1888,9 @@ if (mobileMenuBtn && navLinks) {
         // assignment a brand-new user sits on the auth screen forever.
         signupSucceeded = true;
         signupForm.reset();
+        // 🧭 Remember that this device has an account, so the role picker is
+        // not shown again on the next visit.
+        noteAccountCreated();
 
         // --- ADVISER VERIFICATION: 6-DIGIT CODE ONLY -------------------------
         // The code was already minted and emailed by api/onboarding.js during
@@ -2117,6 +2155,10 @@ if (mobileMenuBtn && navLinks) {
           // a read-through migration before the account was deleted.
           localStorage.removeItem("attendify_device_uuid");
           localStorage.removeItem("attendify_theme");
+          // 🧭 Deleting the account untracks the device, so a genuinely new
+          // person using this machine is asked their role again. Keeping the
+          // flag would send them straight to a Sign in they cannot pass.
+          try { localStorage.removeItem(ACCOUNT_EXISTS_KEY); } catch (_) {}
 
           toast.info(
             "Your account has been deleted. Goodbye! 👋",
