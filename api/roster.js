@@ -189,7 +189,20 @@ async function handleImportRoster(req, res, decoded) {
       warnings: parsed.warnings,
     });
   } catch (error) {
+    // 🔎 The adviser sees "Unable to import the roster." and nothing else, which
+    // is how a wrong-column import and a permissions failure look identical.
+    // Log the real cause with everything an operator needs, and keep the client
+    // message generic so Firestore details are not leaked to the browser.
     console.error("roster import error:", error);
+    if (error && error.code) {
+      console.error("  firestore code:", error.code);
+    }
+    if (/permission|insufficient/i.test(String(error && error.message))) {
+      console.error("  -> a rules/permission problem: the client may be writing this directly");
+    }
+    if (/exceed|quota|rate/i.test(String(error && error.message))) {
+      console.error("  -> a quota or rate limit; retry shortly");
+    }
     return res.status(500).json({ error: "Unable to import the roster." });
   }
 }
