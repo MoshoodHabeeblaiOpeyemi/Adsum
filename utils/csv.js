@@ -54,16 +54,41 @@ function splitLine(line) {
 const normHeader = (h) => String(h || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 
 // --- header aliases -------------------------------------------------------
-const MATRIC_HEADERS = [
+// Matric column headings.
+//
+// ⚠️ ORDER IS PRIORITY, and the weak ones come last.
+//
+// A department sheet very often has BOTH an "S/N" (serial number) column and a
+// "Matric No" column. findCol() returns the first column whose heading matches
+// ANY alias, so a single flat list lets "S/N" win and the roster is imported
+// with 1, 2, 3, 4... in the Matric column. That is not a near miss — it produces
+// a roster where every student is unidentifiable, and it is invisible in the
+// preview unless the adviser reads it carefully.
+//
+// So the strong, unambiguous names are tried across EVERY column first. Only if
+// none of them match do we fall back to the weak names, which are commonly
+// serial numbers.
+const MATRIC_HEADERS_STRONG = [
   "matric", "matricno", "matricnumber", "matricnum", "matriccode", "matricid",
-  "sno", "sn", "serialno", "serialnumber", "serial", "no", "number", "id",
   "registrationnumber", "registrationno", "regno", "regnumber", "registration",
-  "studentnumber", "studentno", "studentid", "indexnumber", "indexno",
+  "studentnumber", "studentno", "studentid",
 ];
+// Ambiguous on their own: "S/N" is a serial number as often as it is a
+// registration number, and "No" / "ID" / "Number" are usually row counters.
+const MATRIC_HEADERS_WEAK = [
+  "sno", "sn", "serialno", "serialnumber", "serial",
+  "no", "number", "id", "indexnumber", "indexno",
+];
+const MATRIC_HEADERS = [...MATRIC_HEADERS_STRONG, ...MATRIC_HEADERS_WEAK];
 
 const NAME_HEADERS = ["name", "fullname", "studentname", "student", "names"];
 const SURNAME_HEADERS = ["surname", "lastname", "familyname"];
-const OTHERNAME_HEADERS = ["othernames", "othername", "givenname", "givennames", "firstname", "firstnames", "middlename"];
+// 🔑 "middlename" is NOT here. It used to be, which meant a sheet carrying
+// Surname / Middle Name / Other Names matched on "Middle Name" and silently
+// dropped the third column. The three are distinct parts of one name and are
+// now parsed separately, then recombined in the correct order.
+const MIDDLE_NAME_HEADERS = ["middlename", "middlenames", "midname"];
+const OTHERNAME_HEADERS = ["othernames", "othername", "givenname", "givennames", "firstname", "firstnames"];
 const EMAIL_HEADERS = ["email", "emailaddress", "mail", "e-mail", "emailaddr"];
 
 /**
@@ -176,10 +201,24 @@ function parseRosterCsv(text) {
   const header = headerCells.map(normHeader);
   const findCol = (aliases) => header.findIndex((h) => aliases.includes(h));
 
-  let matricIdx = findCol(MATRIC_HEADERS);
+  let matricIdx = findCol(MATRIC_HEADERS_STRONG);
   let detectedBy = "header";
 
-  // --- headings unhelpful: fall back to sniffing the data -----------------
+  // 🔑 STRONG HEADINGS FIRST, EVERYWHERE. A sheet with both "S/N" and "Matric
+  // No" must resolve to "Matric No" even though "S/N" sits in column 0 and
+  // matches an alias. Only if NO strong heading exists anywhere do we accept a
+  // weak one, and those are commonly row counters — so the choice is warned
+  // about rather than made silently.
+  if (matricIdx === -1) {
+    matricIdx = findCol(MATRIC_HEADERS_WEAK);
+    if (matricIdx !== -1) {
+      result.warnings.push(
+        `No column was headed "Matric", so "${headerCells[matricIdx] || "column " + (matricIdx + 1)}" was used as the identifier. If that column is just a serial number (S/N), remove it and re-upload, or the roster will not match any student.`,
+      );
+    }
+  }
+
+  // No usable heading at all: fall back to sniffing the values.
   if (matricIdx === -1) {
     const dataRows = lines.slice(headerRowIdx + 1).map(splitLine);
     const colCount = Math.max(header.length, 0, ...dataRows.map((r) => r.length));
@@ -201,6 +240,7 @@ function parseRosterCsv(text) {
 
   const nameIdx = findCol(NAME_HEADERS);
   const surnameIdx = findCol(SURNAME_HEADERS);
+  const middleIdx = findCol(MIDDLE_NAME_HEADERS);
   const otherIdx = findCol(OTHERNAME_HEADERS);
   const emailIdx = findCol(EMAIL_HEADERS);
   result.detected = { matric: matricIdx, by: detectedBy, header: true };
@@ -208,13 +248,13 @@ function parseRosterCsv(text) {
   if (emailIdx === -1) {
     result.warnings.push("No email column found. Students can still enrol using their matric number.");
   }
-  if (nameIdx === -1 && surnameIdx === -1) {
+  if (nameIdx === -1 && surnameIdx === -1 && middleIdx === -1) {
     result.warnings.push("No name column found. Students will appear on the roster by matric number only.");
   }
 
   return buildRows(
     lines.slice(headerRowIdx + 1).map(splitLine),
-    { matricIdx, nameIdx, surnameIdx, otherIdx, emailIdx },
+    { matricIdx, nameIdx, surnameIdx, middleIdx, otherIdx, emailIdx },
     result,
     headerRowIdx + 1,
   );
@@ -222,7 +262,7 @@ function parseRosterCsv(text) {
 
 /** Turn parsed rows into students, validating each one. Shared by both paths. */
 function buildRows(rows, cols, result, lineOffset) {
-  const { matricIdx, nameIdx = -1, surnameIdx = -1, otherIdx = -1, emailIdx = -1 } = cols;
+  const { matricIdx, nameIdx = -1, surnameIdx = -1, middleIdx = -1, otherIdx = -1, emailIdx = -1 } = cols;
   const seen = new Set();
 
   for (let i = 0; i < rows.length; i++) {
@@ -259,12 +299,18 @@ function buildRows(rows, cols, result, lineOffset) {
     }
     seen.add(matric);
 
-    // Surname + Other Names is how Nigerian department sheets are laid out;
-    // join them into the single "name" the rest of the app stores.
+    // A Nigerian department sheet lays a name out as Surname / Middle Name /
+    // Other Names. All three are distinct parts of ONE name, so they are read
+    // separately and joined in that order. Every part is optional, so a two- or
+    // one-column sheet produces the same shape without special-casing.
     const surname = surnameIdx >= 0 ? String(cells[surnameIdx] || "").trim() : "";
+    const middle = middleIdx >= 0 ? String(cells[middleIdx] || "").trim() : "";
     const other = otherIdx >= 0 ? String(cells[otherIdx] || "").trim() : "";
     const single = nameIdx >= 0 ? String(cells[nameIdx] || "").trim() : "";
-    const name = (surname && other ? `${surname} ${other}` : single || surname || other)
+
+    // Prefer the three-column layout; fall back to a single full-name column.
+    const combined = [surname, middle, other].filter(Boolean).join(" ").trim();
+    const name = (combined || single)
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, MAX_FIELD);
@@ -280,7 +326,17 @@ function buildRows(rows, cols, result, lineOffset) {
       result.warnings.push(`Line ${lineNo}: no name supplied — this student will show as their matric number.`);
     }
 
-    result.students.push({ matric, name, email });
+    // The three parts are stored alongside the combined name, additively.
+    // Existing readers only touch .matric / .name / .email, so api/roster.js and
+    // the client preview keep working unchanged.
+    result.students.push({
+      matric,
+      name,
+      surname: surname || null,
+      middleName: middle || null,
+      otherNames: other || null,
+      email,
+    });
   }
 
   if (!result.students.length && !result.errors.length) {
