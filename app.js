@@ -8506,7 +8506,18 @@ async function confirmRosterImport() {
     adviserMessage("ok", escapeHTML(msg));
     await loadAdviserRoster();
   } catch (err) {
-    adviserMessage("err", escapeHTML(err.message));
+    // 🔎 The server now says WHY the write failed. A quota limit
+    // resolves in a minute; a rules problem never resolves however many
+    // times Confirm is pressed, so the specific cause matters.
+    //
+    // The CSV is deliberately NOT cleared and the preview is kept, so
+    // Confirm can be pressed again without re-picking the file.
+    const reason = err.payload && err.payload.reason;
+    adviserMessage(
+      "err",
+      escapeHTML(err.message) + (reason ? " " + escapeHTML(reason) : ""),
+    );
+    if (el.preview) el.preview.classList.remove("hidden");
   } finally {
     if (el.confirm) { el.confirm.disabled = false; el.confirm.textContent = "Confirm import"; }
   }
