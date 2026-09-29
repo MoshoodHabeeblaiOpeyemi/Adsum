@@ -360,10 +360,35 @@ function busyPaint() {
   busyLabelEl.textContent = label;
 }
 
-function busyShow(label) {
+// 🔒 A stack entry can forbid the escape hatch. Signup is the case that
+// matters: it is a TWO-STEP sequence (create the Auth user, then write the
+// profile), and "Stop waiting" would release the screen in the gap between
+// them — the user starts typing into what looks like a fresh form, and the
+// second request then lands and creates a real account underneath them.
+// For such a flow the blocker must run to completion one way or the other,
+// because the account either exists or it does not.
+let busyEscapeAllowed = true;
+
+function busyShow(label, opts) {
   if (!busyOverlay) return;
+  const escape = !(opts && opts.noEscape);
+  if (busyDepth === 0) busyEscapeAllowed = escape;
+  // A non-escapable step anywhere in the stack disables the hatch for all of
+  // them: releasing the screen while such a step is live is exactly the bug.
+  else if (!escape) busyEscapeAllowed = false;
   busyStack.push(String(label || "Working…").slice(0, BUSY_LABEL_MAX));
   busyDepth++;
+  // A noEscape step can JOIN an already-running escapable one, and then the
+  // hatch must be withdrawn. The first step's timer is already armed at this
+  // point, so re-evaluate: kill it, and hide the buttons if they are already
+  // on screen. Without this, a login in flight would keep offering "Stop
+  // waiting" after a signup started underneath it.
+  if (!busyEscapeAllowed) {
+    clearTimeout(busySlowTimer);
+    busySlowTimer = null;
+    if (busyHintEl) busyHintEl.classList.add("hidden");
+    if (busyCancelBtn) busyCancelBtn.classList.add("hidden");
+  }
   if (busyDepth === 1) {
     // A show can arrive while a previous hide is still pending, or
     // the overlay would vanish from under the new request.
@@ -377,11 +402,14 @@ function busyShow(label) {
     if (busyHintEl) busyHintEl.classList.add("hidden");
     if (busyCancelBtn) busyCancelBtn.classList.add("hidden");
     clearTimeout(busySlowTimer);
-    busySlowTimer = setTimeout(() => {
-      if (busyDepth < 1) return;
-      if (busyHintEl) busyHintEl.classList.remove("hidden");
-      if (busyCancelBtn) busyCancelBtn.classList.remove("hidden");
-    }, BUSY_SLOW_AFTER_MS);
+    busySlowTimer = null;
+    if (busyEscapeAllowed) {
+      busySlowTimer = setTimeout(() => {
+        if (busyDepth < 1) return;
+        if (busyHintEl) busyHintEl.classList.remove("hidden");
+        if (busyCancelBtn) busyCancelBtn.classList.remove("hidden");
+      }, BUSY_SLOW_AFTER_MS);
+    }
   }
   busyPaint();
 }
@@ -414,10 +442,13 @@ function busyHide() {
 /**
  * Run `fn` behind the blocker. The overlay is dismissed no matter how
  * `fn` ends — success, handled rejection or a genuine throw.
+ *
+ * `opts.noEscape` withholds the 6s "Stop waiting" hatch. Use it only for a
+ * multi-step sequence that must not be abandoned half-done (see signup).
  */
-async function withBusy(label, fn) {
+async function withBusy(label, fn, opts) {
   if (!busyOverlay) return await fn();
-  busyShow(label);
+  busyShow(label, opts);
   try {
     return await fn();
   } finally {
@@ -430,14 +461,14 @@ async function withBusy(label, fn) {
  * running. Used on the writes where a second execution is not just
  * redundant but actively damaging.
  */
-async function withBusyOnce(label, lockKey, fn) {
+async function withBusyOnce(label, lockKey, fn, opts) {
   if (lockKey && busyLocks.has(lockKey)) {
     toast.info("That action is already running.", "Just a moment");
     return undefined;
   }
   if (lockKey) busyLocks.add(lockKey);
   try {
-    return await withBusy(label, fn);
+    return await withBusy(label, fn, opts);
   } finally {
     if (lockKey) busyLocks.delete(lockKey);
   }
@@ -481,6 +512,10 @@ async function withBusyButton(btn, label, fn) {
 if (busyCancelBtn) {
   busyCancelBtn.addEventListener("click", () => {
     if (!busyOverlay) return;
+    // Belt and braces: a step marked noEscape never un-hides this button,
+    // but if it were ever triggered anyway the request would be released
+    // mid-sequence — the exact state this flag exists to prevent.
+    if (!busyEscapeAllowed) return;
     clearTimeout(busySlowTimer);
     clearTimeout(busyHideTimer);
     busyDepth = 0;
@@ -2337,83 +2372,129 @@ if (signupForm) {
         refreshIcons();
       }
 
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
-      const uid = userCredential.user.uid;
-
-      // 🔒 PHASE 5: the profile is written by the SERVER, not here.
-      //
-      // This used to claim `departmentReps/{rep_INST_DEPT_LEVEL}` on the
-      // client and then setDoc the profile, which meant the rep badge was won
-      // by whoever signed up first — a race, not a decision. The server now
-      // checks this matric against `chosenRepMatric` on the level roster and
-      // writes whatever role is actually warranted, so the client's request
-      // is a REQUEST and never a grant.
-      //
-      // A rep is never requested and therefore never refused: the server checks
-      // this matric against `chosenRepMatric` on the level roster for EVERY
-      // non-adviser signup and writes whatever role is actually warranted, so
-      // there is no request to refuse and no explanation owed.
+      // Declared OUTSIDE the blocker because the post-network code below reads
+      // it (rep grant, roster status, adviser mail delivery). It is assigned
+      // from the wrapper's return value.
       let signup = null;
-      try {
-        const idToken = await userCredential.user.getIdToken();
-        const res = await fetch("/api/onboarding?action=createProfile", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            role: signedRole,
-            repIntent: false,
-            // 🔑 `name` is NOT optional. api/onboarding.js refuses the whole
-            // signup without it ("name is required."), and it is what the
-            // server stores as `users.name` — the display name on course cards,
-            // approval requests and the rep-change trail.
-            //
-            // It used to be dropped from this body when the rep card was
-            // removed, which 400'd EVERY signup (student, chosen rep and adviser
-            // alike) even with all three name boxes filled in. The server now
-            // also derives it from the parts, so this is belt-and-braces.
-            name,
-            firstName: firstName || "",
-            middleName: middleName || "",
-            lastName: lastName || "",
-            matric: matric || "",
-            institution,
-            department,
-            level,
-            email,
-          }),
-        });
-        signup = await res.json();
-        if (!res.ok) {
-          throw new Error(
-            (signup && signup.error) ||
-              "Unable to create your account profile.",
-          );
-        }
-      } catch (apiErr) {
-        // The Auth account exists but has no profile, and a profile-less
-        // account is a "ghost" that handleAuthState() refuses. Removing the
-        // Auth user keeps the two in step.
-        try {
-          await userCredential.user.delete();
-        } catch (_) {
-          /* best effort — the ghost is also caught on next sign-in */
-        }
-        throw apiErr;
-      }
+      // 🔒 THE NETWORK SEQUENCE ONLY, and deliberately so.
+      //
+      // Signup is TWO round trips: create the Auth user, then write the
+      // profile. Both live inside this block; everything after it (the
+      // rep/roster modals and toasts) MUST stay outside, because a
+      // showConfirm() that opened under a full-screen scrim would be
+      // invisible AND untappable.
+      //
+      // `noEscape` is the point. Releasing the screen between the two steps
+      // would let the user start typing into what looks like a fresh form
+      // while step two was still in flight — and it would then land and
+      // create a real account underneath them. The account either exists or
+      // it does not, so this must run to completion one way or the other.
+      //
+      // isCreatingAccount is still set above and still cleared in the
+      // finally: it gates onAuthStateChanged, which is a different concern
+      // from the visual lock, and signupSucceeded is what re-drives
+      // handleAuthState() afterwards.
+      // Assigned from the wrapper's return. If the lock refuses a second
+      // attempt it returns `undefined` and the outer value stays `null`, so
+      // every `signup && ...` branch below correctly falls through to the
+      // plain success toast rather than reading a stale object.
+      signup =
+        await withBusyOnce(
+          "Creating your account…",
+          "signup",
+          async () => {
+            const userCredential = await createUserWithEmailAndPassword(
+              auth,
+              email,
+              password,
+            );
+
+            // 🔒 PHASE 5: the profile is written by the SERVER, not here.
+          //
+          // This used to claim `departmentReps/{rep_INST_DEPT_LEVEL}` on the
+          // client and then setDoc the profile, which meant the rep badge was
+          // won by whoever signed up first — a race, not a decision. The server
+          // now checks this matric against `chosenRepMatric` on the level roster
+          // and writes whatever role is actually warranted, so the client's
+          // request is a REQUEST and never a grant.
+          //
+          // A rep is never requested and therefore never refused: the server
+          // checks this matric against `chosenRepMatric` on the level roster
+          // for EVERY non-adviser signup and writes whatever role is actually
+          // warranted, so there is no request to refuse and no explanation owed.
+          // (No inner `let signup` here — the outer one is the one the code
+          // below reads, and a second declaration would shadow it.)
+          try {
+            const idToken = await userCredential.user.getIdToken();
+            const res = await fetch("/api/onboarding?action=createProfile", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({
+                role: signedRole,
+                repIntent: false,
+                // 🔑 `name` is NOT optional. api/onboarding.js refuses the
+                // whole signup without it ("name is required."), and it is
+                // what the server stores as `users.name` — the display name on
+                // course cards, approval requests and the rep-change trail.
+                //
+                // It used to be dropped from this body when the rep card was
+                // removed, which 400'd EVERY signup (student, chosen rep and
+                // adviser alike) even with all three name boxes filled in. The
+                // server now also derives it from the parts, so this is
+                // belt-and-braces.
+                name,
+                firstName: firstName || "",
+                middleName: middleName || "",
+                lastName: lastName || "",
+                matric: matric || "",
+                institution,
+                department,
+                level,
+                email,
+              }),
+            });
+            signup = await res.json();
+            if (!res.ok) {
+              throw new Error(
+                (signup && signup.error) ||
+                  "Unable to create your account profile.",
+              );
+            }
+          } catch (apiErr) {
+            // The Auth account exists but has no profile, and a profile-less
+            // account is a "ghost" that handleAuthState() refuses. Removing
+            // the Auth user keeps the two in step.
+            try {
+              await userCredential.user.delete();
+            } catch (_) {
+              /* best effort — the ghost is also caught on next sign-in */
+            }
+            throw apiErr;
+          }
+          // `signup` is assigned (not shadowed) so the post-network code below
+          // reads exactly the value it always did.
+          return signup;
+        },
+        { noEscape: true },
+      );
 
       // 🛑 The account is real and the profile is on disk. THIS flag is what
       // the `finally` block below needs to re-run handleAuthState() by hand:
       // onAuthStateChanged() swallowed the only auth event (isCreatingAccount
-      // was still locked) and Firebase never fires it again. Without this
+      // was still locked) and it never fires again. Without this
       // assignment a brand-new user sits on the auth screen forever.
-      signupSucceeded = true;
+      //
+      // ⚠️ Guarded on `signup` because the lock REFUSES a duplicate by
+      // returning undefined rather than throwing — so a refused second attempt
+      // falls through here. Without this check it would set signupSucceeded,
+      // re-run handleAuthState() and reset the form for an account that was
+      // never created.
+      if (signup) {
+        signupSucceeded = true;
+      }
       signupForm.reset();
       // 🧭 Remember that this device has an account, so the role picker is
       // not shown again on the next visit.
@@ -2549,7 +2630,21 @@ if (loginForm) {
         submitBtn.textContent = "Logging in... ⏳";
       }
 
-      await signInWithEmailAndPassword(auth, email, password);
+      // 🔒 WHY THE AUTH SCREEN NEEDED THIS MORE THAN ANY OTHER SCREEN.
+      // The button above was already disabled, so a double-tap on it was
+      // impossible — but the LINKS were not. "Sign Up", "Log In", "Forgot
+      // password?" and "Change" all stayed live, so on a slow connection a
+      // user could tap Log In and then tap Sign Up mid-request. showAuthView()
+      // swaps the view, the sign-in lands, and handleAuthState() then runs
+      // against a screen that is no longer the one they started on.
+      //
+      // The scrim covers the whole viewport, so those links are unreachable
+      // until the request settles. Escape hatch KEPT: a sign-in has no
+      // partial state — it either authenticated or it did not, so letting a
+      // user stop waiting is safe here in a way it is not for signup.
+      await withBusyOnce("Signing you in…", "login", () =>
+        signInWithEmailAndPassword(auth, email, password),
+      );
       loginForm.reset();
     } catch (error) {
       console.error("Login error:", error);
