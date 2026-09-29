@@ -18,6 +18,9 @@
 //     is named with its line number instead of hiding behind an unrelated error
 //   - proves itself first, by planting a known error and requiring that it is
 //     caught — a validator that cannot fail is worse than no validator
+//   - checks index.html for duplicate ids, because getElementById resolves to
+//     the FIRST match in document order and a collided id silently strands one
+//     element forever, with no error anywhere
 //
 // Run: npm run check
 
@@ -109,6 +112,66 @@ for (const d of ["api", "utils"]) {
   badFn === 0
     ? ok(`all ${names.length} top-level functions parse independently`)
     : console.log(`        (${badFn} broken)`);
+}
+
+// --- 5. HTML integrity: a duplicate id strands one element forever --------
+//
+// WHY THIS EXISTS
+// ---------------
+// index.html declared id="rosterCount" TWICE: once on the rep's live-roster
+// heading, once on the adviser's "Students imported" tile. getElementById
+// returns the FIRST match in document order, so the adviser dashboard wrote the
+// imported-student count into the rep's hidden heading and the tile kept the
+// literal "0" from the markup. Nothing was wrong with the data, the API or the
+// rules — the number was going to a different element. The bug was reported
+// from a screen thousands of lines away from its cause, and this validator
+// could not see it because it never read the markup.
+//
+// A duplicate id is never intentional, and it always fails the same silent way,
+// so it is a hard failure.
+{
+  const html = fs.readFileSync("index.html", "utf8");
+  const lineAt = (s, idx) => s.slice(0, idx).split(/\r?\n/).length;
+
+  const seen = new Map();
+  for (const m of html.matchAll(/\sid\s*=\s*"([^"]+)"/g)) {
+    if (!seen.has(m[1])) seen.set(m[1], []);
+    seen.get(m[1]).push(m.index);
+  }
+  const dups = [...seen.entries()].filter(([, hits]) => hits.length > 1);
+  for (const [id, hits] of dups) {
+    bad(
+      `duplicate id="${id}" in index.html`,
+      `lines ${hits.map((i) => lineAt(html, i)).join(", ")} — getElementById can only ever reach the first`,
+    );
+  }
+  if (!dups.length) ok(`index.html has ${seen.size} ids, none duplicated`);
+
+  // Lookups in app.js that match no element. Two are created at runtime by the
+  // very code that looks them up; the third is an `if (el)`-guarded lookup for
+  // an element that has since left the markup. Anything NOT on this list is a
+  // reference renamed on one side only — the bug above in a new costume, and
+  // the reason this list stays explicit rather than being a wildcard.
+  const INTENTIONALLY_ABSENT = new Set([
+    "repEnrolledStudentsSection", // created on demand, then appended
+    "personalLogContainer", // created on demand, then appended
+    "managementToolbar", // guarded; element removed from the markup
+  ]);
+  const refs = new Map();
+  for (const m of app.matchAll(/getElementById\(\s*["']([^"'$]+)["']\s*\)/g)) {
+    if (!refs.has(m[1])) refs.set(m[1], []);
+    refs.get(m[1]).push(lineAt(app, m.index));
+  }
+  const missing = [...refs.entries()].filter(
+    ([id]) => !seen.has(id) && !INTENTIONALLY_ABSENT.has(id),
+  );
+  for (const [id, lines] of missing) {
+    bad(
+      `app.js looks up id="${id}" which is not in index.html`,
+      `app.js:${lines.slice(0, 3).join(", ")}${lines.length > 3 ? ` (+${lines.length - 3} more)` : ""}`,
+    );
+  }
+  if (!missing.length) ok(`all ${refs.size} getElementById targets exist`);
 }
 
 console.log(fails === 0 ? "\nALL PARSED CLEAN" : `\n${fails} PROBLEM(S)`);

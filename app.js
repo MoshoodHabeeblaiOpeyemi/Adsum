@@ -8624,7 +8624,14 @@ function adviserEls() {
   return {
     section: document.getElementById("adviserDashboard"),
     scope: document.getElementById("adviserScope"),
-    count: document.getElementById("rosterCount"),
+    // ⚠️ NOT "rosterCount". That id belongs to the rep's live-roster heading
+    // (#rosterSection), and this tile used to reuse it. Duplicate ids are
+    // resolved to the FIRST element in document order, so this dashboard was
+    // writing the imported-student count into the rep's hidden heading while
+    // the tile kept the literal "0" from the markup — the import had worked,
+    // the number just went somewhere else. check.js now fails on a duplicate
+    // id so this cannot come back.
+    count: document.getElementById("adviserRosterCount"),
     rep: document.getElementById("rosterRep"),
     imported: document.getElementById("rosterImported"),
     file: document.getElementById("rosterFile"),
@@ -8774,18 +8781,15 @@ function renderAdviserRoster(data) {
   adviserRoster = data;
 
   if (count) {
-    // 📍 The roster id this screen is actually reading. Shown only when the
-    // numbers look wrong (0 students, or no import date), because that is the
-    // one case where knowing WHICH document was read settles the question
-    // immediately. Hidden on a healthy roster so it costs no clutter.
+    // 📍 Which roster document this screen is actually reading. Kept because
+    // the last time this tile disagreed with the import banner the cause was a
+    // DUPLICATE id in the markup, not a data problem — and knowing which
+    // document the server read is the fastest way to tell those two apart.
+    // Hidden on a healthy roster so it costs no clutter.
     const looksWrong = !data.count || !data.lastImportAt;
     count.textContent = String(data.count ?? 0);
     count.title =
-      looksWrong && data.rosterId
-        ? "Reading roster: " +
-          data.rosterId +
-          " (0 students, no import date — this is the document the server found)"
-        : "";
+      looksWrong && data.rosterId ? "Reading roster: " + data.rosterId : "";
   }
   if (rep) {
     rep.textContent = data.chosenRepName
