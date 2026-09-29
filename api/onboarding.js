@@ -178,18 +178,31 @@ function buildProfile(body, decoded) {
     );
   }
 
-  const name = clean(body.name);
   const firstName = clean(body.firstName);
   const middleName = clean(body.middleName);
   const lastName = clean(body.lastName);
-  if (
-    overLong(name) ||
-    overLong(firstName) ||
-    overLong(middleName) ||
-    overLong(lastName)
-  ) {
+  if (overLong(firstName) || overLong(middleName) || overLong(lastName)) {
     return fail(400, "Name fields are too long.");
   }
+
+  // 🔑 `name` is the display name stored on the profile and echoed into course
+  // cards, approval requests and the rep-change trail, so it must never be
+  // empty. An explicit `name` wins, but a body that omits it is DERIVED from the
+  // parts rather than refused.
+  //
+  // It used to be mandatory on the wire, which made it a single point of
+  // failure: one client build dropped it from the body when the rep card was
+  // removed, and EVERY signup — student, chosen rep and adviser alike — began
+  // 400-ing with "name is required." even though the name boxes were filled in.
+  // The parts were in the same body the whole time, so deriving from them keeps
+  // a cached page working and removes the coupling entirely.
+  //
+  // [first, middle, last] matches what app.js builds, and an adviser (no middle
+  // name field) naturally yields "First Last" — the same value it already sends.
+  const name =
+    clean(body.name) ||
+    [firstName, middleName, lastName].filter(Boolean).join(" ");
+  if (overLong(name)) return fail(400, "Name fields are too long.");
   if (!name) return fail(400, "name is required.");
 
   // Matric is the student's identity key and is PERMANENT, so it is normalised

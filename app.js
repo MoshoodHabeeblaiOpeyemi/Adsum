@@ -2167,6 +2167,16 @@ if (signupForm) {
           body: JSON.stringify({
             role: signedRole,
             repIntent: false,
+            // 🔑 `name` is NOT optional. api/onboarding.js refuses the whole
+            // signup without it ("name is required."), and it is what the
+            // server stores as `users.name` — the display name on course cards,
+            // approval requests and the rep-change trail.
+            //
+            // It used to be dropped from this body when the rep card was
+            // removed, which 400'd EVERY signup (student, chosen rep and adviser
+            // alike) even with all three name boxes filled in. The server now
+            // also derives it from the parts, so this is belt-and-braces.
+            name,
             firstName: firstName || "",
             middleName: middleName || "",
             lastName: lastName || "",
