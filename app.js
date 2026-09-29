@@ -9080,12 +9080,18 @@ async function saveChosenRep(matric) {
     return;
   }
   try {
-    await adviserApi("chooseRep", { matric });
-    adviserMessage(
-      "ok",
+    const result = await adviserApi("chooseRep", { matric });
+    // 🔎 The adviser's choice now promotes an account that already exists, so
+    // the two outcomes are worth telling apart out loud: "done" and "done the
+    // moment they sign up" look identical in the rep tile otherwise.
+    let msg =
       escapeHTML((picked && picked.name) || matric) +
-        " is now the course rep for this level.",
-    );
+      " is now the course rep for this level.";
+    msg +=
+      result && result.repLinked
+        ? " Their account has been updated."
+        : " They have not signed up yet, so they will be made rep automatically the moment they do.";
+    adviserMessage("ok", msg);
     await loadAdviserRoster();
   } catch (err) {
     adviserMessage("err", escapeHTML(err.message));

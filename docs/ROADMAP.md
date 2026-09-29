@@ -200,6 +200,17 @@ mystery.
 - **Replacing a rep demotes them for real** — the outgoing rep's profile is
   updated to `role: "student"`, `isRep: false` inside the same transaction.
   "The old rep becomes a regular student" is now true rather than assumed.
+- **Naming a rep promotes them for real.** `chooseRep` finds the account by
+  matric and writes `role: "rep"` + `repGrantedByAdviser: true` in the same
+  transaction, then links `chosenRepUid`. Before this, the ONLY place a rep was
+  ever granted was at signup, and only if the student had ticked the "Course Rep"
+  card. Since the normal order is *students register, then the adviser picks*,
+  naming an already-registered student left the dashboard showing a rep whose
+  profile still said `student` — and `firestore.rules` gates course creation on
+  `isAdviserGrantedRep()`, so that student could not create a course at all.
+  The lookup is a one-field `matric` equality, which uses the automatic
+  single-field index; a multi-field query would have needed an index to finish
+  building first, which is the wrong moment to be fragile.
 - `utils/rosters.js` owns the roster id so the writer and the reader cannot
   derive different documents. Its `normSegment()` collapses `"200L"`, `"200 L"`
   and `"200-L"` to one level — without it, an adviser who typed `200 L` and a

@@ -366,29 +366,82 @@ async function handleChooseRep(req, res, decoded) {
         ).find((s) => s.matric === wanted);
         const repName =
           (student && student.name) || roster.chosenRepName || null;
-        // Replacing a rep is allowed but LOGGED, with the outgoing rep named.
-        // The old rep is not edited here: they keep their account and simply
-        // stop being the rep, which is what "becomes a regular student" means.
-        // Their role is demoted by the same transaction via `role: "student"`
-        // in Phase 5 when the account is linked, not here.
         const isReplacement =
           Boolean(roster.chosenRepMatric) && roster.chosenRepMatric !== wanted;
+
+        // 🔎 WHERE THE GRANT LANDS, AND WHY IT HAS TO HAPPEN HERE.
+        //
+        // Until now the only place a rep was ever granted was
+        // api/onboarding.js AT SIGNUP, and only when the student had ticked the
+        // "Course Rep" card. So an adviser naming a student who had ALREADY
+        // registered — or who registered as a plain student — produced a
+        // dashboard that displayed a rep whose profile still said `student`.
+        // That is not cosmetic: firestore.rules gates course creation on
+        // isAdviserGrantedRep(), which requires BOTH role == "rep" AND
+        // repGrantedByAdviser == true, so the named rep could not create a
+        // course at all. The adviser's decision is the authority, so the
+        // promotion happens in this transaction.
+        //
+        // ONE-field equality only. `matric` carries Firestore's automatic
+        // single-field index, so this needs no composite index and works the
+        // moment it deploys — a multi-field query would fail until the index
+        // finished building, which is exactly the wrong moment to be fragile.
+        //
+        // The scope is then matched in code, because the same matric can exist
+        // in two institutions and an adviser only ever owns one level. It is
+        // matched by ROSTER ID rather than by comparing the three fields
+        // directly, so a student who typed "200 L" is still recognised as
+        // belonging to the roster for "200L": normSegment() is what collapses
+        // that spacing, and reusing it here means this test can never disagree
+        // with how the roster is addressed everywhere else. The cap is a guard
+        // against an unbounded read, not an expected limit.
+        const accountSnap = await tx.get(
+          db.collection("users").where("matric", "==", wanted).limit(25),
+        );
+        const accountDoc =
+          accountSnap.docs.find(
+            (d) =>
+              rosterDocId(
+                d.data().institution,
+                d.data().department,
+                d.data().level,
+              ) === rosterRef.id,
+          ) || null;
+        const accountUid = accountDoc ? accountDoc.id : null;
+
         // 🔒 The outgoing rep may already have an account. "Old rep becomes a
         // regular student" is only true if their profile actually says so, so
         // the demotion happens here rather than being assumed. A null
-        // `chosenRepUid` means they never signed up, so there is nothing to do.
-        if (isReplacement && roster.chosenRepUid) {
+        // `chosenRepUid` means they never signed up, and there is nothing to
+        // demote. (This comment used to claim the demotion did NOT happen here,
+        // which had been false since Phase 5.) Guarded against demoting the
+        // same document that is about to be promoted.
+        if (
+          isReplacement &&
+          roster.chosenRepUid &&
+          roster.chosenRepUid !== accountUid
+        ) {
           tx.update(db.collection("users").doc(roster.chosenRepUid), {
             role: ROLE.STUDENT,
             isRep: false,
             repGrantedByAdviser: false,
           });
         }
+        if (accountDoc) {
+          tx.update(db.collection("users").doc(accountUid), {
+            role: ROLE.REP,
+            isRep: true,
+            repGrantedByAdviser: true,
+          });
+        }
         tx.update(rosterRef, {
           chosenRepMatric: wanted,
           chosenRepName: repName,
-          // Stays null until that student signs up; Phase 5 links the account.
-          chosenRepUid: null,
+          // The uid whenever that student already has an account — linked here
+          // instead of waiting for a signup that has already happened. Null
+          // only when they have not registered yet; api/onboarding.js links it
+          // then.
+          chosenRepUid: accountUid,
           chosenRepAt: FieldValue.serverTimestamp(),
           repChanges: appendRepChange(roster.repChanges, {
             action: isReplacement
@@ -433,6 +486,11 @@ async function handleChooseRep(req, res, decoded) {
       success: true,
       chosenRepMatric: after.chosenRepMatric || null,
       chosenRepName: after.chosenRepName || null,
+      // Whether the chosen student already had an account and was promoted by
+      // the transaction above. The dashboard says which happened, because
+      // "named but not yet registered" and "named and already promoted" are
+      // otherwise indistinguishable in the rep tile.
+      repLinked: Boolean(after.chosenRepUid),
       cleared: Boolean(clear),
     });
   } catch (error) {
