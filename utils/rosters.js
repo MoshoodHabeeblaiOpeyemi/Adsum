@@ -8,7 +8,10 @@
 // Extracted here because "where is the roster for this level?" is exactly the
 // kind of question that gets answered twice, differently.
 
-const norm = (v) => String(v || "").trim().toUpperCase();
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase();
 
 /**
  * Collapse the spacing people vary inside a field, so "200 L", "200L" and
@@ -28,7 +31,20 @@ const normSegment = (v) => norm(v).replace(/[\s._-]+/g, "");
  * the same level collide deliberately rather than producing two rosters.
  */
 const rosterDocId = (institution, department, level) =>
-  `${normSegment(institution)}_${normSegment(department)}_${normSegment(level)}`.replace(/[^A-Z0-9_]/g, "_");
+  `${normSegment(institution)}_${normSegment(department)}_${normSegment(level)}`.replace(
+    /[^A-Z0-9_]/g,
+    "_",
+  );
+
+// Preserve the historical departmentReps key recipe because its existing
+// documents are the signup race guard. Adviser rep changes must address the
+// same slot rather than creating an uncoordinated second key.
+const repSlotId = (institution, department, level) => {
+  const inst = institution.replace(/[^a-zA-Z0-9]/g, "_");
+  const dept = department.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+  const lvl = level.replace(/[^a-zA-Z0-9]/g, "_");
+  return `rep_${inst}_${dept}_${lvl}`;
+};
 
 /**
  * Look up the roster covering a student's own (institution, department, level).
@@ -36,10 +52,12 @@ const rosterDocId = (institution, department, level) =>
  * it just means the adviser has not imported it yet.
  */
 async function findRosterFor(db, { institution, department, level }) {
-  const ref = db.collection("departmentRosters").doc(rosterDocId(institution, department, level));
+  const ref = db
+    .collection("departmentRosters")
+    .doc(rosterDocId(institution, department, level));
   const snap = await ref.get();
   if (!snap.exists) return null;
   return { ref, id: ref.id, data: snap.data() };
 }
 
-module.exports = { norm, normSegment, rosterDocId, findRosterFor };
+module.exports = { norm, normSegment, rosterDocId, repSlotId, findRosterFor };

@@ -1100,6 +1100,47 @@ if (mobileMenuBtn && navLinks) {
 
 // --- REAL-TIME FIRESTORE SYNC ---
 let unsubscribeCourses = null;
+let unsubscribeUserProfile = null;
+let userProfileListenerUid = null;
+
+function startUserProfileListener(uid) {
+  if (userProfileListenerUid === uid && unsubscribeUserProfile) return;
+  if (unsubscribeUserProfile) unsubscribeUserProfile();
+  userProfileListenerUid = uid;
+  unsubscribeUserProfile = onSnapshot(
+    doc(db, "users", uid),
+    (snap) => {
+      if (!auth.currentUser || auth.currentUser.uid !== uid) return;
+      if (!snap.exists()) {
+        signOut(auth);
+        return;
+      }
+      const previous = currentUser || {};
+      currentUser = snap.data();
+      checkAuth();
+      syncAdviserDashboard();
+      syncAdviserSurfaces();
+      if (
+        !previous.isRep &&
+        currentUser.isRep &&
+        currentUser.repGrantedByAdviser
+      ) {
+        toast.success(
+          "Your Level Adviser selected you as course rep. You can now create a course.",
+          "Course Rep Access Updated",
+        );
+      }
+    },
+    (error) => console.error("User profile listener error:", error),
+  );
+}
+
+function stopUserProfileListener() {
+  if (unsubscribeUserProfile) unsubscribeUserProfile();
+  unsubscribeUserProfile = null;
+  userProfileListenerUid = null;
+}
+
 // Map of courseId → unsubscribe function for per-course member listeners
 const memberListeners = {};
 
@@ -1570,7 +1611,10 @@ if (showSignupBtn) {
 }
 
 // --- PHASE 2: ROLE PICKER — browse free, lock only on signup success ---
-// pendingRole is just a *draft intention* (signup subtitle + rep checkbox).
+// pendingRole is just a *draft intention* for the pre-signup labels.
+// Students and advisers are the only choices, and the server decides each
+// account's true role from the roster at signup — most visibly by discovering
+// the adviser-chosen rep.
 // It NEVER persists and NEVER locks anything until createUser succeeds.
 let pendingRole = null;
 const rolePicker = document.getElementById("rolePicker");
@@ -1605,7 +1649,6 @@ const ROLE_LABEL = {
 };
 const ROLE_SUB = {
   adviser: "Staff verification first — then import your level roster.",
-  rep: "Your adviser must have picked you — otherwise you join as a student.",
   student: "Join your courses and check in. Device-locked, real-time.",
 };
 
@@ -1652,7 +1695,9 @@ if (roleTrack) {
     },
     { passive: true },
   );
-  setActiveRoleCard(window.innerWidth >= 900 ? 1 : 0);
+  // Default landing is deliberate: with adviser and student the order no longer
+  // matters, and 0 is the first card whatever cards exist.
+  setActiveRoleCard(0);
 }
 
 if (rolePrev)
@@ -1668,10 +1713,11 @@ roleDots.forEach((d) =>
 );
 
 function applyRoleToForm() {
-  // pendingRole: 'adviser' | 'rep' | 'student' | null (generic fallback).
-  // Card is the ONLY distinction: checkbox is gone.
+  // pendingRole: 'adviser' | 'student' | null (generic fallback).
+  // Card is the ONLY distinction: checkbox is gone. There is no rep card: the
+  // server discovers the adviser-chosen rep from the roster at signup.
   const isAdviser = pendingRole === "adviser";
-  const isStudentLike = pendingRole === "rep" || pendingRole === "student";
+  const isStudentLike = pendingRole === "student";
   document
     .querySelectorAll(".role-adviser-only")
     .forEach((el) => el.classList.toggle("hidden", !isAdviser));
@@ -1928,15 +1974,16 @@ if (signupForm) {
   signupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const submitBtn = signupForm.querySelector("button[type='submit']");
-    // Role comes ONLY from the card (pendingRole). Checkbox is gone.
-    const signedRole =
-      pendingRole === "adviser"
-        ? "adviser"
-        : pendingRole === "rep"
-          ? "rep"
-          : "student";
+    // Role comes ONLY from the card (pendingRole), and the rep card is GONE:
+    // students and advisers are the only choices. A client that posts
+    // role: "rep" is rejected by SIGNUP_ROLES server-side; nothing below can
+    // produce it, so the server can only ever DISCOVER a rep from the roster.
+    const signedRole = pendingRole === "adviser" ? "adviser" : "student";
     const isAdviserSignup = signedRole === "adviser";
-    const isRepSignup = signedRole === "rep";
+
+    // Name handling per track: advisers use school-staff fields, everyone else
+    // uses the student name fields. The rep card is gone, so the student branch
+    // is the only student-like path.
 
     // Name handling per role
     let name = "";
@@ -1951,7 +1998,7 @@ if (signupForm) {
         return;
       }
       name = firstName + " " + lastName;
-    } else if (signedRole === "rep" || signedRole === "student") {
+    } else if (signedRole === "student") {
       firstName = document.getElementById("signupFirstName").value.trim();
       middleName = document.getElementById("signupMiddleName").value.trim();
       lastName = document.getElementById("signupLastName").value.trim();
@@ -2004,8 +2051,6 @@ if (signupForm) {
       );
       return;
     }
-    const isRep = isRepSignup; // card decides, not a checkbox
-
     const institutionInput = document.getElementById("signupInstitution");
     const departmentInput = document.getElementById("signupDepartment");
     const levelInput = document.getElementById("signupLevel");
@@ -2050,11 +2095,19 @@ if (signupForm) {
       { label: "Department", value: department },
       { label: "Level", value: level },
       { label: isAdviserSignup ? "School Email" : "Email", value: email },
-      { label: "Account Type", value: ROLE_LABEL[signedRole] || signedRole },
+      {
+        label: "Signup type",
+        value: isAdviserSignup
+          ? "Level Adviser"
+          : "Student; rep status checked automatically",
+      },
     );
+    // Advisers verify by email next; every non-adviser gets the same permanent
+    // matric warning, and a rep refusal is now impossible — the card is gone
+    // and the server simply discovers the chosen rep for them.
     const confirmMessage = isAdviserSignup
       ? "Please double-check everything below. You are joining as a Level Adviser — email verification comes next."
-      : "Please double-check everything below. Your matric number is PERMANENT — it cannot be changed after signup.";
+      : "Please double-check everything below. Your matric number is PERMANENT — it cannot be changed after signup. If your adviser picked you as the Course Rep, your account becomes one automatically.";
     const confirmed = await showConfirm({
       title: "Confirm Your Details",
       message: confirmMessage,
@@ -2098,8 +2151,10 @@ if (signupForm) {
       // writes whatever role is actually warranted, so the client's request
       // is a REQUEST and never a grant.
       //
-      // A rep refusal is NOT a failure: the account is created as a student
-      // and the response says so.
+      // A rep is never requested and therefore never refused: the server checks
+      // this matric against `chosenRepMatric` on the level roster for EVERY
+      // non-adviser signup and writes whatever role is actually warranted, so
+      // there is no request to refuse and no explanation owed.
       let signup = null;
       try {
         const idToken = await userCredential.user.getIdToken();
@@ -2111,7 +2166,7 @@ if (signupForm) {
           },
           body: JSON.stringify({
             role: signedRole,
-            name,
+            repIntent: false,
             firstName: firstName || "",
             middleName: middleName || "",
             lastName: lastName || "",
@@ -2199,6 +2254,22 @@ if (signupForm) {
           );
           setTimeout(openAdviserVerifyModal, 600);
         }
+      } else if (signup && signup.isRep) {
+        await showConfirm({
+          title: "Your adviser chose you as course rep",
+          message:
+            "Your matric matched the rep selected by your Level Adviser, so your account was made course rep automatically. You can now create and manage courses for your level.",
+          okText: "I understand",
+          cancelText: "Close",
+          danger: false,
+          icon: "user-check",
+          details: [
+            { label: "Matric", value: matric },
+            { label: "Department", value: department },
+            { label: "Level", value: level },
+            { label: "Chosen by", value: "Your Level Adviser" },
+          ],
+        });
       } else if (signup && signup.rosterStatus === "unverified") {
         // 🔒 PHASE 6: the account is real, but this matric is not on the
         // level roster the adviser imported. Say so and name the next step —
@@ -2322,6 +2393,7 @@ const handleAuthState = async (user) => {
 
     if (userDoc.exists()) {
       currentUser = userDoc.data();
+      startUserProfileListener(user.uid);
       startCourseListener();
       startNotificationsListener();
       checkAuth();
@@ -2357,6 +2429,7 @@ const handleAuthState = async (user) => {
       checkAuth();
     }
   } else {
+    stopUserProfileListener();
     currentUser = null;
     if (portalSection) portalSection.classList.add("hidden");
     hideAllManagementPanels();

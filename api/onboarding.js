@@ -43,21 +43,45 @@
 
 const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldValue,
+  Timestamp,
+} = require("firebase-admin/firestore");
 const crypto = require("crypto");
 const verifyAppCheck = require("../utils/appCheck");
-const { ROLE, VERIFICATION, SIGNUP_ROLES, isAdviserTrack } = require("../utils/roles");
+const {
+  ROLE,
+  VERIFICATION,
+  SIGNUP_ROLES,
+  isAdviserTrack,
+} = require("../utils/roles");
 // `norm` is already declared locally above; only the roster lookup is imported.
-const { findRosterFor } = require("../utils/rosters");
+const { findRosterFor, repSlotId } = require("../utils/rosters");
 const { isInstitutionDomain } = require("../utils/institutions");
 const { sendVerificationCode } = require("../utils/mailer");
 
 try {
-  if (getApps().length === 0) initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") }) });
-} catch (e) { if (!/already exists/.test(e.message)) console.error("Init error:", e); }
+  if (getApps().length === 0)
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(
+          /\\n/g,
+          "\n",
+        ),
+      }),
+    });
+} catch (e) {
+  if (!/already exists/.test(e.message)) console.error("Init error:", e);
+}
 
 const db = getFirestore();
-const norm = (v) => String(v || "").trim().toUpperCase();
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase();
 
 // Kept identical to api/verification.js so a code minted at signup expires on
 // the same clock a resent one does.
@@ -91,22 +115,10 @@ const overLong = (s) => s.length > MAX_FIELD;
  * collection migrated in the same commit.
  */
 const adviserSlotId = (institution, department, level) =>
-  `adviser_${norm(institution)}_${norm(department)}_${norm(level)}`.replace(/[^A-Z0-9_]/g, "_");
-
-/**
- * ⚠️ Byte-for-byte copy of the recipe app.js used before this endpoint existed.
- * Changing it would orphan every live `departmentReps` document: the new ids
- * would not collide with the old ones, so a SECOND rep could claim a level that
- * already has one. If this is ever changed, migrate the collection in the same
- * commit — never on its own.
- */
-const repSlotId = (institution, department, level) => {
-  const inst = institution.replace(/[^a-zA-Z0-9]/g, "_");
-  const dept = department.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-  const lvl = level.replace(/[^a-zA-Z0-9]/g, "_");
-  return `rep_${inst}_${dept}_${lvl}`;
-};
-
+  `adviser_${norm(institution)}_${norm(department)}_${norm(level)}`.replace(
+    /[^A-Z0-9_]/g,
+    "_",
+  );
 
 /** Cap the rep-change trail, matching api/roster.js. */
 const REP_CHANGE_LIMIT = 50;
@@ -132,7 +144,11 @@ function buildProfile(body, decoded) {
     return fail(400, `role must be one of: ${SIGNUP_ROLES.join(", ")}.`);
   }
   const isAdviser = role === ROLE.ADVISER_PENDING;
-  const isRep = role === ROLE.REP;
+  // ⚠️ DELIBERATELY IGNORED: there is no rep card anymore, and legacy clients
+  // may still post role "rep" (SIGNUP_ROLES keeps accepting it so a cached
+  // page does not 400). The grant below never reads this flag — the roster
+  // decides for EVERY non-adviser signup, so a forged "rep" buys nothing.
+  const isRep = false;
 
   const institution = clean(body.institution);
   const department = clean(body.department);
@@ -149,18 +165,29 @@ function buildProfile(body, decoded) {
   // person controls this mailbox. `body.email` is only used to CONFIRM the
   // form and the account agree — if a tampered client posts someone else's
   // address we refuse rather than mail a code to a stranger.
-  const tokenEmail = String(decoded.email || "").trim().toLowerCase();
-  if (!tokenEmail) return fail(403, "This account has no email address to verify.");
+  const tokenEmail = String(decoded.email || "")
+    .trim()
+    .toLowerCase();
+  if (!tokenEmail)
+    return fail(403, "This account has no email address to verify.");
   const bodyEmail = clean(body.email).toLowerCase();
   if (bodyEmail && bodyEmail !== tokenEmail) {
-    return fail(400, "The email on this form does not match your signed-in account.");
+    return fail(
+      400,
+      "The email on this form does not match your signed-in account.",
+    );
   }
 
   const name = clean(body.name);
   const firstName = clean(body.firstName);
   const middleName = clean(body.middleName);
   const lastName = clean(body.lastName);
-  if (overLong(name) || overLong(firstName) || overLong(middleName) || overLong(lastName)) {
+  if (
+    overLong(name) ||
+    overLong(firstName) ||
+    overLong(middleName) ||
+    overLong(lastName)
+  ) {
     return fail(400, "Name fields are too long.");
   }
   if (!name) return fail(400, "name is required.");
@@ -171,11 +198,16 @@ function buildProfile(body, decoded) {
   // different students in the registry.
   const matric = norm(body.matric);
   if (isAdviser) {
-    if (matric) return fail(400, "Adviser accounts do not carry a matric number.");
+    if (matric)
+      return fail(400, "Adviser accounts do not carry a matric number.");
   } else if (!matric) {
-    return fail(400, "A matric number is required for student and rep accounts.");
+    return fail(
+      400,
+      "A matric number is required for student and rep accounts.",
+    );
   }
-  if (matric && overLong(matric)) return fail(400, "That matric number is too long.");
+  if (matric && overLong(matric))
+    return fail(400, "That matric number is too long.");
 
   return {
     ok: true,
@@ -216,21 +248,23 @@ async function checkAdviserEligibility(profile) {
   if (!check.configured) {
     return {
       status: 503,
-      error: "Institution verification is not set up on this deployment yet. Please try again later.",
+      error:
+        "Institution verification is not set up on this deployment yet. Please try again later.",
       code: "REGISTRY_NOT_CONFIGURED",
     };
   }
   if (!check.ok) {
     return {
       status: 403,
-      error: "That email is not an official address for this institution. Use your school email, or ask your department to add the domain.",
+      error:
+        "That email is not an official address for this institution. Use your school email, or ask your department to add the domain.",
       code: "DOMAIN_NOT_OFFICIAL",
     };
   }
 
-  const slotRef = db.collection("adviserSlots").doc(
-    adviserSlotId(profile.institution, profile.department, profile.level),
-  );
+  const slotRef = db
+    .collection("adviserSlots")
+    .doc(adviserSlotId(profile.institution, profile.department, profile.level));
   const slotSnap = await slotRef.get();
   if (slotSnap.exists) {
     return {
@@ -246,45 +280,54 @@ async function handleCreateProfile(req, res, decoded) {
   try {
     const built = buildProfile(req.body || {}, decoded);
     if (!built.ok) {
-      return res.status(built.status).json({ error: built.error, code: built.code });
+      return res
+        .status(built.status)
+        .json({ error: built.error, code: built.code });
     }
     const p = built.profile;
 
     if (p.isAdviser) {
       const eligible = await checkAdviserEligibility(p);
       if (!eligible.ok) {
-        return res.status(eligible.status).json({ error: eligible.error, code: eligible.code });
+        return res
+          .status(eligible.status)
+          .json({ error: eligible.error, code: eligible.code });
       }
     }
 
     const profileRef = db.collection("users").doc(decoded.uid);
-    const repSlotRef = p.isRep
-      ? db.collection("departmentReps").doc(repSlotId(p.institution, p.department, p.level))
-      : null;
 
     // 🔒 PHASE 5 + 6: the rep is a GRANT and roster membership is a CHECK, and
     // both are decided by the server from the PROFILE's own institution /
     // department / level — never from a request parameter, so a student cannot
-    // point at a level that would accept them. The client asked for something;
-    // this is what they actually get.
+    // point at a level that would accept them. The role choice on the form is
+    // display only; this is what they actually get.
     //
     // The roster is fetched ONCE and both decisions read it, so they can never
     // disagree about which document was consulted.
     const roster = await findRosterFor(db, p);
     const rosterData = (roster && roster.data) || {};
-    const rosterMatrics = Array.isArray(rosterData.matrics) ? rosterData.matrics.map(norm) : [];
+    const rosterMatrics = Array.isArray(rosterData.matrics)
+      ? rosterData.matrics.map(norm)
+      : [];
 
     // PHASE 5 — the rep. Only the student the adviser NAMED may hold the role.
-    // This replaces the old client-side race where whoever signed up first won
-    // an empty `departmentReps` slot. A refusal is NOT an error: the account is
-    // created as a student, and `repRequest` below says which of the four
-    // cases applied so the client can explain it.
-    let repDecision = { granted: false, reason: "NOT_REQUESTED" };
-    if (p.isRep) {
-      const chosen = rosterData.chosenRepMatric ? norm(rosterData.chosenRepMatric) : "";
+    // The form no longer asks (reps are discovered, not self-declared), so the
+    // check runs for EVERY non-adviser signup: if this matric is the chosen
+    // one, the account is born a rep; otherwise it is a student and there is
+    // nothing to regret. A refusal is NOT an error, so there is no
+    // repRequest/reason to report — the signup-success modal just says which
+    // of the two happened.
+    let repDecision = { granted: false, reason: "AUTO_CHECK" };
+    if (!p.isAdviser) {
+      const chosen = rosterData.chosenRepMatric
+        ? norm(rosterData.chosenRepMatric)
+        : "";
       if (!roster) repDecision = { granted: false, reason: "NO_ROSTER" };
-      else if (!chosen) repDecision = { granted: false, reason: "NO_REP_CHOSEN" };
-      else if (norm(p.matric) !== chosen) repDecision = { granted: false, reason: "NOT_THE_CHOSEN_REP" };
+      else if (!chosen)
+        repDecision = { granted: false, reason: "NO_REP_CHOSEN" };
+      else if (norm(p.matric) !== chosen)
+        repDecision = { granted: false, reason: "NOT_THE_CHOSEN_REP" };
       else repDecision = { granted: true, reason: "CHOSEN" };
     }
     // 🔒 The role actually written to the profile.
@@ -306,14 +349,29 @@ async function handleCreateProfile(req, res, decoded) {
     // Three cases, and only the rep one is conditional:
     //   adviser -> ADVISER_PENDING, always (it is later promoted to
     //              level_anchor by api/verification.js, never here)
-    //   rep     -> only when the ADVISER named them
+    //   rep     -> when the ADVISER named this matric on the level roster.
+    //              The request is irrelevant: every non-adviser signup is
+    //              checked, so a chosen rep who tapped "Student" is still
+    //              born a rep, and a random stranger is harmlessly a student.
     //   student -> otherwise
     const effectiveRole = p.isAdviser
       ? ROLE.ADVISER_PENDING
-      : p.isRep && repDecision.granted
+      : repDecision.granted
         ? ROLE.REP
         : ROLE.STUDENT;
     const effectiveIsRep = effectiveRole === ROLE.REP;
+
+    // 🔒 BACKSTOP for a race the auto-grant makes vanishingly narrow: two
+    // simultaneous signups consult the same roster, both are told "you are the
+    // chosen one", and only one may hold the per-level slot. The roster's
+    // chosenRepMatric is the real single source; this just keeps a second
+    // document saying the same thing. Read BEFORE the transaction and decided
+    // from the GRANT, never from whatever the client asked for.
+    const repSlotRef = effectiveIsRep
+      ? db
+          .collection("departmentReps")
+          .doc(repSlotId(p.institution, p.department, p.level))
+      : null;
 
     // PHASE 6 — roster membership, for students and reps. Advisers carry no
     // matric so it does not apply to them.
@@ -324,7 +382,11 @@ async function handleCreateProfile(req, res, decoded) {
     // forward. They get an account plus a clear status; it resolves when the
     // adviser re-imports the roster or the rep approves them.
     const onRoster = rosterMatrics.includes(norm(p.matric));
-    const rosterStatus = p.isAdviser ? null : onRoster ? "verified" : "unverified";
+    const rosterStatus = p.isAdviser
+      ? null
+      : onRoster
+        ? "verified"
+        : "unverified";
     const rosterReason = p.isAdviser
       ? null
       : onRoster
@@ -347,7 +409,10 @@ async function handleCreateProfile(req, res, decoded) {
         if (repSlotRef && effectiveIsRep) {
           const slot = await tx.get(repSlotRef);
           if (slot.exists) throw new Error("REP_SLOT_TAKEN");
-          tx.set(repSlotRef, { repUid: decoded.uid, registeredAt: FieldValue.serverTimestamp() });
+          tx.set(repSlotRef, {
+            repUid: decoded.uid,
+            registeredAt: FieldValue.serverTimestamp(),
+          });
         }
         tx.create(profileRef, {
           uid: decoded.uid,
@@ -376,7 +441,9 @@ async function handleCreateProfile(req, res, decoded) {
           // when the adviser re-imports or the rep approves them.
           rosterStatus,
           rosterReason,
-          verificationStatus: p.isAdviser ? VERIFICATION.PENDING_EMAIL : VERIFICATION.NOT_REQUIRED,
+          verificationStatus: p.isAdviser
+            ? VERIFICATION.PENDING_EMAIL
+            : VERIFICATION.NOT_REQUIRED,
           // Written as explicit nulls (not omitted) so the keys always EXIST:
           // firestore.rules pins them with `get('verifiedAt', null) == ...`, and
           // touching a missing key in a rules expression is an ERROR that would
@@ -388,7 +455,12 @@ async function handleCreateProfile(req, res, decoded) {
       });
     } catch (txErr) {
       if (txErr.message === "PROFILE_EXISTS") {
-        return res.status(409).json({ error: "This account already has a profile.", code: "PROFILE_EXISTS" });
+        return res
+          .status(409)
+          .json({
+            error: "This account already has a profile.",
+            code: "PROFILE_EXISTS",
+          });
       }
       if (txErr.message === "REP_SLOT_TAKEN") {
         return res.status(409).json({
@@ -432,18 +504,23 @@ async function handleCreateProfile(req, res, decoded) {
           delivery: mail.delivered ? "email" : "not_configured",
           message: mail.delivered
             ? "A 6-digit code is on its way to your school email. If you don't see it within a minute, check your Spam folder and mark it as 'Not Spam'."
-            : "Account created. Email delivery is not configured on this deployment yet — use \"Resend verification\" once an administrator sets it up.",
+            : 'Account created. Email delivery is not configured on this deployment yet — use "Resend verification" once an administrator sets it up.',
           expiresInSeconds: CODE_TTL_MS / 1000,
         };
       } catch (verErr) {
         // The account is real and correct; only the code failed. Say so
         // precisely instead of 500-ing a signup the user has already committed
         // to and would then retry into a 409.
-        console.error("onboarding: first code failed for", decoded.uid, verErr.message);
+        console.error(
+          "onboarding: first code failed for",
+          decoded.uid,
+          verErr.message,
+        );
         verification = {
           required: true,
           delivery: "failed",
-          message: "Account created, but we could not send the code. Use \"Resend verification\" to try again.",
+          message:
+            'Account created, but we could not send the code. Use "Resend verification" to try again.',
         };
       }
     }
@@ -472,20 +549,27 @@ async function handleCreateProfile(req, res, decoded) {
         // The account and the role are already committed and correct. Failing to
         // write the convenience pointer must not undo a legitimate signup, so it
         // is logged and the user simply does not appear in the history yet.
-        console.error("onboarding: rep link failed for", decoded.uid, linkErr.message);
+        console.error(
+          "onboarding: rep link failed for",
+          decoded.uid,
+          linkErr.message,
+        );
       }
     }
 
     return res.status(200).json({
       success: true,
-      // 🔒 The role actually granted, which is NOT always the one requested.
+      // 🔒 The role actually granted, which is decided by the level roster and
+      // is NOT always what the form said. `repRequest` is always present for a
+      // non-adviser so the client can modal on it: CHOSEN means "you are the
+      // rep", everything else means an ordinary student signup.
       role: effectiveRole,
       isRep: effectiveIsRep,
       isAdviser: p.isAdviser,
+      repRequest: p.isAdviser ? undefined : repDecision,
       // Phase 6: reported so the client can tell a roster-validated student
       // from one awaiting the rep's approval.
       ...(rosterStatus ? { rosterStatus, rosterReason } : {}),
-      ...(p.isRep && !repDecision.granted ? { repRequest: repDecision } : {}),
       ...(verification ? { verification } : {}),
     });
   } catch (error) {
@@ -495,16 +579,22 @@ async function handleCreateProfile(req, res, decoded) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Method not allowed" });
   try {
     await verifyAppCheck(req);
     const header = req.headers.authorization || "";
-    if (!header.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+    if (!header.startsWith("Bearer "))
+      return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
     const action = req.query.action;
     switch (action) {
-      case "createProfile": return handleCreateProfile(req, res, decoded);
-      default: return res.status(400).json({ error: "Invalid action. Use: createProfile" });
+      case "createProfile":
+        return handleCreateProfile(req, res, decoded);
+      default:
+        return res
+          .status(400)
+          .json({ error: "Invalid action. Use: createProfile" });
     }
   } catch (error) {
     console.error("Onboarding API error:", error);

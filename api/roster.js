@@ -95,7 +95,7 @@ async function loadAdviserScope(uid) {
  * api/onboarding.js's Phase 5 reader can never derive different ids for the
  * same level — a mismatch would make a taken rep look free.
  */
-const { rosterDocId } = require("../utils/rosters");
+const { rosterDocId, repSlotId } = require("../utils/rosters");
 
 /**
  * Import (or re-import) the level master list.
@@ -333,6 +333,10 @@ async function handleChooseRep(req, res, decoded) {
         if (!snap.exists) throw new Error("NO_ROSTER");
         const roster = snap.data();
         const matrics = Array.isArray(roster.matrics) ? roster.matrics : [];
+        const repSlotRef = db
+          .collection("departmentReps")
+          .doc(repSlotId(scope.institution, scope.department, scope.level));
+        const repSlotSnap = await tx.get(repSlotRef);
 
         if (clear) {
           // Standing the rep down is a CHANGE like any other, so it is logged
@@ -371,6 +375,7 @@ async function handleChooseRep(req, res, decoded) {
               repGrantedByAdviser: false,
             });
           }
+          if (repSlotSnap.exists) tx.delete(repSlotRef);
           return;
         }
 
@@ -451,7 +456,19 @@ async function handleChooseRep(req, res, decoded) {
             role: ROLE.REP,
             isRep: true,
             repGrantedByAdviser: true,
+            rosterStatus: "verified",
+            rosterReason: "ON_ROSTER",
           });
+          tx.set(repSlotRef, {
+            repUid: accountUid,
+            registeredAt:
+              repSlotSnap.exists && repSlotSnap.data().repUid === accountUid
+                ? repSlotSnap.data().registeredAt ||
+                  FieldValue.serverTimestamp()
+                : FieldValue.serverTimestamp(),
+          });
+        } else if (repSlotSnap.exists) {
+          tx.delete(repSlotRef);
         }
         tx.update(rosterRef, {
           chosenRepMatric: wanted,
