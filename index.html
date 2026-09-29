@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="VeriPresenX — verified, server-authoritative attendance for Nigerian universities. Anti-proxy check-in by live QR, PIN and GPS, with course reps and level advisers in one trust chain.">
+  <meta name="description"
+    content="VeriPresenX — verified, server-authoritative attendance for Nigerian universities. Anti-proxy check-in by live QR, PIN and GPS, with course reps and level advisers in one trust chain.">
   <meta name="theme-color" content="#7C6CF0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0A0B14" media="(prefers-color-scheme: dark)">
   <title>VeriPresenX | Verified Attendance Platform</title>
@@ -86,13 +87,15 @@
               <span class="role-badge">One per level</span>
               <div class="role-icon"><i data-lucide="shield-check"></i></div>
               <h3>Level Adviser</h3>
-              <p class="role-desc">Verified staff managing one level of a department. Import the class list and pick the rep.</p>
+              <p class="role-desc">Verified staff managing one level of a department. Import the class list and pick the
+                rep.</p>
               <ul class="role-points">
                 <li><i data-lucide="check"></i> One adviser per level</li>
                 <li><i data-lucide="check"></i> Imports the roster</li>
                 <li><i data-lucide="check"></i> Picks the course rep</li>
               </ul>
-              <button type="button" class="btn role-cta" data-go-role="adviser">Continue as Adviser <i data-lucide="arrow-right"></i></button>
+              <button type="button" class="btn role-cta" data-go-role="adviser">Continue as Adviser <i
+                  data-lucide="arrow-right"></i></button>
               <span class="role-free">Tap to preview — no commitment</span>
             </article>
 
@@ -107,7 +110,8 @@
                 <li><i data-lucide="check"></i> Starts live sessions</li>
                 <li><i data-lucide="check"></i> Approves edge cases</li>
               </ul>
-              <button type="button" class="btn role-cta" data-go-role="rep">Continue as Rep <i data-lucide="arrow-right"></i></button>
+              <button type="button" class="btn role-cta" data-go-role="rep">Continue as Rep <i
+                  data-lucide="arrow-right"></i></button>
               <span class="role-free">Tap to preview — no commitment</span>
             </article>
 
@@ -122,7 +126,8 @@
                 <li><i data-lucide="check"></i> Live QR + PIN check-in</li>
                 <li><i data-lucide="check"></i> Track your rate</li>
               </ul>
-              <button type="button" class="btn role-cta" data-go-role="student">Continue as Student <i data-lucide="arrow-right"></i></button>
+              <button type="button" class="btn role-cta" data-go-role="student">Continue as Student <i
+                  data-lucide="arrow-right"></i></button>
               <span class="role-free">Tap to preview — no commitment</span>
             </article>
           </div>
@@ -146,7 +151,8 @@
 
       <!-- SIGN UP CARD -->
       <section id="signupCard" class="card hidden">
-        <button type="button" id="backToRolesFromSignup" class="role-back"><i data-lucide="arrow-left"></i> All roles</button>
+        <button type="button" id="backToRolesFromSignup" class="role-back"><i data-lucide="arrow-left"></i> All
+          roles</button>
         <div id="roleContextBanner" class="role-context hidden">
           <span id="roleContextText">Joining as Student</span>
           <button type="button" id="changeRoleBtn">Change</button>
@@ -168,7 +174,8 @@
             <input type="text" id="signupFirstName" placeholder="John">
           </div>
           <div class="field role-student-only hidden">
-            <label for="signupMiddleName">Middle Name <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+            <label for="signupMiddleName">Middle Name <span
+                style="color:var(--muted);font-weight:400;">(optional)</span></label>
             <input type="text" id="signupMiddleName" placeholder="Oluwaseun">
           </div>
           <div class="field role-student-only hidden">
@@ -211,7 +218,8 @@
           </div>
           <div class="field">
             <label for="signupPasswordConfirm">Retype Password</label>
-            <input type="password" id="signupPasswordConfirm" required placeholder="••••••••" autocomplete="new-password">
+            <input type="password" id="signupPasswordConfirm" required placeholder="••••••••"
+              autocomplete="new-password">
             <!-- 🔗 LIVE CORRELATION. Feedback appears as soon as the confirm field
                  has something in it, and clears when it is emptied — so a
                  mismatch is caught before submitting rather than as a Firebase
@@ -220,11 +228,16 @@
                  state. -->
             <small id="passwordMatchHint" class="pw-hint" hidden></small>
           </div>
-          <div class="field role-adviser-only hidden" id="ninFieldWrap" title="Available after pilot — pending provider onboarding">
-            <label for="ninButton">NIN Verification <span style="color:var(--muted);font-weight:400;">(coming soon)</span></label>
-            <button type="button" id="ninButton" class="btn-outline" disabled style="width:100%;padding:10px;border-radius:10px;opacity:.55;cursor:not-allowed;">Verify with NIN — Available after pilot</button>
+          <div class="field role-adviser-only hidden" id="ninFieldWrap"
+            title="Available after pilot — pending provider onboarding">
+            <label for="ninButton">NIN Verification <span style="color:var(--muted);font-weight:400;">(coming
+                soon)</span></label>
+            <button type="button" id="ninButton" class="btn-outline" disabled
+              style="width:100%;padding:10px;border-radius:10px;opacity:.55;cursor:not-allowed;">Verify with NIN —
+              Available after pilot</button>
           </div>
-          <button type="submit" class="btn"><i data-lucide="user-check"></i> <span id="signupSubmitLabel">Sign Up</span></button>
+          <button type="submit" class="btn"><i data-lucide="user-check"></i> <span id="signupSubmitLabel">Sign
+              Up</span></button>
         </form>
 
         <p style="text-align: center; margin-top: 15px; font-size: 0.85rem;">
@@ -235,7 +248,8 @@
 
       <!-- LOG IN CARD -->
       <section id="loginCard" class="card hidden">
-        <button type="button" id="backToRolesFromLogin" class="role-back"><i data-lucide="arrow-left"></i> All roles</button>
+        <button type="button" id="backToRolesFromLogin" class="role-back"><i data-lucide="arrow-left"></i> All
+          roles</button>
         <h2><i data-lucide="log-in"></i> Welcome Back</h2>
         <p>Log in to access your course portals.</p>
 
@@ -265,25 +279,24 @@
 
     <!-- MAIN DASHBOARD -->
     <section id="dashboardSection" class="hidden">
-  <!-- PERSISTENT BANNER — shown on the dashboard while an adviser is still
+      <!-- PERSISTENT BANNER — shown on the dashboard while an adviser is still
        unverified, so dismissing the modal never leaves them without a way back
        in. This is the difference between "a nag" and "a dead end". -->
-  <div id="adviserVerifyBanner" class="hidden"
-       style="position:sticky; top:0; z-index:70; margin:0 0 16px; padding:12px 16px;
+      <div id="adviserVerifyBanner" class="hidden" style="position:sticky; top:0; z-index:70; margin:0 0 16px; padding:12px 16px;
               border-radius:12px; border:1.5px solid #d9a441; background:var(--card-bg);
               display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-    <span style="font-size:1.1rem;">🔒</span>
-    <div style="flex:1; min-width:200px;">
-      <strong style="display:block; font-size:0.87rem;">You're a Pending Adviser</strong>
-      <span style="font-size:0.78rem; color:var(--text-muted);">
-        Enter the 6-digit code we emailed you to unlock your roster tools. This
-        account is removed automatically if it isn't verified within 24 hours.
-      </span>
-    </div>
-    <button type="button" class="btn" id="adviserBannerVerifyBtn" style="width:auto; padding:9px 16px;">
-      <i data-lucide="shield-check"></i> Enter code
-    </button>
-  </div>
+        <span style="font-size:1.1rem;">🔒</span>
+        <div style="flex:1; min-width:200px;">
+          <strong style="display:block; font-size:0.87rem;">You're a Pending Adviser</strong>
+          <span style="font-size:0.78rem; color:var(--text-muted);">
+            Enter the 6-digit code we emailed you to unlock your roster tools. This
+            account is removed automatically if it isn't verified within 24 hours.
+          </span>
+        </div>
+        <button type="button" class="btn" id="adviserBannerVerifyBtn" style="width:auto; padding:9px 16px;">
+          <i data-lucide="shield-check"></i> Enter code
+        </button>
+      </div>
       <div class="dashboard-header">
         <h2><i data-lucide="hand-metal"></i> Hey, <span id="displayName">Student</span>!</h2>
         <p style="margin-bottom: 5px;">
@@ -342,8 +355,8 @@
           <h4 id="bannerTitle" style="color: #28a745; margin-bottom: 5px;">
             <i data-lucide="radio" style="color: #28a745;"></i> ATTENDANCE SESSION LIVE
           </h4>
-          <p id="bannerText" style="font-size: 0.9rem; margin-bottom: 5px;">Check-in closes in <strong id="countdownTimer"
-              style="font-size: 1.2rem;">5:00</strong></p>
+          <p id="bannerText" style="font-size: 0.9rem; margin-bottom: 5px;">Check-in closes in <strong
+              id="countdownTimer" style="font-size: 1.2rem;">5:00</strong></p>
         </div>
 
         <!-- 📡 PUBLIC HOTSPOT STRIP — transparency: EVERY enrolled student
@@ -369,154 +382,155 @@
 
           <!-- PHASE 1 — BEFORE CLASS: the only decisions a rep makes up front -->
           <div id="sessionSetupCard">
-          <p style="font-size: 0.9rem; margin-bottom: 15px;">Generate a secure PIN for today's lecture attendance.</p>
+            <p style="font-size: 0.9rem; margin-bottom: 15px;">Generate a secure PIN for today's lecture attendance.</p>
 
-          <!-- LECTURE LOCATION SELECTOR -->
-          <div
-            style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
-            <div class="hall-actions-row">
-              <label for="repHallSelect"
-                style="font-size: 0.85rem; font-weight: 700; color: var(--navy); margin-bottom: 0;">
-                <i data-lucide="map-pin"></i> Lecture Location / Hall:
-              </label>
-              <div class="hall-actions">
-                <button id="setLocationBtn" type="button"
-                  style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
-                  <i data-lucide="crosshairs"></i> Set Current Location
-                </button>
-                <button id="manageHallsBtn" type="button"
-                  style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
-                  <i data-lucide="sliders"></i> Manage Halls
-                </button>
+            <!-- LECTURE LOCATION SELECTOR -->
+            <div
+              style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
+              <div class="hall-actions-row">
+                <label for="repHallSelect"
+                  style="font-size: 0.85rem; font-weight: 700; color: var(--navy); margin-bottom: 0;">
+                  <i data-lucide="map-pin"></i> Lecture Location / Hall:
+                </label>
+                <div class="hall-actions">
+                  <button id="setLocationBtn" type="button"
+                    style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
+                    <i data-lucide="crosshairs"></i> Set Current Location
+                  </button>
+                  <button id="manageHallsBtn" type="button"
+                    style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
+                    <i data-lucide="sliders"></i> Manage Halls
+                  </button>
+                </div>
               </div>
+              <select id="repHallSelect" class="custom-dropdown"
+                style="width: 100%; border-radius: 10px; font-size: 0.9rem;"></select>
+              <div id="hallInfoBadge" class="hall-info-chip">
+                <span><i data-lucide="info"></i> Smart indoor geofence active</span>
+              </div>
+              <div id="setLocationStatus"
+                style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: none;"></div>
             </div>
-            <select id="repHallSelect" class="custom-dropdown"
-              style="width: 100%; border-radius: 10px; font-size: 0.9rem;"></select>
-            <div id="hallInfoBadge" class="hall-info-chip">
-              <span><i data-lucide="info"></i> Smart indoor geofence active</span>
-            </div>
-            <div id="setLocationStatus"
-              style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; display: none;"></div>
-          </div>
 
-          <!-- ATTENDANCE MODE SELECTOR — HOW students verify this lecture -->
-          <div id="attendanceModeSection"
-            style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
-            <p style="font-size: 0.85rem; font-weight: 700; color: var(--navy); margin: 0 0 2px;">
-              <i data-lucide="shield-check"></i> Attendance Mode
-            </p>
-            <p style="font-size: 0.75rem; color: var(--muted); margin: 0 0 10px;">
-              Choose how students verify presence this lecture.
-            </p>
-            <div id="modeCardsGrid" class="mode-cards-grid"></div>
-            <div id="modeHint" style="font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4;"></div>
-            <!-- 📺 QR DISPLAY CHOICE — appears when QR + Device Lock is selected:
+            <!-- ATTENDANCE MODE SELECTOR — HOW students verify this lecture -->
+            <div id="attendanceModeSection"
+              style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
+              <p style="font-size: 0.85rem; font-weight: 700; color: var(--navy); margin: 0 0 2px;">
+                <i data-lucide="shield-check"></i> Attendance Mode
+              </p>
+              <p style="font-size: 0.75rem; color: var(--muted); margin: 0 0 10px;">
+                Choose how students verify presence this lecture.
+              </p>
+              <div id="modeCardsGrid" class="mode-cards-grid"></div>
+              <div id="modeHint" style="font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4;">
+              </div>
+              <!-- 📺 QR DISPLAY CHOICE — appears when QR + Device Lock is selected:
                  where does the big rolling code live? Projector or trusted
                  physically-present students acting as live "hotspots". -->
-            <div id="qrDisplayChoiceRow" class="hidden"
-              style="margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--bg); border: 1.5px dashed var(--teal);">
-              <p style="font-size: 0.75rem; font-weight: 700; color: var(--navy); margin: 0 0 8px;">
-                Where will the rotating QR be shown?
-              </p>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" data-qr-display="projector"
-                  style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
-                  <div style="font-weight: 700;">📺 Projector</div>
-                  <div style="color: var(--muted); margin-top: 2px;">Halls with a projector/cast — fullscreen portrait, biggest QR</div>
-                </button>
-                <button type="button" data-qr-display="hotspots"
-                  style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
-                  <div style="font-weight: 700;">👥 Hotspot Students</div>
-                  <div style="color: var(--muted); margin-top: 2px;">No projector — pick trusted students in the hall to show the QR</div>
-                </button>
+              <div id="qrDisplayChoiceRow" class="hidden"
+                style="margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--bg); border: 1.5px dashed var(--teal);">
+                <p style="font-size: 0.75rem; font-weight: 700; color: var(--navy); margin: 0 0 8px;">
+                  Where will the rotating QR be shown?
+                </p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" data-qr-display="projector"
+                    style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
+                    <div style="font-weight: 700;">📺 Projector</div>
+                    <div style="color: var(--muted); margin-top: 2px;">Halls with a projector/cast — fullscreen
+                      portrait, biggest QR</div>
+                  </button>
+                  <button type="button" data-qr-display="hotspots"
+                    style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
+                    <div style="font-weight: 700;">👥 Hotspot Students</div>
+                    <div style="color: var(--muted); margin-top: 2px;">No projector — pick trusted students in the hall
+                      to show the QR</div>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <button id="generatePinBtn" class="btn">
-            <i data-lucide="clock"></i> Generate Attendance PIN
-          </button>
+            <button id="generatePinBtn" class="btn">
+              <i data-lucide="clock"></i> Generate Attendance PIN
+            </button>
           </div><!-- /sessionSetupCard -->
 
           <!-- PHASE 2/3 — LIVE & JUST-ENDED: everything the rep needs while the
                session runs, nothing else. Manual requests pop open on arrival. -->
           <div id="liveSessionCard" class="hidden">
-          <div id="activePinDisplay" class="hidden"
-            style="margin-top: 15px; padding: 15px; background: var(--card-bg); border-radius: 8px; text-align: center; border: 2px dashed var(--teal);">
-            <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 5px;">ACTIVE ATTENDANCE PIN:</p>
-            <span id="pinCodeText"
-              style="font-size: 2rem; font-weight: bold; color: var(--teal); letter-spacing: 8px;">----</span>
-            <p style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;">New PIN in: <strong
-                id="pinRotationTimer" style="color: var(--navy);">0:10</strong></p>
-          </div>
+            <div id="activePinDisplay" class="hidden"
+              style="margin-top: 15px; padding: 15px; background: var(--card-bg); border-radius: 8px; text-align: center; border: 2px dashed var(--teal);">
+              <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 5px;">ACTIVE ATTENDANCE PIN:</p>
+              <span id="pinCodeText"
+                style="font-size: 2rem; font-weight: bold; color: var(--teal); letter-spacing: 8px;">----</span>
+              <p style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;">New PIN in: <strong
+                  id="pinRotationTimer" style="color: var(--navy);">0:10</strong></p>
+            </div>
 
-          <!-- MODE 2: PROJECTOR QR (large halls with a screen) -->
-          <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <button id="showQrBtn" type="button" class="btn btn-outline hidden"
-              style="flex: 1; font-size: 0.85rem;">
-              <i data-lucide="qr-code"></i> 📺 Show Rotating QR
-            </button>
-            <button id="hotspotsBtn" type="button" class="btn btn-outline hidden"
-              style="flex: 1; font-size: 0.85rem;">
-              <i data-lucide="users"></i> 👥 Hotspots
-            </button>
-          </div>
+            <!-- MODE 2: PROJECTOR QR (large halls with a screen) -->
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+              <button id="showQrBtn" type="button" class="btn btn-outline hidden" style="flex: 1; font-size: 0.85rem;">
+                <i data-lucide="qr-code"></i> 📺 Show Rotating QR
+              </button>
+              <button id="hotspotsBtn" type="button" class="btn btn-outline hidden"
+                style="flex: 1; font-size: 0.85rem;">
+                <i data-lucide="users"></i> 👥 Hotspots
+              </button>
+            </div>
 
-          <!-- CLOSE CLASS & SAVE -->
-          <div id="closeClassWrapper" class="hidden"
-            style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-            <button id="closeClassBtn" class="btn"
-              style="background: var(--danger); font-size: 0.85rem; padding: 10px 16px; width: 100%;">
-              <i data-lucide="folder-check"></i> Close Class & Save Attendance
-            </button>
-          </div>
+            <!-- CLOSE CLASS & SAVE -->
+            <div id="closeClassWrapper" class="hidden"
+              style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+              <button id="closeClassBtn" class="btn"
+                style="background: var(--danger); font-size: 0.85rem; padding: 10px 16px; width: 100%;">
+                <i data-lucide="folder-check"></i> Close Class & Save Attendance
+              </button>
+            </div>
 
-          <!-- PHYSICAL PRESENCE CHECK (Headcount) — optional pre-close reality check -->
-          <div id="presenceCheckPanel" class="hidden"
-            style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-            <button id="conductHeadcountBtn" type="button" class="btn btn-outline"
-              style="width: 100%; font-size: 0.85rem;">
-              <i data-lucide="scan-line"></i> Conduct Physical Presence Check
-            </button>
+            <!-- PHYSICAL PRESENCE CHECK (Headcount) — optional pre-close reality check -->
+            <div id="presenceCheckPanel" class="hidden"
+              style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+              <button id="conductHeadcountBtn" type="button" class="btn btn-outline"
+                style="width: 100%; font-size: 0.85rem;">
+                <i data-lucide="scan-line"></i> Conduct Physical Presence Check
+              </button>
 
-            <div id="headcountPanel" class="hidden"
-              style="margin-top: 10px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
-              <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 8px;">
-                Count the bodies in the hall and enter the number. We compare it against
-                system check-ins so ghost check-ins can't hide. Optional — closing the class
-                without this just saves the system count.
-              </p>
-              <div class="headcount-row">
-                <input type="number" id="physicalCountInput" min="0" placeholder="e.g., 74"
-                  style="flex: 1 1 150px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;" />
-                <button id="saveHeadcountBtn" class="btn"
-                  style="font-size: 0.8rem; padding: 10px 14px; width: auto;">
-                  <i data-lucide="check"></i> Save Count
-                </button>
-              </div>
-              <div id="headcountComparison" class="hidden"
-                style="margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 0.82rem; text-align: center; font-weight: 600;">
+              <div id="headcountPanel" class="hidden"
+                style="margin-top: 10px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
+                <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 8px;">
+                  Count the bodies in the hall and enter the number. We compare it against
+                  system check-ins so ghost check-ins can't hide. Optional — closing the class
+                  without this just saves the system count.
+                </p>
+                <div class="headcount-row">
+                  <input type="number" id="physicalCountInput" min="0" placeholder="e.g., 74"
+                    style="flex: 1 1 150px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 1rem;" />
+                  <button id="saveHeadcountBtn" class="btn" style="font-size: 0.8rem; padding: 10px 14px; width: auto;">
+                    <i data-lucide="check"></i> Save Count
+                  </button>
+                </div>
+                <div id="headcountComparison" class="hidden"
+                  style="margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 0.82rem; text-align: center; font-weight: 600;">
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- MANUAL VERIFICATION REQUESTS QUEUE (Fail-Safe Override) -->
-          <div id="manualRequestsPanel" class="hidden"
-            style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-            <h4 style="color: var(--navy); font-size: 0.95rem; margin-bottom: 5px;">
-              <i data-lucide="hand-helping"></i> Manual Verification Requests
-              (<span id="manualRequestsCount">0</span>)
-            </h4>
-            <p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 10px;">
-              Students stuck by GPS/network failure can request manual attendance.
-              Confirm you can physically see them before approving — every decision is permanently logged.
-            </p>
-            <div id="manualRequestsListContainer" style="max-height: 240px; overflow-y: auto;">
-              <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">
-                No pending manual requests. 👍
+            <!-- MANUAL VERIFICATION REQUESTS QUEUE (Fail-Safe Override) -->
+            <div id="manualRequestsPanel" class="hidden"
+              style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+              <h4 style="color: var(--navy); font-size: 0.95rem; margin-bottom: 5px;">
+                <i data-lucide="hand-helping"></i> Manual Verification Requests
+                (<span id="manualRequestsCount">0</span>)
+              </h4>
+              <p style="font-size: 0.78rem; color: var(--muted); margin-bottom: 10px;">
+                Students stuck by GPS/network failure can request manual attendance.
+                Confirm you can physically see them before approving — every decision is permanently logged.
               </p>
+              <div id="manualRequestsListContainer" style="max-height: 240px; overflow-y: auto;">
+                <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">
+                  No pending manual requests. 👍
+                </p>
+              </div>
             </div>
-          </div>
           </div><!-- /liveSessionCard -->
         </div>
 
@@ -529,10 +543,13 @@
           <h3 style="color: var(--navy); margin-bottom: 5px;">
             <i data-lucide="upload"></i> Bulk Student Import
           </h3>
-          <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Upload a CSV file with matric numbers to auto-enroll students. Format: one matric per line, or with headers.</p>
+          <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Upload a CSV file with matric numbers
+            to auto-enroll students. Format: one matric per line, or with headers.</p>
 
           <div style="margin-bottom: 15px;">
-            <label for="csvFileInput" style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Select CSV File:</label>
+            <label for="csvFileInput"
+              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Select CSV
+              File:</label>
             <input type="file" id="csvFileInput" accept=".csv"
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem;">
           </div>
@@ -541,7 +558,8 @@
             <i data-lucide="upload-cloud"></i> Import Students
           </button>
 
-          <div id="importProgress" class="hidden" style="margin-top: 15px; padding: 12px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border);">
+          <div id="importProgress" class="hidden"
+            style="margin-top: 15px; padding: 12px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border);">
             <div style="font-size: 0.85rem; color: var(--text);">
               <span id="importStatus">Processing...</span>
               <div id="importResults" style="margin-top: 8px; font-size: 0.8rem; color: var(--muted);"></div>
@@ -555,10 +573,13 @@
           <h3 style="color: var(--navy); margin-bottom: 5px;">
             <i data-lucide="calendar-x"></i> Holiday & Exemption Management
           </h3>
-          <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Mark students as excused for specific dates (medical, university events, etc.). Excused absences don't count against the 70% threshold.</p>
+          <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Mark students as excused for specific
+            dates (medical, university events, etc.). Excused absences don't count against the 70% threshold.</p>
 
           <div style="margin-bottom: 15px;">
-            <label for="exemptStudentSelect" style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Select Student:</label>
+            <label for="exemptStudentSelect"
+              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Select
+              Student:</label>
             <select id="exemptStudentSelect"
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem;">
               <option value="">-- Choose student --</option>
@@ -566,13 +587,17 @@
           </div>
 
           <div style="margin-bottom: 15px;">
-            <label for="exemptDate" style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Date of Absence:</label>
+            <label for="exemptDate"
+              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Date of
+              Absence:</label>
             <input type="date" id="exemptDate"
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem;">
           </div>
 
           <div style="margin-bottom: 15px;">
-            <label for="exemptReason" style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Reason for Exemption:</label>
+            <label for="exemptReason"
+              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Reason for
+              Exemption:</label>
             <select id="exemptReason"
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem;">
               <option value="medical">Medical Emergency/Illness</option>
@@ -584,9 +609,10 @@
           </div>
 
           <div style="margin-bottom: 15px;">
-            <label for="exemptDetails" style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Additional Details:</label>
-            <textarea id="exemptDetails" rows="2" maxlength="200"
-              placeholder="Provide any additional context..."
+            <label for="exemptDetails"
+              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Additional
+              Details:</label>
+            <textarea id="exemptDetails" rows="2" maxlength="200" placeholder="Provide any additional context..."
               style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem; resize: none;"></textarea>
           </div>
 
@@ -597,7 +623,8 @@
           <div style="margin-top: 20px;">
             <h4 style="font-size: 0.9rem; color: var(--navy); margin-bottom: 10px;">Current Exemptions:</h4>
             <div id="exemptionsList" style="max-height: 200px; overflow-y: auto;">
-              <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No exemptions recorded yet.</p>
+              <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No exemptions
+                recorded yet.</p>
             </div>
           </div>
         </div>
@@ -700,12 +727,16 @@
             <p style="color: #fff; font-size: 0.95rem; font-weight: 700; margin-bottom: 10px;">
               📸 Point at the class QR code
             </p>
-            <div style="position: relative; width: min(86vw, 420px); aspect-ratio: 1; border-radius: 16px; overflow: hidden; border: 2px solid var(--violet); background: #000;">
+            <div
+              style="position: relative; width: min(86vw, 420px); aspect-ratio: 1; border-radius: 16px; overflow: hidden; border: 2px solid var(--violet); background: #000;">
               <video id="qrScannerVideo" autoplay playsinline muted
                 style="width: 100%; height: 100%; object-fit: cover;"></video>
-              <div style="position: absolute; inset: 12%; border: 2px dashed rgba(255,255,255,0.7); border-radius: 12px; pointer-events: none;"></div>
+              <div
+                style="position: absolute; inset: 12%; border: 2px dashed rgba(255,255,255,0.7); border-radius: 12px; pointer-events: none;">
+              </div>
             </div>
-            <p id="qrScannerStatus" style="color: rgba(255,255,255,0.75); font-size: 0.8rem; margin-top: 10px; text-align: center;">
+            <p id="qrScannerStatus"
+              style="color: rgba(255,255,255,0.75); font-size: 0.8rem; margin-top: 10px; text-align: center;">
               Looking for a QR code…
             </p>
             <button type="button" id="qrScannerCloseBtn" class="btn btn-outline"
@@ -775,7 +806,8 @@
         </p>
         <div id="classExemptionsList"
           style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--bg);">
-          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No exemptions recorded yet.</p>
+          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No exemptions recorded
+            yet.</p>
         </div>
       </div>
 
@@ -797,8 +829,10 @@
         <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">
           Every closed class's public record — present count, headcount check, flags and Hotspots.
         </p>
-        <div id="classReportsList" style="border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--bg);">
-          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No closed classes yet.</p>
+        <div id="classReportsList"
+          style="border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--bg);">
+          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 10px;">No closed classes yet.
+          </p>
         </div>
       </div>
 
@@ -841,21 +875,21 @@
           </div>
         </div>
 
-        </div>
+      </div>
 
-        <!-- 👥 LIVE ROSTER view (drawer destination for staff; stacked for students) -->
-        <div id="rosterSection" class="hidden">
-          <h3 style="margin-bottom: 10px; font-size: 1.1rem; color: var(--navy);">
-            <i data-lucide="users"></i> Live Attendance Roster (<span id="rosterCount">0</span>)
-          </h3>
-          <div
-            style="background: var(--bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border); max-height: 250px; overflow-y: auto;">
-            <ul id="rosterList" style="list-style: none; padding-left: 0;">
-              <li style="color: var(--muted); font-size: 0.9rem; text-align: center; padding: 10px;">Waiting for session
-                to start...</li>
-            </ul>
-          </div>
+      <!-- 👥 LIVE ROSTER view (drawer destination for staff; stacked for students) -->
+      <div id="rosterSection" class="hidden">
+        <h3 style="margin-bottom: 10px; font-size: 1.1rem; color: var(--navy);">
+          <i data-lucide="users"></i> Live Attendance Roster (<span id="rosterCount">0</span>)
+        </h3>
+        <div
+          style="background: var(--bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border); max-height: 250px; overflow-y: auto;">
+          <ul id="rosterList" style="list-style: none; padding-left: 0;">
+            <li style="color: var(--muted); font-size: 0.9rem; text-align: center; padding: 10px;">Waiting for session
+              to start...</li>
+          </ul>
         </div>
+      </div>
       </div>
     </section>
 
@@ -897,7 +931,8 @@
           Nobody — not even you — can edit or erase this history.
         </p>
         <div id="auditLogContainer">
-          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">No audit events yet. 👍</p>
+          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">No audit events yet. 👍
+          </p>
         </div>
       </div>
 
@@ -912,7 +947,8 @@
           the physical headcount before drawing conclusions.
         </p>
         <div id="securityEventsContainer">
-          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">No security signals. 👍</p>
+          <p style="font-size: 0.85rem; color: var(--muted); text-align: center; padding: 8px;">No security signals. 👍
+          </p>
         </div>
       </div>
 
@@ -924,248 +960,264 @@
       </div>
     </div>
 
-  <!-- SEMESTER ATTENDANCE REPORT (Phase 5) ----------------------------
+    <!-- SEMESTER ATTENDANCE REPORT (Phase 5) ----------------------------
        The document a Head of Department actually asks for: every class
        held so far and each student's percentage. CSV for a spreadsheet,
        "Save as PDF" for the print-ready version. -->
-  <section id="semesterReport" class="container hidden">
-    <div class="adviser-head">
-      <div>
-        <h2 class="adviser-h2">Semester Attendance Report</h2>
-        <p class="adviser-sub" id="reportSub">Every class held so far, with each student's percentage.</p>
+    <section id="semesterReport" class="container hidden">
+      <div class="adviser-head">
+        <div>
+          <h2 class="adviser-h2">Semester Attendance Report</h2>
+          <p class="adviser-sub" id="reportSub">Every class held so far, with each student's percentage.</p>
+        </div>
+        <div class="adviser-row">
+          <button type="button" class="btn btn-outline" id="reportCsvBtn">
+            <i data-lucide="table"></i> Download CSV</button>
+          <button type="button" class="btn" id="reportPdfBtn">
+            <i data-lucide="file-text"></i> Save as PDF</button>
+        </div>
       </div>
-      <div class="adviser-row">
-        <button type="button" class="btn btn-outline" id="reportCsvBtn">
-          <i data-lucide="table"></i> Download CSV</button>
-        <button type="button" class="btn" id="reportPdfBtn">
-          <i data-lucide="file-text"></i> Save as PDF</button>
-      </div>
-    </div>
 
-    <div class="adviser-stats">
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Classes held</span>
-        <strong class="adviser-stat-value" id="reportSessions">0</strong>
+      <div class="adviser-stats">
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Classes held</span>
+          <strong class="adviser-stat-value" id="reportSessions">0</strong>
+        </div>
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Students</span>
+          <strong class="adviser-stat-value" id="reportStudents">0</strong>
+        </div>
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Average attendance</span>
+          <strong class="adviser-stat-value" id="reportAverage">0%</strong>
+        </div>
       </div>
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Students</span>
-        <strong class="adviser-stat-value" id="reportStudents">0</strong>
-      </div>
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Average attendance</span>
-        <strong class="adviser-stat-value" id="reportAverage">0%</strong>
-      </div>
-    </div>
 
-    <div class="adviser-card">
-      <div class="adviser-preview-scroll">
-        <table class="report-table">
-          <thead><tr><th>Student</th><th class="num">Matric</th>
-          <th class="num">Attended</th><th class="num">%</th></tr></thead>
-          <tbody id="reportBody"></tbody>
-        </table>
+      <div class="adviser-card">
+        <div class="adviser-preview-scroll">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th class="num">Matric</th>
+                <th class="num">Attended</th>
+                <th class="num">%</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+        <p class="adviser-foot" id="reportNote"></p>
       </div>
-      <p class="adviser-foot" id="reportNote"></p>
-    </div>
 
-    <!-- 🗑️ ESCAPE HATCH
+      <!-- 🗑️ ESCAPE HATCH
          Hiding the settings gear (an adviser has no matric to edit) also hides
          "Delete My Account", which lives on the student dashboard they never
          see. So it is restated here — an account you cannot delete is an
          account you are stuck with, and advisers are exactly the people who
          need an exit: an adviser who applied for the wrong level is locked into
          it for life unless they can delete. -->
-    <div style="margin-top: 36px; text-align: center;">
-      <button data-delete-account
-        style="background: transparent; border: none; color: var(--danger); text-decoration: underline; cursor: pointer; font-size: 0.85rem;">
-        <i data-lucide="alert-triangle"></i> Delete My Account
-      </button>
-    </div>
-  </section>
-  <!-- CODE SENT ACKNOWLEDGEMENT ------------------------------------------
+      <div style="margin-top: 36px; text-align: center;">
+        <button data-delete-account
+          style="background: transparent; border: none; color: var(--danger); text-decoration: underline; cursor: pointer; font-size: 0.85rem;">
+          <i data-lucide="alert-triangle"></i> Delete My Account
+        </button>
+      </div>
+    </section>
+    <!-- CODE SENT ACKNOWLEDGEMENT ------------------------------------------
        The adviser must ACKNOWLEDGE that a code is on its way before the
        code-entry field appears. Deliberately a modal, not a toast: a 15-second
        toast vanishes while the user is still looking for their inbox, and on a
        brand-new sending domain the spam-folder note is the single most
        important thing they will read. It now lives here rather than at the
        foot of the email, so it cannot be skimmed past. -->
-  <div id="codeSentModal" class="modal" role="dialog" aria-modal="true"
-       aria-labelledby="codeSentTitle">
-    <div class="modal-card" style="max-width: 420px;">
-      <div style="text-align:center; margin-bottom:6px;">
-        <span style="font-size:2rem;">📧</span>
-      </div>
-      <h3 id="codeSentTitle" style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 10px; text-align:center;">
-        Check your email
-      </h3>
-      <p style="font-size:0.88rem; color:var(--text-muted); margin:0 0 10px; line-height:1.55; text-align:center;">
-        We sent a 6-digit code to
-        <strong id="codeSentEmail" style="color:var(--text-primary); word-break:break-all;">your school email</strong>.
-      </p>
+    <div id="codeSentModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="codeSentTitle">
+      <div class="modal-card" style="max-width: 420px;">
+        <div style="text-align:center; margin-bottom:6px;">
+          <span style="font-size:2rem;">📧</span>
+        </div>
+        <h3 id="codeSentTitle"
+          style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 10px; text-align:center;">
+          Check your email
+        </h3>
+        <p style="font-size:0.88rem; color:var(--text-muted); margin:0 0 10px; line-height:1.55; text-align:center;">
+          We sent a 6-digit code to
+          <strong id="codeSentEmail" style="color:var(--text-primary); word-break:break-all;">your school
+            email</strong>.
+        </p>
 
-      <div style="margin:14px 0; padding:12px 14px; border-radius:12px;
+        <div style="margin:14px 0; padding:12px 14px; border-radius:12px;
                   border:1.5px solid #d9a441; background:rgba(217,164,65,0.08);">
-        <strong style="display:block; font-size:0.83rem; margin-bottom:5px; color:#d9a441;">
-          Can't see it? Check your spam folder.
-        </strong>
-        <span style="font-size:0.79rem; color:var(--text-muted); line-height:1.55;">
-          VeriPresenX sends from a new email address, so the code often lands in
-          <strong>Spam</strong> or <strong>Promotions</strong>. Open that folder,
-          find the email from us, and mark it <strong>"Not Spam"</strong> —
-          otherwise every future code goes there too.
-        </span>
+          <strong style="display:block; font-size:0.83rem; margin-bottom:5px; color:#d9a441;">
+            Can't see it? Check your spam folder.
+          </strong>
+          <span style="font-size:0.79rem; color:var(--text-muted); line-height:1.55;">
+            VeriPresenX sends from a new email address, so the code often lands in
+            <strong>Spam</strong> or <strong>Promotions</strong>. Open that folder,
+            find the email from us, and mark it <strong>"Not Spam"</strong> —
+            otherwise every future code goes there too.
+          </span>
+        </div>
+
+        <p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 4px; line-height:1.5; text-align:center;">
+          The code expires in 10 minutes. You can request a new one at any time.
+        </p>
+
+        <button type="button" class="btn" id="codeSentAckBtn" style="width:100%; margin-top:16px;">
+          <i data-lucide="check"></i> I understand — enter my code
+        </button>
       </div>
-
-      <p style="font-size:0.76rem; color:var(--text-muted); margin:0 0 4px; line-height:1.5; text-align:center;">
-        The code expires in 10 minutes. You can request a new one at any time.
-      </p>
-
-      <button type="button" class="btn" id="codeSentAckBtn" style="width:100%; margin-top:16px;">
-        <i data-lucide="check"></i> I understand — enter my code
-      </button>
     </div>
-  </div>
 
-  <!-- ADVISER CODE VERIFICATION (Phase 3 UX) -------------------------------
+    <!-- ADVISER CODE VERIFICATION (Phase 3 UX) -------------------------------
        The 6-digit code is the ONLY verification path. Firebase's own
        verification email was removed because it duplicated this one and its
        action link pointed at a project with no Hosting enabled, so it led to
        a dead page. A pending adviser could not verify at all without this
        modal — the API existed, but nothing in the app called it. -->
-  <div id="adviserVerifyModal" class="modal" role="dialog" aria-modal="true"
-       aria-labelledby="adviserVerifyTitle">
-    <div class="modal-card" style="max-width: 420px;">
-      <h3 id="adviserVerifyTitle" style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 8px;">
-        Verify your school email
-      </h3>
-      <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 6px; line-height:1.5;">
-        We sent a 6-digit code to
-        <strong id="adviserVerifyEmail" style="color:var(--text-primary); word-break:break-all;">your email</strong>.
-        Enter it below to unlock your adviser tools.
-      </p>
-      <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 14px; line-height:1.5;">
-        💡 Can't see it? It may be in your Spam or Promotions folder — check there
-        and mark it "Not Spam" so future codes reach your inbox. The code expires
-        in 10 minutes.
-      </p>
+    <div id="adviserVerifyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="adviserVerifyTitle">
+      <div class="modal-card" style="max-width: 420px;">
+        <h3 id="adviserVerifyTitle" style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 8px;">
+          Verify your school email
+        </h3>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 6px; line-height:1.5;">
+          We sent a 6-digit code to
+          <strong id="adviserVerifyEmail" style="color:var(--text-primary); word-break:break-all;">your email</strong>.
+          Enter it below to unlock your adviser tools.
+        </p>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 14px; line-height:1.5;">
+          💡 Can't see it? It may be in your Spam or Promotions folder — check there
+          and mark it "Not Spam" so future codes reach your inbox. The code expires
+          in 10 minutes.
+        </p>
 
-      <form id="adviserVerifyForm" novalidate>
-        <label for="adviserCodeInput" style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:6px;">
-          6-digit code
-        </label>
-        <input type="text" id="adviserCodeInput" inputmode="numeric" maxlength="6"
-               pattern="[0-9]{6}" autocomplete="one-time-code" spellcheck="false"
-               placeholder="000000"
-               style="width:100%; text-align:center; letter-spacing:10px; font-size:1.5rem;
+        <form id="adviserVerifyForm" novalidate>
+          <label for="adviserCodeInput" style="display:block; font-size:0.8rem; font-weight:700; margin-bottom:6px;">
+            6-digit code
+          </label>
+          <input type="text" id="adviserCodeInput" inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
+            autocomplete="one-time-code" spellcheck="false" placeholder="000000" style="width:100%; text-align:center; letter-spacing:10px; font-size:1.5rem;
                       font-weight:700; padding:12px; border-radius:12px;
                       border:1.5px solid var(--card-border); background:var(--bg);
                       color:var(--text-primary); font-family:ui-monospace, monospace;" />
-        <div id="adviserVerifyMsg" class="hidden"
-             style="margin-top:12px; padding:10px 12px; border-radius:10px; font-size:0.8rem;
+          <div id="adviserVerifyMsg" class="hidden" style="margin-top:12px; padding:10px 12px; border-radius:10px; font-size:0.8rem;
                     border:1.5px solid var(--card-border); background:var(--bg);"></div>
 
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
-          <button type="submit" class="btn" id="adviserVerifyBtn" style="flex:1; min-width:140px;">
-            <i data-lucide="shield-check"></i> Verify code
-          </button>
-          <button type="button" class="btn btn-outline" id="adviserResendBtn" style="flex:1; min-width:140px;">
-            <i data-lucide="send"></i> Resend code
-          </button>
-        </div>
-      </form>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+            <button type="submit" class="btn" id="adviserVerifyBtn" style="flex:1; min-width:140px;">
+              <i data-lucide="shield-check"></i> Verify code
+            </button>
+            <button type="button" class="btn btn-outline" id="adviserResendBtn" style="flex:1; min-width:140px;">
+              <i data-lucide="send"></i> Resend code
+            </button>
+          </div>
+        </form>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px;">
-        <button type="button" class="btn btn-outline" id="adviserVerifyLaterBtn"
-                style="font-size:0.8rem; padding:8px 12px;">
-          Do this later
-        </button>
-        <span style="font-size:0.72rem; color:var(--text-muted); text-align:right;">
-          Adviser tools stay locked until you verify.
-        </span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px;">
+          <button type="button" class="btn btn-outline" id="adviserVerifyLaterBtn"
+            style="font-size:0.8rem; padding:8px 12px;">
+            Do this later
+          </button>
+          <span style="font-size:0.72rem; color:var(--text-muted); text-align:right;">
+            Adviser tools stay locked until you verify.
+          </span>
+        </div>
       </div>
     </div>
-  </div>
 
 
-  <!-- ADVISER DASHBOARD (Phase 4) -------------------------------------
+    <!-- ADVISER DASHBOARD (Phase 4) -------------------------------------
        Deliberately minimal: two actions (import a roster, name the rep) plus a
        read-only summary. An adviser is a gate, not a manager. Hidden by default
        and revealed only for a VERIFIED adviser - see isVerifiedAdviser() in
        app.js, which must never be replaced by a role === "adviser" test. -->
-  <section id="adviserDashboard" class="container hidden">
-    <!-- 🌟 ADVISER DASHBOARD HEADER
+    <section id="adviserDashboard" class="container hidden">
+      <!-- 🌟 ADVISER DASHBOARD HEADER
          A verified adviser does not use the student dashboard. They are not a
          student with a course list, they are the trust root for ONE level, so
          the two surfaces are separate and mutually exclusive. This header
          replaces the "Hey, <name>!" greeting entirely. -->
-    <div class="adviser-hero">
-      <div class="adviser-hero-glow" aria-hidden="true"></div>
-      <div class="adviser-hero-top">
-        <span class="adviser-badge-lg"><i data-lucide="shield-check"></i> Level Adviser</span>
-        <span class="adviser-scope" id="adviserScope">-</span>
+      <div class="adviser-hero">
+        <div class="adviser-hero-glow" aria-hidden="true"></div>
+        <div class="adviser-hero-top">
+          <span class="adviser-badge-lg"><i data-lucide="shield-check"></i> Level Adviser</span>
+          <span class="adviser-scope" id="adviserScope">-</span>
+        </div>
+        <h1 class="adviser-hero-title">Adviser Dashboard</h1>
+        <p class="adviser-hero-name" id="adviserName">-</p>
+        <p class="adviser-hero-sub">
+          You are the verified anchor for this level. Import the roster, then name
+          one course rep. Nothing else is needed.
+        </p>
       </div>
-      <h1 class="adviser-hero-title">Adviser Dashboard</h1>
-      <p class="adviser-hero-name" id="adviserName">-</p>
-      <p class="adviser-hero-sub">
-        You are the verified anchor for this level. Import the roster, then name
-        one course rep. Nothing else is needed.
-      </p>
-    </div>
 
-    <div class="adviser-stats">
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Students imported</span>
-        <strong class="adviser-stat-value" id="rosterCount">0</strong>
+      <div class="adviser-stats">
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Students imported</span>
+          <strong class="adviser-stat-value" id="rosterCount">0</strong>
+        </div>
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Course Rep</span>
+          <strong class="adviser-stat-value" id="rosterRep">Not chosen</strong>
+        </div>
+        <div class="adviser-stat">
+          <span class="adviser-stat-label">Last import</span>
+          <strong class="adviser-stat-value" id="rosterImported">Never</strong>
+        </div>
       </div>
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Course Rep</span>
-        <strong class="adviser-stat-value" id="rosterRep">Not chosen</strong>
-      </div>
-      <div class="adviser-stat">
-        <span class="adviser-stat-label">Last import</span>
-        <strong class="adviser-stat-value" id="rosterImported">Never</strong>
-      </div>
-    </div>
 
-    <div class="adviser-card">
-      <h3 class="adviser-card-h3"><i data-lucide="upload"></i> Import Level Roster</h3>
-      <p class="adviser-card-p">Upload your department's list for this level. A column of matric
-        numbers is all we need - we find it whether it is headed "Matric No", "S/No",
-        "S/N" or something else entirely.</p>
-      <input type="file" id="rosterFile" accept=".csv,text/csv,text/plain" class="hidden" />
-      <div class="adviser-row">
-        <button type="button" class="btn btn-outline" id="rosterPickBtn">
-          <i data-lucide="file-spreadsheet"></i> Choose CSV file</button>
-        <button type="button" class="btn hidden" id="rosterConfirmBtn">
-          <i data-lucide="check"></i> Confirm import</button>
-        <button type="button" class="btn btn-outline hidden" id="rosterCancelBtn">Cancel</button>
+      <div class="adviser-card">
+        <h3 class="adviser-card-h3"><i data-lucide="calendar-range"></i> End Academic Session</h3>
+        <p class="adviser-card-p">An academic session covers two semesters. Ending it clears only this level's imported
+          student list so you can prepare the next session. The selected course rep and all course attendance records
+          are kept.
+        </p>
+        <div class="adviser-row">
+          <button type="button" class="btn btn-outline" id="endAcademicSessionBtn">
+            <i data-lucide="archive-restore"></i> End academic session</button>
+        </div>
       </div>
-      <div class="adviser-msg hidden" id="rosterMsg"></div>
-      <div class="adviser-preview hidden" id="rosterPreview"></div>
-    </div>
 
-    <div class="adviser-card">
-      <h3 class="adviser-card-h3"><i data-lucide="user-check"></i> Select the Course Rep</h3>
-      <p class="adviser-card-p">Name one student from your roster. Only the student you choose here
-        becomes the rep - nobody can claim the role by signing up first.</p>
-      <select id="repSelect" class="adviser-select" disabled>
-        <option value="">Import a roster first</option>
-      </select>
-      <div class="adviser-row">
-        <button type="button" class="btn" id="repSaveBtn" disabled>
-          <i data-lucide="user-check"></i> Name this rep</button>
-        <button type="button" class="btn btn-outline hidden" id="repClearBtn">
-          <i data-lucide="user-x"></i> Remove rep</button>
+      <div class="adviser-card">
+        <h3 class="adviser-card-h3"><i data-lucide="upload"></i> Import Level Roster</h3>
+        <p class="adviser-card-p">Upload your department's list for this level. A column of matric
+          numbers is all we need - we find it whether it is headed "Matric No", "S/No",
+          "S/N" or something else entirely. Confirming a file replaces the current roster;
+          students left out of the new file are removed.</p>
+        <input type="file" id="rosterFile" accept=".csv,text/csv,text/plain" class="hidden" />
+        <div class="adviser-row">
+          <button type="button" class="btn btn-outline" id="rosterPickBtn">
+            <i data-lucide="file-spreadsheet"></i> Choose CSV file</button>
+          <button type="button" class="btn hidden" id="rosterConfirmBtn">
+            <i data-lucide="check"></i> Confirm import</button>
+          <button type="button" class="btn btn-outline hidden" id="rosterCancelBtn">Cancel</button>
+        </div>
+        <div class="adviser-msg hidden" id="rosterMsg"></div>
+        <div class="adviser-preview hidden" id="rosterPreview"></div>
       </div>
-      <details class="adviser-log hidden" id="repLogWrap">
-        <summary>Rep change history</summary>
-        <ul class="adviser-log-list" id="repLog"></ul>
-      </details>
-    </div>
 
-    <p class="adviser-foot">Re-import at the start of each semester. Re-importing never erases
-      the rep history.</p>
-  </section>
+      <div class="adviser-card">
+        <h3 class="adviser-card-h3"><i data-lucide="user-check"></i> Select the Course Rep</h3>
+        <p class="adviser-card-p">Name one student from your roster. Only the student you choose here
+          becomes the rep - nobody can claim the role by signing up first.</p>
+        <select id="repSelect" class="adviser-select" disabled>
+          <option value="">Import a roster first</option>
+        </select>
+        <div class="adviser-row">
+          <button type="button" class="btn" id="repSaveBtn" disabled>
+            <i data-lucide="user-check"></i> Name this rep</button>
+          <button type="button" class="btn btn-outline hidden" id="repClearBtn">
+            <i data-lucide="user-x"></i> Remove rep</button>
+        </div>
+        <details class="adviser-log hidden" id="repLogWrap">
+          <summary>Rep change history</summary>
+          <ul class="adviser-log-list" id="repLog"></ul>
+        </details>
+      </div>
+
+      <p class="adviser-foot">Re-import when the level roster changes or at the start of a new academic session.
+        Re-importing keeps the rep history.</p>
+    </section>
 
   </main>
 
@@ -1233,7 +1285,8 @@
     <div class="modal-card" style="max-width: 540px; max-height: 88vh; overflow-y: auto; padding: 26px 22px;">
 
       <h3 style="margin-bottom: 4px;"><i data-lucide="book-open"></i> Your VeriPresenX Handbook</h3>
-      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 14px;">Everything you need to know — in about two minutes. Pick your lane below.</p>
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 14px;">Everything you need to know — in about
+        two minutes. Pick your lane below.</p>
 
       <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
         <span class="guide-badge">🎓 Student</span>
@@ -1258,12 +1311,24 @@
 
       <!-- ② ADVISER — the trust root -->
       <div class="guide-section" style="border: 1.5px solid var(--violet);">
-        <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Level Advisers: Verify, Then Roster, Then Rep</strong>
+        <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Level Advisers: Verify, Then
+          Roster, Then Rep</strong>
         <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
-          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Sign up with your school email.</strong> Your institution, department and level are locked in when you register.</span></div>
-          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Enter the 6-digit code.</strong> We email it to you. ⚠️ <strong>Check your Spam folder</strong> the first time — our sending address is new, so it usually lands there until you mark it "Not Spam".</span></div>
-          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Import your level roster.</strong> Upload your department's CSV. All we need is a column of matric numbers — we find it whether it's headed "Matric No", "S/No", "S/N", or something else. You'll see a preview before anything is saved.</span></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size:0.87rem; color:var(--text-primary);"><strong>Name one Course Rep.</strong> Choose one student from the roster. Only that student becomes the rep — nobody can claim the role by signing up first.</span></div>
+          <div class="guide-step"><span class="guide-step-num">1</span><span
+              style="font-size:0.87rem; color:var(--text-primary);"><strong>Sign up with your school email.</strong>
+              Your institution, department and level are locked in when you register.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span
+              style="font-size:0.87rem; color:var(--text-primary);"><strong>Enter the 6-digit code.</strong> We email it
+              to you. ⚠️ <strong>Check your Spam folder</strong> the first time — our sending address is new, so it
+              usually lands there until you mark it "Not Spam".</span></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><span
+              style="font-size:0.87rem; color:var(--text-primary);"><strong>Import your level roster.</strong> Upload
+              your department's CSV. All we need is a column of matric numbers — we find it whether it's headed "Matric
+              No", "S/No", "S/N", or something else. You'll see a preview before anything is saved.</span></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><span
+              style="font-size:0.87rem; color:var(--text-primary);"><strong>Name one Course Rep.</strong> Choose one
+              student from the roster. Only that student becomes the rep — nobody can claim the role by signing up
+              first.</span></div>
         </div>
         <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">
           ⏳ <strong>Not verified yet?</strong> You can't do anything else in the app, and the
@@ -1275,11 +1340,23 @@
       <div class="guide-section" style="border: 1.5px solid var(--teal);">
         <strong style="color: var(--teal);"><i data-lucide="graduation-cap"></i> For Students: Checking In</strong>
         <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
-          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Join &amp; show up.</strong> Your Rep shares a class code — join once, then simply walk into the lecture hall for every session.</span></div>
-          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Watch the screen.</strong> The Rep shows a <strong>PIN that changes every 10 seconds</strong>, or a rotating QR code. A screenshot is already expired by the time it reaches anyone else.</span></div>
-          <div class="guide-step"><span class="guide-step-num">3</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Type it (or scan it).</strong> Enter the code on your phone, or point your camera at the QR. One second, done.</span></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>See the ✅.</strong> You're on the live roster instantly. No paper, no queue, no "did he see my name?"</span></div>
-          <div class="guide-step"><span class="guide-step-num">5</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Track your semester.</strong> The analytics tab shows your attendance %, your excused days 🛡️, and exactly how many classes stand between you and the 70% exam threshold.</span></div>
+          <div class="guide-step"><span class="guide-step-num">1</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Join &amp; show up.</strong> Your Rep
+              shares a class code — join once, then simply walk into the lecture hall for every session.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Watch the screen.</strong> The Rep shows a
+              <strong>PIN that changes every 10 seconds</strong>, or a rotating QR code. A screenshot is already expired
+              by the time it reaches anyone else.</span></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Type it (or scan it).</strong> Enter the
+              code on your phone, or point your camera at the QR. One second, done.</span></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>See the ✅.</strong> You're on the live
+              roster instantly. No paper, no queue, no "did he see my name?"</span></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Track your semester.</strong> The
+              analytics tab shows your attendance %, your excused days 🛡️, and exactly how many classes stand between
+              you and the 70% exam threshold.</span></div>
         </div>
         <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">
           🎓 <strong>Asked to be a Rep?</strong> You only become one if your Level Adviser
@@ -1294,40 +1371,72 @@
 
       <!-- FOR REPS -->
       <div class="guide-section" style="border: 1.5px solid var(--violet);">
-        <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Course Reps: Run a Lecture in 60 Seconds</strong>
+        <strong style="color: var(--violet);"><i data-lucide="shield-check"></i> For Course Reps: Run a Lecture in 60
+          Seconds</strong>
         <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px;">
-          <div class="guide-step"><span class="guide-step-num">1</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Pick an attendance mode.</strong> <strong>QR + Device Lock</strong> (students scan a rotating code) or <strong>PIN + Device Lock</strong> (they type a changing 4-digit code). Both work without GPS.</span></div>
-          <div class="guide-step"><span class="guide-step-num">2</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Hit "Generate PIN".</strong> The class reads it off your screen, or you show the QR on the projector. Watch the roster fill live.</span></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Optional headcount.</strong> Tap <em>"Conduct Physical Presence Check"</em> and type the number of bodies you actually see. The app flags the difference — no ghost check-ins.</span></div>
-          <div class="guide-step"><span class="guide-step-num">5</span><span style="font-size: 0.87rem; color: var(--text-primary);"><strong>Approve &amp; close.</strong> One-tap approve the manual requests you can physically see, then <em>"Close Class &amp; Save"</em>. Records archive forever — download them as CSV or PDF any time, with a percentage per student.</span></div>
+          <div class="guide-step"><span class="guide-step-num">1</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Pick an attendance mode.</strong>
+              <strong>QR + Device Lock</strong> (students scan a rotating code) or <strong>PIN + Device Lock</strong>
+              (they type a changing 4-digit code). Both work without GPS.</span></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Hit "Generate PIN".</strong> The class
+              reads it off your screen, or you show the QR on the projector. Watch the roster fill live.</span></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Optional headcount.</strong> Tap
+              <em>"Conduct Physical Presence Check"</em> and type the number of bodies you actually see. The app flags
+              the difference — no ghost check-ins.</span></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><span
+              style="font-size: 0.87rem; color: var(--text-primary);"><strong>Approve &amp; close.</strong> One-tap
+              approve the manual requests you can physically see, then <em>"Close Class &amp; Save"</em>. Records
+              archive forever — download them as CSV or PDF any time, with a percentage per student.</span></div>
         </div>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">🚩 <strong>Empty seat linked to a check-in?</strong> You can't delete a student mid-session (that's the law). Tap <strong>Flag Absent</strong> instead — it instantly alerts the student, and the incident is logged permanently.</p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-top: 10px;">🚩 <strong>Empty seat linked to a
+            check-in?</strong> You can't delete a student mid-session (that's the law). Tap <strong>Flag Absent</strong>
+          instead — it instantly alerts the student, and the incident is logged permanently.</p>
       </div>
 
       <!-- SECURITY SHIELD -->
       <div class="guide-section" style="border: 1.5px solid var(--border);">
-        <strong style="color: var(--navy);"><i data-lucide="shield"></i> The Invisible Shield — Why You Can Trust the Numbers</strong>
-        <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <div><span class="guide-check">⏱️</span> <strong>Rotating PIN</strong> — the code changes every 10 seconds, so a screenshot is already expired by the time it lands. It's generated on the server, so a Rep can't freeze one open.</div>
-          <div><span class="guide-check">🛑</span> <strong>Wrong-PIN lockout</strong> — five wrong codes and you're paused for 30 seconds. Nobody can guess their way in.</div>
-          <div><span class="guide-check">🔒</span> <strong>Device Lock</strong> — the first phone you use is bound to your account. One phone, one student; anything else is flagged to the Rep.</div>
-          <div><span class="guide-check">📍</span> <strong>Location (coming)</strong> — hall geofencing is built but switched <strong>off in the web app</strong>, because a browser can't tell one hall from the next precisely enough. It switches on in the mobile app.</div>
-          <div><span class="guide-check">📊</span> <strong>Your records are yours</strong> — download attendance as CSV or PDF, with a percentage for every student, any time.</div>
-          <div><span class="guide-check">🤝</span> <strong>Fail-Safe override</strong> — real problems (dead GPS, dropped network) get a human rescue hatch. Never a dead end.</div>
-          <div><span class="guide-check">🚩</span> <strong>Anti-beef system</strong> — no silent deletions; every removal, flag, and approval is permanent and visible.</div>
-          <div><span class="guide-check">👁️</span> <strong>Watchdog</strong> — screenshot attempts and app-switching mid-session are logged for the Rep to review.</div>
+        <strong style="color: var(--navy);"><i data-lucide="shield"></i> The Invisible Shield — Why You Can Trust the
+          Numbers</strong>
+        <div
+          style="font-size: 0.82rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <div><span class="guide-check">⏱️</span> <strong>Rotating PIN</strong> — the code changes every 10 seconds, so
+            a screenshot is already expired by the time it lands. It's generated on the server, so a Rep can't freeze
+            one open.</div>
+          <div><span class="guide-check">🛑</span> <strong>Wrong-PIN lockout</strong> — five wrong codes and you're
+            paused for 30 seconds. Nobody can guess their way in.</div>
+          <div><span class="guide-check">🔒</span> <strong>Device Lock</strong> — the first phone you use is bound to
+            your account. One phone, one student; anything else is flagged to the Rep.</div>
+          <div><span class="guide-check">📍</span> <strong>Location (coming)</strong> — hall geofencing is built but
+            switched <strong>off in the web app</strong>, because a browser can't tell one hall from the next precisely
+            enough. It switches on in the mobile app.</div>
+          <div><span class="guide-check">📊</span> <strong>Your records are yours</strong> — download attendance as CSV
+            or PDF, with a percentage for every student, any time.</div>
+          <div><span class="guide-check">🤝</span> <strong>Fail-Safe override</strong> — real problems (dead GPS,
+            dropped network) get a human rescue hatch. Never a dead end.</div>
+          <div><span class="guide-check">🚩</span> <strong>Anti-beef system</strong> — no silent deletions; every
+            removal, flag, and approval is permanent and visible.</div>
+          <div><span class="guide-check">👁️</span> <strong>Watchdog</strong> — screenshot attempts and app-switching
+            mid-session are logged for the Rep to review.</div>
         </div>
       </div>
 
       <!-- TROUBLESHOOTING -->
       <div class="guide-section" style="border: 1.5px dashed var(--border);">
         <strong style="color: var(--navy);"><i data-lucide="wrench"></i> When Things Go Wrong</strong>
-        <div style="font-size: 0.82rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-          <div>❌ <em>"Invalid PIN"</em> → the code just rotated. Ask for the current one — it's a feature, not a bug.</div>
-          <div>❌ <em>"GPS too weak"</em> → move near a window. The radius already absorbs indoor bounce, so don't fight it.</div>
-          <div>❌ <em>"Device Locked"</em> → that phone is registered to another matric. Use your own device — borrowing phones is exactly what we're blocking.</div>
-          <div>❌ <em>"No GPS at all?"</em> → your Rep can run the session in <strong>PIN + Device Lock</strong> mode. No location needed.</div>
-          <div>❌ <em>Flagged absent by mistake?</em> → see your Rep immediately. Decisions are final but never silent, and always on record.</div>
+        <div
+          style="font-size: 0.82rem; color: var(--text-primary); display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <div>❌ <em>"Invalid PIN"</em> → the code just rotated. Ask for the current one — it's a feature, not a bug.
+          </div>
+          <div>❌ <em>"GPS too weak"</em> → move near a window. The radius already absorbs indoor bounce, so don't fight
+            it.</div>
+          <div>❌ <em>"Device Locked"</em> → that phone is registered to another matric. Use your own device — borrowing
+            phones is exactly what we're blocking.</div>
+          <div>❌ <em>"No GPS at all?"</em> → your Rep can run the session in <strong>PIN + Device Lock</strong> mode. No
+            location needed.</div>
+          <div>❌ <em>Flagged absent by mistake?</em> → see your Rep immediately. Decisions are final but never silent,
+            and always on record.</div>
         </div>
       </div>
 
@@ -1488,11 +1597,13 @@
         Choose up to <strong>5</strong> students who have <strong>already checked in to this class</strong> — that's the
         proof-of-presence rule: you cannot appoint someone who hasn't scanned the code, so the rotating QR can never
         reach a phone outside the hall. Each becomes a session hotspot: their app shows the same rotating QR for
-        nearby students to scan. <strong>Grants are public</strong> — the whole class sees who hotspots and who appointed
+        nearby students to scan. <strong>Grants are public</strong> — the whole class sees who hotspots and who
+        appointed
         them — and their power ends automatically when this class closes.
       </p>
       <div id="hotspotOptionsList"
-        style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 12px; background: var(--bg);"></div>
+        style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 12px; background: var(--bg);">
+      </div>
       <div style="display: flex; gap: 8px;">
         <button id="granthotspotsBtn" class="btn" style="flex: 1; font-size: 0.85rem;">
           <i data-lucide="broadcast"></i> Grant Hotspot Power
@@ -1516,17 +1627,21 @@
       <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 20px; font-size: 0.95rem; line-height: 1.5;">
         Screenshots and screen recording are blocked during active attendance sessions for security purposes.
       </p>
-      <div style="background: rgba(255, 255, 255, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.7);">
-        <p style="margin: 0;">⚠️ Attempting to screenshot or record during attendance will be logged and may result in disciplinary action.</p>
+      <div
+        style="background: rgba(255, 255, 255, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.7);">
+        <p style="margin: 0;">⚠️ Attempting to screenshot or record during attendance will be logged and may result in
+          disciplinary action.</p>
       </div>
-      <button id="dismissSecurityAlert" style="background: var(--teal); color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+      <button id="dismissSecurityAlert"
+        style="background: var(--teal); color: #ffffff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
         I Understand - Return to App
       </button>
     </div>
   </div>
 
   <!-- CUSTOM CONFIRM DIALOG -->
-  <div id="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div id="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title"
+    aria-describedby="confirm-message">
     <div id="confirm-box">
       <div id="confirm-icon"><i data-lucide="alert-triangle"></i></div>
       <div id="confirm-title">Are you sure?</div>
@@ -1580,8 +1695,8 @@
     <span id="drawerTabBadge" class="drawer-tab-badge hidden">0</span>
   </button>
 
-    <script src="/utils/report.js"></script>
-<script type="module" src="app.js"></script>
+  <script src="/utils/report.js"></script>
+  <script type="module" src="app.js"></script>
   <script>
     // Initialize Lucide icons across the entire DOM once loaded
     document.addEventListener("DOMContentLoaded", () => {

@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "check": "node --experimental-vm-modules check.js"
+    "check": "node --experimental-vm-modules check.js",
+    "test:rules": "node rules-test.js"
   },
   "dependencies": {
     "firebase-admin": "12.7.0"

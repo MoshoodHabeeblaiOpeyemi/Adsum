@@ -29,8 +29,6 @@
 
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
-const db = getFirestore();
-
 // A 4-digit PIN is 10,000 values. Five misses per ~30 seconds means a full
 // sweep of the keyspace takes ~16.6 hours instead of under a minute, which puts
 // it far outside any single class session.
@@ -43,7 +41,8 @@ const WINDOW_MS = 30 * 1000;
  *
  * @returns {Promise<{blocked: boolean, attempts: number, retryAfterSeconds: number}>}
  */
-async function recordFailure(uid, courseId) {
+async function recordFailure(uid, courseId, sessionExpiresAt) {
+  const db = getFirestore();
   const ref = db.collection("pinAttempts").doc(`${uid}_${courseId}`);
   const now = Date.now();
 
@@ -55,12 +54,14 @@ async function recordFailure(uid, courseId) {
 
     // The window slides: attempts older than WINDOW_MS stop counting. A
     // student who stops guessing for 30 seconds gets a clean slate.
-    const withinWindow = last > windowStart;
+    const sameSession = data.sessionExpiresAt === sessionExpiresAt;
+    const withinWindow = sameSession && last > windowStart;
     const attempts = withinWindow ? Number(data.count || 0) + 1 : 1;
 
     tx.set(ref, {
       uid,
       courseId,
+      sessionExpiresAt,
       count: attempts,
       lastAttempt: now,
       updatedAt: FieldValue.serverTimestamp(),
@@ -69,7 +70,10 @@ async function recordFailure(uid, courseId) {
     return {
       blocked: attempts >= MAX_ATTEMPTS,
       attempts,
-      retryAfterSeconds: Math.max(1, Math.ceil((last + WINDOW_MS - now) / 1000)),
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil((last + WINDOW_MS - now) / 1000),
+      ),
     };
   });
 }
@@ -77,7 +81,10 @@ async function recordFailure(uid, courseId) {
 /** Clear the counter after a correct PIN, so honest typos do not accumulate. */
 async function recordSuccess(uid, courseId) {
   try {
-    await db.collection("pinAttempts").doc(`${uid}_${courseId}`).delete();
+    await getFirestore()
+      .collection("pinAttempts")
+      .doc(`${uid}_${courseId}`)
+      .delete();
   } catch (e) {
     // A stale counter only delays the next legitimate check-in by 30 seconds.
     // Never fail a good check-in because cleanup failed.
@@ -88,10 +95,16 @@ async function recordSuccess(uid, courseId) {
 /** Is this pair already locked out? Read-only, for early rejection. */
 async function isBlocked(uid, courseId) {
   try {
-    const snap = await db.collection("pinAttempts").doc(`${uid}_${courseId}`).get();
+    const snap = await getFirestore()
+      .collection("pinAttempts")
+      .doc(`${uid}_${courseId}`)
+      .get();
     if (!snap.exists) return false;
     const d = snap.data();
-    return Number(d.count || 0) >= MAX_ATTEMPTS && Date.now() - Number(d.lastAttempt || 0) < WINDOW_MS;
+    return (
+      Number(d.count || 0) >= MAX_ATTEMPTS &&
+      Date.now() - Number(d.lastAttempt || 0) < WINDOW_MS
+    );
   } catch (e) {
     // Fail OPEN here on purpose: if the throttle store is unreachable, blocking
     // every student in the hall is a worse outcome than briefly losing the
@@ -101,4 +114,10 @@ async function isBlocked(uid, courseId) {
   }
 }
 
-module.exports = { recordFailure, recordSuccess, isBlocked, MAX_ATTEMPTS, WINDOW_MS };
+module.exports = {
+  recordFailure,
+  recordSuccess,
+  isBlocked,
+  MAX_ATTEMPTS,
+  WINDOW_MS,
+};

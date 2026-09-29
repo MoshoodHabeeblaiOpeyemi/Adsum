@@ -118,7 +118,7 @@ concurrent requests from one matric cannot both succeed.
 ## Project structure
 
 ```text
-api/                     6 serverless functions, 13 actions (see below)
+api/                     Serverless endpoints for account, roster, course and attendance workflows
 utils/appCheck.js        App Check gate — called FIRST by every endpoint
 app.js                   the entire client (~7 500 lines, no framework)
 index.html               markup + all screen containers
@@ -136,11 +136,15 @@ docs/                    architecture, security model, roadmap
 | Function | Actions |
 | --- | --- |
 | `api/account.js` | `claimMatric`, `deleteAccount` |
-| `api/approval.js` | `approveManual`, `grantHotspot` |
+| `api/approval.js` | `requestManual`, `approveManual`, `grantHotspot` |
 | `api/attendance.js` | `submit`, `flagAbsent` |
 | `api/course.js` | `enroll`, `leave`, `remove`, `delete` |
+| `api/onboarding.js` | `createProfile` |
+| `api/prune-advisers.js` | Scheduled cleanup of unverified adviser applications |
+| `api/roster.js` | `importRoster`, `chooseRep`, `getRoster`, `endAcademicSession` |
 | `api/semester.js` | `endSemester` |
-| `api/session.js` | `close`, `registerDevice` |
+| `api/session.js` | `close`, `registerDevice`, `rotatePin`, `startSession` |
+| `api/verification.js` | `sendCode`, `verifyCode`, `verifyNIN` |
 
 Called as `POST /api/<function>?action=<action>` with `Authorization: Bearer <idToken>`.
 
@@ -154,6 +158,7 @@ Called as `POST /api/<function>?action=<action>` with `Authorization: Bearer <id
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | You need the data model, collection by collection |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | You want to know what is next and why |
 | [PRESENTATION.md](PRESENTATION.md) | You are demoing or writing the launch post |
+| [brand/README.md](brand/README.md) | You are touching logos or icons |
 
 ### Verify before committing
 
@@ -171,14 +176,38 @@ If the PowerShell execution policy blocks the `npm` shim, run node directly:
 ```bash
 node --experimental-vm-modules check.js
 ```
-| [brand/README.md](brand/README.md) | You are touching logos or icons |
+
+### Verify the rules before they ship
+
+`check.js` cannot validate `firestore.rules` — it parses JavaScript, not the rules
+language — and those rules deploy to production **automatically** on a push to `main`
+(`.github/workflows/deploy-firestore-rules.yml`), with no validation step of their own.
+`rules-test.js` closes that gap by running the rules against the Firestore emulator and
+asserting **both** directions, so a check that should deny but allows (a hole) and one
+that should allow but denies (a regression) each fail the run.
+
+```bash
+# 1. start the emulator with the rules under test (jar cached by the Firebase CLI)
+java -jar "$HOME/.cache/firebase/emulators/cloud-firestore-emulator-v1.22.0.jar" \
+     --rules firestore.rules --port 8080
+
+# 2. run the checks (Node 18+)
+npm run test:rules
+```
+
+This is not decorative. It found that the proof-of-presence guard on session hotspots
+existed on `members` `update` but not `create`, which let a rep hand a student who never
+scanned in a row that — because `session_assistant` counts as course staff — also read
+`session/secret`, the live rotating PIN. Against the previous rules it fails **9** checks.
 
 ---
 
 ## Status
 
-**Functionally complete PWA, demo-ready.** Previously hardened through four internal
-audit rounds. Outstanding gaps are catalogued honestly in
-[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md#known-gaps) — notably that PIN rotation
-and the 3-strike fail-safe counter are still client-driven, which is what Phase 5
-addresses.
+**Functionally complete PWA, demo-ready.** Hardened through four internal audit rounds plus
+the Phase 5 server-authority work: PIN rotation, the submission throttle, the
+manual-request threshold and course creation are all enforced server-side, and the session
+and PIN documents are backend-only. Remaining gaps are catalogued honestly in
+[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md#known-gaps) — notably that any signed-in
+account can read course documents, and that GPS geofencing is a deterrent rather than proof
+of physical presence.

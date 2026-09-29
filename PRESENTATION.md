@@ -93,9 +93,13 @@ afterwards."
 
 Do not hide the gaps. Naming them builds more trust than perfection does.
 
-**Say:** "Two things are still client-driven: the PIN rotation timestamp and the
-three-strike fail-safe counter. They are next on the roadmap, and they are written down in
-the repo's security model rather than buried."
+**Say:** "Two things are still open, and I keep them written down in the repo's security
+model rather than buried. First, course documents are readable by any signed-in account,
+and those documents carry the enrolled matric numbers — fixing that properly needs a
+separate public catalog and a private roster, because course discovery is how a student
+joins in the first place. Second, GPS geofencing is a deterrent, not proof of presence: a
+rooted device can report coordinates it is not standing at. The counter to that is the
+physical headcount on close, which is why it exists."
 
 ---
 

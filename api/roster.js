@@ -26,17 +26,36 @@
 
 const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldValue,
+  Timestamp,
+} = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
 const { isVerifiedAdviser, ROLE } = require("../utils/roles");
 const { parseRosterCsv } = require("../utils/csv");
 
 try {
-  if (getApps().length === 0) initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") }) });
-} catch (e) { if (!/already exists/.test(e.message)) console.error("Init error:", e); }
+  if (getApps().length === 0)
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(
+          /\\n/g,
+          "\n",
+        ),
+      }),
+    });
+} catch (e) {
+  if (!/already exists/.test(e.message)) console.error("Init error:", e);
+}
 
 const db = getFirestore();
-const norm = (v) => String(v || "").trim().toUpperCase();
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase();
 
 // Cap the students returned in one preview page. A level roster is small
 // (tens), but this must not become an unbounded read on a malformed import.
@@ -46,7 +65,8 @@ const PREVIEW_LIMIT = 200;
 // body — is what stops one adviser reading or writing another's roster.
 async function loadAdviserScope(uid) {
   const snap = await db.collection("users").doc(uid).get();
-  if (!snap.exists) return { error: { status: 404, body: { error: "Profile not found." } } };
+  if (!snap.exists)
+    return { error: { status: 404, body: { error: "Profile not found." } } };
   const profile = snap.data();
 
   // 🔒 The one gate. Fails closed on a partial or legacy profile.
@@ -70,7 +90,6 @@ async function loadAdviserScope(uid) {
   };
 }
 
-
 /**
  * The roster document id. Delegated to utils/rosters.js so this writer and
  * api/onboarding.js's Phase 5 reader can never derive different ids for the
@@ -90,11 +109,15 @@ const { rosterDocId } = require("../utils/rosters");
 async function handleImportRoster(req, res, decoded) {
   try {
     const scope = await loadAdviserScope(decoded.uid);
-    if (scope.error) return res.status(scope.error.status).json(scope.error.body);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
 
     const { csv, commit } = req.body || {};
     if (typeof csv !== "string" || !csv.trim()) {
-      return res.status(400).json({ error: "No CSV content received. Re-upload the file.", code: "NO_CSV" });
+      return res.status(400).json({
+        error: "No CSV content received. Re-upload the file.",
+        code: "NO_CSV",
+      });
     }
 
     const parsed = parseRosterCsv(csv);
@@ -112,16 +135,35 @@ async function handleImportRoster(req, res, decoded) {
       });
     }
 
-    const rosterRef = db.collection("departmentRosters").doc(
-      rosterDocId(scope.institution, scope.department, scope.level),
-    );
+    const rosterRef = db
+      .collection("departmentRosters")
+      .doc(rosterDocId(scope.institution, scope.department, scope.level));
     const existingSnap = await rosterRef.get();
     const previous = existingSnap.exists ? existingSnap.data() : null;
-    const previousCount = Array.isArray(previous?.matrics) ? previous.matrics.length : 0;
+    const previousStudents = Array.isArray(previous?.students)
+      ? previous.students
+      : [];
+    const previousMatrics = Array.isArray(previous?.matrics)
+      ? previous.matrics
+      : [];
+    const previousMatricSet = new Set(
+      [
+        ...previousMatrics.map((matric) => norm(matric)),
+        ...previousStudents.map((student) => norm(student?.matric)),
+      ].filter(Boolean),
+    );
+    const previousCount =
+      Array.isArray(previous?.students) || Array.isArray(previous?.matrics)
+        ? Math.max(previousStudents.length, previousMatrics.length)
+        : Number.isFinite(previous?.count)
+          ? previous.count
+          : 0;
     const newCount = parsed.students.length;
     // "Duplicates" = students already on the roster, so a re-import reports
     // honestly instead of implying a fresh list.
-    const carriedOver = previous ? parsed.students.filter((s) => previous.matrics.includes(s.matric)).length : 0;
+    const carriedOver = parsed.students.filter((student) =>
+      previousMatricSet.has(norm(student.matric)),
+    ).length;
     const added = newCount - carriedOver;
 
     if (!commit) {
@@ -142,7 +184,13 @@ async function handleImportRoster(req, res, decoded) {
     // is not on the level roster is exactly the state this feature exists to
     // prevent. Reported back so the UI can say so out loud.
     const repSurvives =
-      Boolean(previous?.chosenRepMatric) && parsed.students.some((s) => s.matric === previous.chosenRepMatric);
+      Boolean(previous?.chosenRepMatric) &&
+      parsed.students.some((s) => s.matric === previous.chosenRepMatric);
+    const droppedRepRef =
+      previous?.chosenRepUid && !repSurvives
+        ? db.collection("users").doc(previous.chosenRepUid)
+        : null;
+    const droppedRepSnap = droppedRepRef ? await droppedRepRef.get() : null;
 
     const now = FieldValue.serverTimestamp();
     const batch = db.batch();
@@ -174,8 +222,16 @@ async function handleImportRoster(req, res, decoded) {
         by: decoded.uid,
       }),
       importedAt: now,
+      rosterClearedAt: null,
       previousCount,
     });
+    if (droppedRepRef && droppedRepSnap.exists) {
+      batch.update(droppedRepRef, {
+        role: ROLE.STUDENT,
+        isRep: false,
+        repGrantedByAdviser: false,
+      });
+    }
     await batch.commit();
 
     return res.status(200).json({
@@ -205,17 +261,23 @@ async function handleImportRoster(req, res, decoded) {
     console.error("  firestore code:", code, "| message:", msg);
 
     const isPermission = code === 7 || /permission|insufficient/i.test(msg);
-    const isQuota = /exceed|quota|rate|resource-exhausted/i.test(msg) || code === 8;
-    const isBadValue = /invalid|undefined|unsupported|out of range/i.test(msg) || code === 3;
-    const isUnavailable = code === 14 || /unavailable|deadline|network|ECONN/i.test(msg);
+    const isQuota =
+      /exceed|quota|rate|resource-exhausted/i.test(msg) || code === 8;
+    const isBadValue =
+      /invalid|undefined|unsupported|out of range/i.test(msg) || code === 3;
+    const isUnavailable =
+      code === 14 || /unavailable|deadline|network|ECONN/i.test(msg);
 
-    if (isPermission) console.error("  -> rules/permission problem on the roster document");
+    if (isPermission)
+      console.error("  -> rules/permission problem on the roster document");
     if (isQuota) console.error("  -> quota or rate limit");
     if (isBadValue) console.error("  -> a field value Firestore cannot store");
-    if (isUnavailable) console.error("  -> Firestore unreachable from this function");
+    if (isUnavailable)
+      console.error("  -> Firestore unreachable from this function");
 
     return res.status(500).json({
-      error: "Unable to save the roster. Your file was read fine — nothing has been saved.",
+      error:
+        "Unable to save the roster. Your file was read fine — nothing has been saved.",
       code: "IMPORT_WRITE_FAILED",
       // The raw status, so the client can show something specific. Safe: a fixed
       // enum, not a path.
@@ -232,7 +294,6 @@ async function handleImportRoster(req, res, decoded) {
     });
   }
 }
-
 
 /** Cap the rep-change audit trail. Firestore bills by document size, and a
  *  long-lived roster must not grow without limit. */
@@ -256,12 +317,13 @@ function appendRepChange(existing, entry) {
 async function handleChooseRep(req, res, decoded) {
   try {
     const scope = await loadAdviserScope(decoded.uid);
-    if (scope.error) return res.status(scope.error.status).json(scope.error.body);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
 
     const { matric, clear } = req.body || {};
-    const rosterRef = db.collection("departmentRosters").doc(
-      rosterDocId(scope.institution, scope.department, scope.level),
-    );
+    const rosterRef = db
+      .collection("departmentRosters")
+      .doc(rosterDocId(scope.institution, scope.department, scope.level));
 
     // Re-read inside the transaction: a concurrent import could otherwise
     // change the roster between the membership check and the write.
@@ -299,14 +361,18 @@ async function handleChooseRep(req, res, decoded) {
         if (!wanted) throw new Error("NO_MATRIC");
         if (!matrics.includes(wanted)) throw new Error("NOT_ON_ROSTER");
 
-        const student = (Array.isArray(roster.students) ? roster.students : []).find((s) => s.matric === wanted);
-        const repName = (student && student.name) || roster.chosenRepName || null;
+        const student = (
+          Array.isArray(roster.students) ? roster.students : []
+        ).find((s) => s.matric === wanted);
+        const repName =
+          (student && student.name) || roster.chosenRepName || null;
         // Replacing a rep is allowed but LOGGED, with the outgoing rep named.
         // The old rep is not edited here: they keep their account and simply
         // stop being the rep, which is what "becomes a regular student" means.
         // Their role is demoted by the same transaction via `role: "student"`
         // in Phase 5 when the account is linked, not here.
-        const isReplacement = Boolean(roster.chosenRepMatric) && roster.chosenRepMatric !== wanted;
+        const isReplacement =
+          Boolean(roster.chosenRepMatric) && roster.chosenRepMatric !== wanted;
         // 🔒 The outgoing rep may already have an account. "Old rep becomes a
         // regular student" is only true if their profile actually says so, so
         // the demotion happens here rather than being assumed. A null
@@ -325,7 +391,11 @@ async function handleChooseRep(req, res, decoded) {
           chosenRepUid: null,
           chosenRepAt: FieldValue.serverTimestamp(),
           repChanges: appendRepChange(roster.repChanges, {
-            action: isReplacement ? "replaced" : roster.chosenRepMatric ? "unchanged" : "chosen",
+            action: isReplacement
+              ? "replaced"
+              : roster.chosenRepMatric
+                ? "unchanged"
+                : "chosen",
             previousMatric: isReplacement ? roster.chosenRepMatric : null,
             previousName: isReplacement ? roster.chosenRepName || null : null,
             matric: wanted,
@@ -337,14 +407,21 @@ async function handleChooseRep(req, res, decoded) {
       });
     } catch (txErr) {
       if (txErr.message === "NO_ROSTER") {
-        return res.status(404).json({ error: "Import your level roster before choosing a rep.", code: "NO_ROSTER" });
+        return res.status(404).json({
+          error: "Import your level roster before choosing a rep.",
+          code: "NO_ROSTER",
+        });
       }
       if (txErr.message === "NO_MATRIC") {
-        return res.status(400).json({ error: "Choose a student from the roster.", code: "NO_MATRIC" });
+        return res.status(400).json({
+          error: "Choose a student from the roster.",
+          code: "NO_MATRIC",
+        });
       }
       if (txErr.message === "NOT_ON_ROSTER") {
         return res.status(400).json({
-          error: "That matric is not on this level's roster. Import the roster first, or pick a student from the list.",
+          error:
+            "That matric is not on this level's roster. Import the roster first, or pick a student from the list.",
           code: "NOT_ON_ROSTER",
         });
       }
@@ -368,11 +445,12 @@ async function handleChooseRep(req, res, decoded) {
 async function handleGetRoster(req, res, decoded) {
   try {
     const scope = await loadAdviserScope(decoded.uid);
-    if (scope.error) return res.status(scope.error.status).json(scope.error.body);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
 
-    const rosterRef = db.collection("departmentRosters").doc(
-      rosterDocId(scope.institution, scope.department, scope.level),
-    );
+    const rosterRef = db
+      .collection("departmentRosters")
+      .doc(rosterDocId(scope.institution, scope.department, scope.level));
     const snap = await rosterRef.get();
     if (!snap.exists) {
       return res.status(200).json({
@@ -383,6 +461,7 @@ async function handleGetRoster(req, res, decoded) {
         count: 0,
         students: [],
         chosenRepMatric: null,
+        rosterClearedAt: null,
       });
     }
 
@@ -394,15 +473,20 @@ async function handleGetRoster(req, res, decoded) {
     // document id, so the only way to settle it is to report what is ACTUALLY
     // stored. These are counts and the doc id, not user data, and they make the
     // next failure self-describing instead of another guessing round.
-    console.log("roster get:", JSON.stringify({
-      id: rosterRef.id,
-      countField: typeof roster.count,
-      count: roster.count,
-      studentsLen: students.length,
-      matricsLen: matrics.length,
-      hasImportedAt: Boolean(roster.importedAt),
-      repChangesLen: Array.isArray(roster.repChanges) ? roster.repChanges.length : 0,
-    }));
+    console.log(
+      "roster get:",
+      JSON.stringify({
+        id: rosterRef.id,
+        countField: typeof roster.count,
+        count: roster.count,
+        studentsLen: students.length,
+        matricsLen: matrics.length,
+        hasImportedAt: Boolean(roster.importedAt),
+        repChangesLen: Array.isArray(roster.repChanges)
+          ? roster.repChanges.length
+          : 0,
+      }),
+    );
     return res.status(200).json({
       exists: true,
       // The id actually read, so a mismatch is visible instead of inferred.
@@ -410,7 +494,12 @@ async function handleGetRoster(req, res, decoded) {
       institution: roster.institution,
       department: roster.department,
       level: roster.level,
-      count: roster.count || students.length,
+      count:
+        Array.isArray(roster.students) || Array.isArray(roster.matrics)
+          ? Math.max(students.length, matrics.length)
+          : Number.isFinite(roster.count)
+            ? roster.count
+            : 0,
       // Capped so a malformed import cannot return an unbounded list.
       students: students.slice(0, PREVIEW_LIMIT),
       truncated: students.length > PREVIEW_LIMIT,
@@ -418,8 +507,11 @@ async function handleGetRoster(req, res, decoded) {
       chosenRepName: roster.chosenRepName || null,
       chosenRepUid: roster.chosenRepUid || null,
       // The rep-change trail, newest last. Bounded by REP_CHANGE_LIMIT on write.
-      repChanges: Array.isArray(roster.repChanges) ? roster.repChanges.slice(-20) : [],
+      repChanges: Array.isArray(roster.repChanges)
+        ? roster.repChanges.slice(-20)
+        : [],
       lastImportAt: roster.importedAt || null,
+      rosterClearedAt: roster.rosterClearedAt || null,
     });
   } catch (error) {
     console.error("roster get error:", error);
@@ -427,20 +519,77 @@ async function handleGetRoster(req, res, decoded) {
   }
 }
 
+async function handleEndAcademicSession(req, res, decoded) {
+  try {
+    const scope = await loadAdviserScope(decoded.uid);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
+
+    const rosterRef = db
+      .collection("departmentRosters")
+      .doc(rosterDocId(scope.institution, scope.department, scope.level));
+    const result = await db.runTransaction(async (tx) => {
+      const rosterSnap = await tx.get(rosterRef);
+      if (!rosterSnap.exists)
+        return { cleared: false, clearedCount: 0, previousRep: null };
+
+      const roster = rosterSnap.data();
+      const students = Array.isArray(roster.students) ? roster.students : [];
+      const matrics = Array.isArray(roster.matrics) ? roster.matrics : [];
+      const clearedCount = Math.max(
+        students.length,
+        matrics.length,
+        Number.isFinite(roster.count) ? roster.count : 0,
+      );
+
+      tx.update(rosterRef, {
+        students: [],
+        matrics: [],
+        count: 0,
+        importedAt: null,
+        rosterClearedAt: FieldValue.serverTimestamp(),
+        previousCount: clearedCount,
+      });
+      return {
+        cleared: true,
+        clearedCount,
+        retainedRep: roster.chosenRepMatric || null,
+      };
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    console.error("roster academic session close error:", error);
+    return res.status(500).json({
+      error: "Unable to prepare the roster for a new academic session.",
+    });
+  }
+}
+
 module.exports = async (req, res) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Method not allowed" });
   try {
     await verifyAppCheck(req);
     const header = req.headers.authorization || "";
-    if (!header.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+    if (!header.startsWith("Bearer "))
+      return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
     const action = req.query.action;
     switch (action) {
-      case "importRoster": return handleImportRoster(req, res, decoded);
-      case "chooseRep": return handleChooseRep(req, res, decoded);
-      case "getRoster": return handleGetRoster(req, res, decoded);
+      case "importRoster":
+        return handleImportRoster(req, res, decoded);
+      case "chooseRep":
+        return handleChooseRep(req, res, decoded);
+      case "getRoster":
+        return handleGetRoster(req, res, decoded);
+      case "endAcademicSession":
+        return handleEndAcademicSession(req, res, decoded);
       default:
-        return res.status(400).json({ error: "Invalid action. Use: importRoster, chooseRep, getRoster" });
+        return res.status(400).json({
+          error:
+            "Invalid action. Use: importRoster, chooseRep, getRoster, endAcademicSession",
+        });
     }
   } catch (error) {
     console.error("Roster API error:", error);

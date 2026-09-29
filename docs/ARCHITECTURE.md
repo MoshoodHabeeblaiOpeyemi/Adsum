@@ -40,7 +40,7 @@ cached service worker.
 | `devices` | `u_{uid}` | **backend only** | `{uid, matric, lastSeenAt}` — the device lock |
 | `adviserVerifications` | `{uid}` | **backend only** | Transient 6-digit adviser code + `attempts` (max 5) + `expiresAt` (10 min). Deleted on success or lockout |
 | `adviserSlots` | `adviser_{INST}_{DEPT}_{LEVEL}` | **backend only** | The one-adviser-per-level claim. Written in the same transaction that promotes the user to `role: "level_anchor"` |
-| `departmentRosters` | `{INST}_{DEPT}_{LEVEL}` | **backend only** (`api/roster.js`) | The adviser's imported level list: `{institution, department, level, adviserUid, students[], matrics[], count, chosenRepMatric, chosenRepName, chosenRepUid, importedAt}`. Clients may **read** it (only if `isVerifiedAdviser()`) and never write |
+| `departmentRosters` | `{INST}_{DEPT}_{LEVEL}` | **backend only** (`api/roster.js`) | The adviser's imported level list: `{institution, department, level, adviserUid, students[], matrics[], count, chosenRepMatric, chosenRepName, chosenRepUid, importedAt, rosterClearedAt}`. Clients may **read** it (only if `isVerifiedAdviser()`) and never write |
 
 ### `users/{uid}` role vocabulary
 
@@ -71,7 +71,7 @@ an already-promoted state, which is a hole in its own right.
 
 | Subcollection | Doc ID | Written by | Shape |
 | --- | --- | --- | --- |
-| `members` | `{uid}` | rep (client) or backend | `{uid, matric, role}` — `role` ∈ `student` \| `assistant` \| `session_assistant` \| `rep` |
+| `members` | `{uid}` | rep (client) or backend | `{uid, matric, role}` — `role` ∈ `student` \| `assistant` \| `session_assistant` \| `rep`. Appointing a `session_assistant` from the client requires a live session **and** that matric in `secret.attendees` — enforced on `create` as well as `update`, with `matric` pinned, so a hotspot cannot be handed to someone who never scanned in |
 | `session/live` | fixed `live` | course staff | `{pin, previousPin, pinRotationTime, expiresAt, pinRotationInterval, locationMode, qrMode}` — the public session doc |
 | `session/secret` | fixed `secret` | **rep only** | `{pin, previousPin, pinRotationTime, attendees[], managerMatric, rejectedFixes[]}` — the answer key |
 | `checkins` | `{uid}_{ts}` | **backend only** | `{uid, matric, checkedInAt, lat, lon, accuracy}` |
@@ -147,7 +147,7 @@ consulted by the rules. `courses.repUid` is the only authorization source.
 
 ---
 
-## Lifecycle of a session
+## Class attendance lifecycle
 
 1. **Start** — the rep creates `session/live` + `session/secret`. `secret.attendees` is
    seeded with the rep's own matric via `managerMatric`, and `live.expiresAt` is set.
@@ -156,8 +156,10 @@ consulted by the rules. `courses.repUid` is the only authorization source.
    submission; see [SECURITY_MODEL.md](SECURITY_MODEL.md#1-the-server-clock-is-the-authority).
 3. **Check in** — `api/attendance?action=submit`. Verifies token, membership, live
    session, PIN freshness, then runs the atomic transaction.
-4. **Flag / approve / grant** — `flagAbsent` marks an empty seat; `approveManual` resolves
-   a 3-strike escape hatch; `grantHotspot` delegates PIN-reading.
+4. **Flag / approve / grant** — `flagAbsent` cannot flag a student already checked in;
+   `requestManual` requires three server-recorded failures in the same session;
+   `approveManual` rechecks request status, membership, and session inside a transaction;
+   `grantHotspot` enforces its five-student limit transactionally.
 5. **Close** — `api/session?action=close`. Writes `attendance/session_{ts}` with
    `systemCount` vs `physicalHeadcount`, revokes every `session_assistant`, then deletes
    `session/live` and `session/secret`.
@@ -167,6 +169,16 @@ consulted by the rules. `courses.repUid` is the only authorization source.
 `physicalHeadcount` vs `systemCount` is the low-tech integrity check: a rep counting
 heads in the room and comparing against device check-ins makes a bulk-proxy attack visible
 even if every automated control were defeated.
+
+## Academic session rollover
+
+An academic session spans two semesters and is separate from a class attendance session
+and from `endSemester`. A verified Level Adviser uses
+`api/roster?action=endAcademicSession` to clear the level's imported `students[]` and
+`matrics[]`. The selected rep, course documents, and attendance archives are preserved.
+The adviser can then import the new session's roster and change the rep if needed. Reps
+remain responsible for closing each class attendance session; `endSemester` remains the
+separate course-level action that clears semester attendance data.
 
 ---
 

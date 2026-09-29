@@ -63,6 +63,16 @@ service cloud.firestore {
         );
     }
 
+    function isAdviserGrantedRep() {
+      return hasUserProfile()
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.get('role', null) == 'rep'
+        && get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.get('repGrantedByAdviser', false) == true;
+    }
+
     function isCourseStaff(courseId) {
       return isCourseRep(courseId) || (
         isCourseMember(courseId)
@@ -217,7 +227,30 @@ service cloud.firestore {
     match /courses/{courseId} {
       allow read: if signedIn();
 
-      allow create: if hasUserProfile() && validCourseFields();
+      allow create: if isAdviserGrantedRep()
+        && validCourseFields()
+        && request.resource.data.keys().hasOnly([
+          'name', 'code', 'rep', 'repUid', 'institution', 'department',
+          'level', 'enrolled', 'assistants', 'attendanceHistory', 'activeSession'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.institution == get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.institution
+        && request.resource.data.department == get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.department
+        && request.resource.data.level == get(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        ).data.level
+        && request.resource.data.enrolled == [
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.matric
+        ]
+        && request.resource.data.get('assistants', []) == []
+        && request.resource.data.get('attendanceHistory', []) == []
+        && request.resource.data.get('activeSession', null) == null;
 
       allow update: if isCourseStaff(courseId)
         && request.resource.data.repUid == resource.data.repUid
@@ -239,12 +272,34 @@ service cloud.firestore {
 
         // Normal student enrollment must be performed by the trusted backend.
         // The backend uses Firebase Admin credentials and bypasses client rules.
+        //
+        // 🔒 CREATING a hotspot is subject to the SAME proof-of-presence test as
+        // appointing one (see the `update` branch below). The guard used to live
+        // only on `update`, which left the identical hole one verb over: a rep
+        // could skip grantHotspot and `setDoc` a brand-new member row with
+        // `role: "session_assistant"` for a student who never scanned in.
+        // Because `session_assistant` counts as course STAFF in
+        // `isCourseStaff()`, that row also hands its owner read access to
+        // `session/secret` — the live rotating PIN. Found by the emulator
+        // smoke test, which asserted this returned 403 and got 200.
         allow create: if isCourseRep(courseId)
           && request.resource.data.uid == memberUid
-          && request.resource.data.role in ['student', 'assistant', 'session_assistant', 'rep'];
+          && request.resource.data.role in ['student', 'assistant', 'session_assistant', 'rep']
+          && (
+            request.resource.data.role != 'session_assistant'
+            || (
+              exists(/databases/$(database)/documents/courses/$(courseId)/session/live)
+              && get(/databases/$(database)/documents/courses/$(courseId)/session/secret).data.attendees.hasAny([request.resource.data.matric])
+            )
+          );
 
         allow update: if isCourseRep(courseId)
           && request.resource.data.uid == resource.data.uid
+          // 🔒 `matric` is the identity the proof-of-presence test reads.
+          // Without this pin a rep could elevate an absent student's row by
+          // swapping in the matric of a classmate who did scan in, since the
+          // test alone would then be satisfied by the wrong person.
+          && request.resource.data.matric == resource.data.matric
           && request.resource.data.role in ['student', 'assistant', 'session_assistant', 'rep']
           && (
             // 🎯 PROOF-OF-PRESENCE: appointing a session hotspot is only
@@ -256,7 +311,7 @@ service cloud.firestore {
             request.resource.data.role != 'session_assistant'
             || (
               exists(/databases/$(database)/documents/courses/$(courseId)/session/live)
-              && get(/databases/$(database)/documents/courses/$(courseId)/session/secret).data.attendees.hasAny([resource.data.matric])
+              && get(/databases/$(database)/documents/courses/$(courseId)/session/secret).data.attendees.hasAny([request.resource.data.matric])
             )
           );
 
@@ -348,55 +403,42 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Manual verification override requests (3-strike fail-safe).
-      // Students can only create/edit their OWN pending request; the count of
-      // automated failures is tracked client-side and is never stored/shown.
-      // Only course staff can resolve a request — and the decision is final
-      // (approved/rejected requests can never be flipped back to pending).
+      // Manual verification override requests. Creation and approval are
+      // backend-only so clients cannot invent the three-strike eligibility or
+      // add themselves to the attendance list. Students may refine a pending
+      // reason; staff may reject a pending request, while approvals go through
+      // api/approval.js and update attendance atomically.
       match /manualRequests/{requestUid} {
         allow get: if signedIn() && (
           request.auth.uid == requestUid || isCourseStaff(courseId)
         );
         allow list: if isCourseStaff(courseId);
 
-        allow create: if isOwner(requestUid)
-          && request.resource.data.uid == requestUid
-          && request.resource.data.status == 'pending'
-          && request.resource.data.reason is string
-          && request.resource.data.reason.size() > 0
-          && request.resource.data.reason.size() <= 200;
+        allow create: if false;
 
         allow update: if (
             // Student may refine their own reason while still pending...
             isOwner(requestUid)
             && resource.data.status == 'pending'
             && request.resource.data.status == 'pending'
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.sessionExpiresAt == resource.data.sessionExpiresAt
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason'])
             && request.resource.data.reason is string
             && request.resource.data.reason.size() > 0
             && request.resource.data.reason.size() <= 200
           ) || (
-            // ...or, once the request's OWN session is over (the live
-            // session is gone or is a different session), a decided
-            // request no longer binds: the student can ask again for the
-            // new session. The rep still must physically verify them —
-            // approving into an expired session is impossible by design.
-            isOwner(requestUid)
-            && resource.data.status in ['approved', 'rejected']
-            && (
-              !exists(/databases/$(database)/documents/courses/$(courseId)/session/live)
-              || get(/databases/$(database)/documents/courses/$(courseId)/session/live).data.expiresAt
-                != resource.data.sessionExpiresAt
-            )
-            && request.resource.data.uid == requestUid
-            && request.resource.data.status == 'pending'
-            && request.resource.data.reason is string
-            && request.resource.data.reason.size() > 0
-            && request.resource.data.reason.size() <= 200
-          ) || (
-            // ...but ONLY staff can resolve it, and only from pending.
+            // Staff rejection is deliberately narrower than approval.
             isCourseStaff(courseId)
             && resource.data.status == 'pending'
-            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.status == 'rejected'
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.sessionExpiresAt == resource.data.sessionExpiresAt
+            && request.resource.data.reviewedByUid == request.auth.uid
+            && request.resource.data.reviewedAt == request.time
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'reviewedAt', 'reviewedByUid', 'rejectedReason'
+            ])
           );
 
         allow delete: if false;

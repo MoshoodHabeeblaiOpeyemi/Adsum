@@ -1,4 +1,4 @@
-*/=]\# Roadmap
+# Roadmap
 
 ## Working rules
 
@@ -80,7 +80,7 @@ Retires every gap in [SECURITY_MODEL.md](SECURITY_MODEL.md#known-gaps) that the 
 | Server geofence | `haversineMetres()` in `utils/geo.js`. The client gate is now a convenience; the server compares the submitted coordinates to the hall, rejects `accuracy > 500m` (which would otherwise be a way around the radius), and skips only when `locationMode === "no_gps"` |
 | `departmentReps` | Was **client-writable** — `setDoc` with `repUid == auth.uid` was self-appointment, defeating Phase 5's whole point. Now `allow write: if false` |
 | `pinAttempts` | New collection, backend-only. The client can neither read its own count nor clear it |
-| Constant-time PIN compare | `diff |= x ^ y` over the whole string, so a wrong PIN cannot be probed digit-by-digit by timing |
+| Constant-time PIN compare | `diff \|= x ^ y` over the whole string, so a wrong PIN cannot be probed digit-by-digit by timing |
 | Generic 500s | **11** responses were returning `error.message`, which routinely embeds Firestore collection and document paths. All now log in full server-side and return a fixed sentence |
 
 `security: server-authoritative PIN rotation, throttle, geofence, generic errors`
@@ -138,6 +138,7 @@ rep from it, which is what turns the rep badge from *claimed* into *granted*.
 | `importRoster` | Parses the CSV and reports counts **without writing**; a confirmed `commit: true` stores it. All-or-nothing — a partial import would hide missing students until someone fails to check in |
 | `chooseRep` | The matric must already be on the roster. Runs in a transaction so a concurrent import cannot change the list underneath the check. `clear: true` stands the rep down |
 | `getRoster` | Read-only view: counts, the rep, last import. Capped at 200 entries |
+| `endAcademicSession` | Clears the imported level roster for the next academic session; the selected rep and course attendance history are preserved |
 
 Three decisions worth keeping:
 

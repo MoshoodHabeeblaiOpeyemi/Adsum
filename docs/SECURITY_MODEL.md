@@ -200,18 +200,16 @@ the point of "anti-beef": a flag raises an alert that cannot be quietly retracte
 
 ## 9. The 3-strike fail-safe
 
-If automated check-in fails three consecutive times in one session, a manual-override
-escape hatch unlocks. The counter is **never stored and never rendered** — an earlier
-design showed "attempt 2 of 3", which taught students when a retry was worth trying and
-advertised the existence of the bypass.
-
-**Known gap:** `MANUAL_OVERRIDE_STRIKES_REQUIRED = 3` (`app.js:789`) and the counter both
-live in the client's localStorage. A student can clear it via devtools. It is currently a
-UX affordance, not a security control — Phase 5 moves the count server-side.
-
-The escape hatch still cannot bypass the rep: approving into an expired session is
-impossible (`firestore.rules:263-267`), and a decided request unbinds itself only once
-its own session has ended, so the rep must physically verify the student for the new one.
+After three failed check-ins in the current session, a student may request manual
+verification. The browser's local counter only controls button visibility; it is not
+trusted for eligibility. `api/attendance.js` records failures in backend-only
+`pinAttempts/{uid}_{courseId}`, bound to the session expiry, and
+`api/approval?action=requestManual` checks that counter and current membership
+transactionally before creating the request. Direct client creation is denied by
+`firestore.rules`. `approveManual` rechecks pending status, session, enrollment, and
+already-checked-in state in the transaction that records attendance. A staff member must
+still confirm the student physically; manual verification does not automatically approve
+attendance.
 
 ---
 
@@ -278,16 +276,18 @@ UI wording can change without touching stored data.
 
 ## Known gaps
 
-Recorded honestly, because each is a candidate for Phase 5.
+Recorded honestly; resolved items are marked, and remaining risks are explicit.
 
 | Gap | Impact | Fix |
 | --- | --- | --- |
 | PIN rotation timestamp is client-written (`app.js:6279`) | A rep with devtools could backdate `pinRotationTime` to keep a PIN alive | ✅ **Fixed (Phase 5).** `api/session?action=rotatePin` generates the PIN with `crypto.randomInt` and stamps `serverTimestamp()`. The client can neither backdate it nor predict the next PIN |
-| Strike counter is client-side | Clearable via devtools | ✅ **Fixed (Phase 5).** Replaced by `pinAttempts/{uid}_{courseId}`, backend-only, counted in a transaction. The client can neither read nor clear its own count |
-| Geofence is a client accuracy gate only | `app.js:702` accepts at `accuracy <= 50`, and `api/attendance.js:88` **stores** `lat`/`lon`/`accuracy` but never validates distance to a hall. A student can spoof GPS | ✅ **Fixed (Phase 5).** `haversineMetres()` compares submitted coordinates to the hall server-side; `accuracy > 500m` is rejected outright; the check is skipped only for `locationMode: "no_gps"` |
+| Any signed-in user could create a course claiming `repUid` | A student could self-appoint as a course rep through the Firestore SDK | ✅ **Fixed.** Course creation requires an adviser-granted rep profile, matching department scope, and an empty initial session/roster |
+| Manual-request threshold is client-side | LocalStorage controls only when the request button appears; direct request creation would bypass the three-failure threshold | ✅ **Fixed.** Backend-only `pinAttempts` records session-bound failures; `requestManual` enforces the threshold, and Firestore denies direct client creation |
+| Hotspot proof-of-presence guarded `update` but not `create` | A rep could skip `grantHotspot` and `setDoc` a fresh `members` row with `role: "session_assistant"` for a student who never scanned in. Because `session_assistant` counts as course staff in `isCourseStaff()`, that row also granted its owner read access to `session/secret` — the live rotating PIN. Found by `rules-test.js`, which failed 9 checks against the previous rules | ✅ **Fixed.** `members` `create` now carries the same live-session + attendee test as `update`, and `matric` is pinned on `update` so the proof cannot be redirected to a scanned-in classmate |
+| GPS location authenticity | Server validates submitted coordinates against the hall, but a rooted/mock-location device can still forge its reported location | GPS remains disabled on web by default (`GPS_ATTENDANCE_ENABLED` must be explicitly enabled); geofencing is a deterrent, not proof of physical presence |
+| Course catalog reads are `signedIn()` | Any account can read any course doc, including `enrolled[]` matric numbers | Restrict to members/staff, or split the roster into a subcollection. **Not done:** it breaks course discovery, which is how a student joins in the first place |
 | No rate limit on PIN submission | A 4–6 digit PIN could be brute-forced within the freshness window | ✅ **Fixed (Phase 5).** 5 misses per uid+course per 30s, incremented **inside a transaction** — a read-then-write limiter has a race, and 50 parallel requests would each read `count: 0` |
 | Screenshot/leave-app signals are advisory | `securityEvents` records attempts but nothing acts on them | Weight them into a risk score |
-| `courses` read is `signedIn()` | Any account can read any course doc, including `enrolled[]` (matric numbers) | Restrict to members/staff, or split the roster into a subcollection. **Not done:** it breaks course discovery, which is how a student joins in the first place |
 
 ---
 
@@ -300,3 +300,12 @@ Recorded honestly, because each is a candidate for Phase 5.
 5. New user data entering the DOM goes through `escapeHTML()`.
 6. If you relax a rule or a 403, say so in the commit message and here — a relaxed
    check is a security decision, not a bug fix.
+7. Run `npm run check` **and** `npm run test:rules` before pushing. `firestore.rules`
+   deploys to the live project automatically on a push to `main`, and the deploy
+   workflow runs no validation of its own — so the second command is the only thing
+   standing between an edit and an enforceable hole in production. It needs the
+   Firestore emulator running with `--rules firestore.rules`; the header of
+   `rules-test.js` has the exact command.
+8. Add the assertion to `rules-test.js` in the same commit as the rule it covers.
+   Both directions matter: a check that should deny but allows is a hole, and one
+   that should allow but denies is an outage.
