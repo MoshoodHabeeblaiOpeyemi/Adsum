@@ -300,6 +300,200 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
 }
 
 // ============================================================
+// GLOBAL BUSY OVERLAY
+// ------------------------------------------------------------
+// WHAT THIS IS FOR
+// A user who sees nothing happen assumes the tap was missed, and
+// taps again. That is not hypothetical here: the attendance
+// `submit` endpoint writes a document per call, so a double-tap is
+// a duplicate attendance row. This makes an in-flight request
+// VISIBLE and makes the screen untappable while it runs.
+//
+// THREE THINGS THIS DELIBERATELY IS NOT
+// 1. Not a boolean. `busy = true` / `busy = false` flickers when
+//    requests overlap (registerDevice genuinely races attendance
+//    submit) and wedges permanently if one path forgets to clear
+//    it. So it is REFERENCE COUNTED: the overlay is only hidden
+//    when the count returns to zero.
+// 2. Not a modal trap. "Stop waiting" releases the screen without
+//    cancelling the request. A blocker you cannot escape is a
+//    worse bug than the double-tap being prevented.
+// 3. Not automatic. Wrapping every fetch would blur the screen for
+//    the clock-skew probe and the background device registration,
+//    which would read as a haunted app. Call sites opt in, and the
+//    heavy/light split is deliberate.
+//
+// Release always happens in a `finally`, and nothing awaits between
+// the show and the try — the same trap that stranded the signup
+// button on its spinner (see the note above resetSignupButton).
+// ============================================================
+const busyOverlay = document.getElementById("busyOverlay");
+const busyLabelEl = document.getElementById("busyLabel");
+const busyHintEl = document.getElementById("busyHint");
+const busyCancelBtn = document.getElementById("busyCancel");
+
+// Reference count, plus the label of each running action.
+let busyDepth = 0;
+const busyStack = [];
+// Keyed single-flight locks, so a second trigger for the same heavy
+// action is refused even if it arrives by keyboard rather than tap.
+const busyLocks = new Set();
+
+let busyShownAt = 0;
+let busyHideTimer = null;
+let busySlowTimer = null;
+
+// A sub-frame flash of scrim reads as a glitch, so the overlay is
+// held long enough to register as deliberate.
+const BUSY_MIN_VISIBLE_MS = 350;
+// When to admit the request is slow and offer a way out.
+const BUSY_SLOW_AFTER_MS = 6000;
+const BUSY_LABEL_MAX = 64;
+
+function busyPaint() {
+  if (!busyLabelEl) return;
+  // The top of the stack is what the user is actually waiting on;
+  // anything beneath it is background work they cannot see.
+  const others = busyStack.length - 1;
+  let label = busyStack[busyStack.length - 1] || "Working…";
+  if (others > 0) label += " (+" + others + " more)";
+  busyLabelEl.textContent = label;
+}
+
+function busyShow(label) {
+  if (!busyOverlay) return;
+  busyStack.push(String(label || "Working…").slice(0, BUSY_LABEL_MAX));
+  busyDepth++;
+  if (busyDepth === 1) {
+    // A show can arrive while a previous hide is still pending, or
+    // the overlay would vanish from under the new request.
+    clearTimeout(busyHideTimer);
+    busyShownAt = Date.now();
+    busyOverlay.classList.remove("hidden");
+    // Force layout so the opacity transition actually runs.
+    void busyOverlay.offsetWidth;
+    busyOverlay.classList.add("show");
+    busyOverlay.setAttribute("aria-busy", "true");
+    if (busyHintEl) busyHintEl.classList.add("hidden");
+    if (busyCancelBtn) busyCancelBtn.classList.add("hidden");
+    clearTimeout(busySlowTimer);
+    busySlowTimer = setTimeout(() => {
+      if (busyDepth < 1) return;
+      if (busyHintEl) busyHintEl.classList.remove("hidden");
+      if (busyCancelBtn) busyCancelBtn.classList.remove("hidden");
+    }, BUSY_SLOW_AFTER_MS);
+  }
+  busyPaint();
+}
+
+function busyHide() {
+  if (!busyOverlay) return;
+  busyStack.pop();
+  busyDepth = Math.max(0, busyDepth - 1);
+  // Something is still running: keep the scrim up and just relabel.
+  if (busyDepth > 0) {
+    busyPaint();
+    return;
+  }
+  clearTimeout(busySlowTimer);
+  busyStack.length = 0;
+  const elapsed = Date.now() - busyShownAt;
+  const wait = Math.max(0, BUSY_MIN_VISIBLE_MS - elapsed);
+  clearTimeout(busyHideTimer);
+  busyHideTimer = setTimeout(() => {
+    busyOverlay.classList.remove("show");
+    busyOverlay.setAttribute("aria-busy", "false");
+    // Let the fade finish before display:none, but only if nothing
+    // has started again in the meantime.
+    setTimeout(() => {
+      if (busyDepth === 0) busyOverlay.classList.add("hidden");
+    }, 220);
+  }, wait);
+}
+
+/**
+ * Run `fn` behind the blocker. The overlay is dismissed no matter how
+ * `fn` ends — success, handled rejection or a genuine throw.
+ */
+async function withBusy(label, fn) {
+  if (!busyOverlay) return await fn();
+  busyShow(label);
+  try {
+    return await fn();
+  } finally {
+    busyHide();
+  }
+}
+
+/**
+ * The strict form: refuses to start if the same `lockKey` is already
+ * running. Used on the writes where a second execution is not just
+ * redundant but actively damaging.
+ */
+async function withBusyOnce(label, lockKey, fn) {
+  if (lockKey && busyLocks.has(lockKey)) {
+    toast.info("That action is already running.", "Just a moment");
+    return undefined;
+  }
+  if (lockKey) busyLocks.add(lockKey);
+  try {
+    return await withBusy(label, fn);
+  } finally {
+    if (lockKey) busyLocks.delete(lockKey);
+  }
+}
+
+/**
+ * The LIGHT form: no full-screen scrim, just this one button showing a
+ * spinner and refusing further clicks. For actions that are fast,
+ * frequent, or part of a rapid-repetition flow (rotating a QR pin mid
+ * lecture) where dimming the whole screen would be actively hostile.
+ */
+async function withBusyButton(btn, label, fn) {
+  if (!btn) return await fn();
+  if (btn.dataset.busyLocked === "1") {
+    toast.info("Still working on the last one.", "Just a moment");
+    return undefined;
+  }
+  btn.dataset.busyLocked = "1";
+  const originalHTML = btn.innerHTML;
+  const originalDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.innerHTML =
+    '<i data-lucide="loader" class="lucide-spin" style="margin-right:6px; vertical-align:-3px;"></i> ' +
+    label;
+  refreshIcons();
+  try {
+    return await fn();
+  } finally {
+    btn.disabled = originalDisabled;
+    btn.innerHTML = originalHTML;
+    delete btn.dataset.busyLocked;
+    refreshIcons();
+  }
+}
+
+// 🚪 ESCAPE HATCH — "Stop waiting" releases the screen but lets the
+// request finish in the background. It deliberately does NOT abort:
+// the write may already have reached Firestore, and killing it here
+// would leave the user unsure whether it happened. The caller's own
+// success/error toast still reports the outcome either way.
+if (busyCancelBtn) {
+  busyCancelBtn.addEventListener("click", () => {
+    if (!busyOverlay) return;
+    clearTimeout(busySlowTimer);
+    clearTimeout(busyHideTimer);
+    busyDepth = 0;
+    busyStack.length = 0;
+    busyOverlay.classList.remove("show");
+    busyOverlay.setAttribute("aria-busy", "false");
+    setTimeout(() => {
+      if (busyDepth === 0) busyOverlay.classList.add("hidden");
+    }, 220);
+  });
+}
+
+// ============================================================
 // SPLASH SCREEN (pure cosmetic — click anywhere to continue)
 // ============================================================
 const splashScreen = document.getElementById("splashScreen");
@@ -510,6 +704,14 @@ let courses = [];
 let currentUser = null;
 let activeCourse = null;
 let countdownInterval = null;
+// 🔒 Guards PIN rotation, which is TIMER-driven rather than tap-driven: the
+// countdown interval fires it on a schedule. A slow network can therefore
+// leave a rotation in flight when the next tick arrives, and two
+// overlapping rotations would let the screen show a PIN the server has
+// already discarded. Deliberately silent — no button, no overlay, because a
+// full-screen scrim flashing on its own during a lecture would be far worse
+// than the problem it solves.
+let pinRotateInFlight = false;
 let isCreatingAccount = false; // 👈 ADD THIS LINE HERE%
 let studentExemptions = []; // Cache for student exemptions
 let securityOverlayActive = false; // Track if security overlay is showing
@@ -2577,7 +2779,11 @@ document
           danger: true,
         })
       ) {
-        try {
+      try {
+        // 🔒 The most destructive action in the app. A second run would
+        // re-query an already-deleted account, and the 2s reload below is
+        // racing anything that follows it.
+        await withBusyOnce("Deleting your account…", "deleteAccount", async () => {
           const idToken = await auth.currentUser.getIdToken();
 
           const response = await fetch("/api/account?action=deleteAccount", {
@@ -2590,10 +2796,10 @@ document
 
           if (!response.ok) {
             const result = await response.json().catch(() => ({}));
-            // Say what actually happened. "Check your connection" was actively
-            // misleading: a missing Firestore index or a server fault is not
-            // the user's network, and telling them so sent them debugging the
-            // wrong thing entirely.
+            // Say what actually happened. "Check your connection" was
+            // actively misleading: a missing Firestore index or a server
+            // fault is not the user's network, and telling them so sent them
+            // debugging the wrong thing entirely.
             const hint =
               result.code === "INDEX_NOT_DEPLOYED"
                 ? "This is a server-side issue, not your connection. Please try again shortly."
@@ -2605,8 +2811,9 @@ document
 
           localStorage.removeItem("veripresenx_device_uuid");
           localStorage.removeItem("veripresenx_theme");
-          // Clear any pre-rebrand keys too, in case this device never triggered
-          // a read-through migration before the account was deleted.
+          // Clear any pre-rebrand keys too, in case this device never
+          // triggered a read-through migration before the account was
+          // deleted.
           localStorage.removeItem("attendify_device_uuid");
           localStorage.removeItem("attendify_theme");
           // 🧭 Deleting the account untracks the device, so a genuinely new
@@ -2625,7 +2832,8 @@ document
           setTimeout(() => {
             window.location.reload();
           }, 2000);
-        } catch (error) {
+        });
+      } catch (error) {
           console.error("Delete account error:", error);
           toast.error(
             error.message ||
@@ -2934,21 +3142,30 @@ window.deleteCourse = async function (courseId) {
     })
   ) {
     try {
-      const idToken = await auth.currentUser.getIdToken();
-      const response = await fetch("/api/course?action=delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+      // 🔒 Destructive and irreversible. A double execution is not a no-op
+      // here — it re-runs a delete of a document the first call already
+      // removed — so it is locked per course.
+      await withBusyOnce(
+        "Deleting the course…",
+        "courseDelete:" + courseId,
+        async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/course?action=delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ courseId }),
+          });
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(result.error || "Unable to delete course.");
+          // Remove from local state immediately
+          courses = courses.filter((c) => c.id !== courseId);
+          renderCourses();
         },
-        body: JSON.stringify({ courseId }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Unable to delete course.");
-      // Remove from local state immediately
-      courses = courses.filter((c) => c.id !== courseId);
-      renderCourses();
+      );
     } catch (error) {
       console.error("Delete course error:", error);
       toast.error("Unable to delete course. Please try again.");
@@ -2971,20 +3188,26 @@ window.leaveCourse = async function (courseId) {
     })
   ) {
     try {
-      const idToken = await auth.currentUser.getIdToken();
-      const response = await fetch("/api/course?action=leave", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ courseId }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Unable to leave course.");
+      await withBusyOnce(
+        "Leaving the course…",
+        "courseLeave:" + courseId,
+        async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/course?action=leave", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ courseId }),
+          });
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(result.error || "Unable to leave course.");
 
-      toast.info(`You have left ${course.name}.`, "Left Course 👋");
+          toast.info(`You have left ${course.name}.`, "Left Course 👋");
+        },
+      );
     } catch (error) {
       console.error("Leave course error:", error);
       toast.error("Unable to leave course. Please check your connection.");
@@ -5566,55 +5789,67 @@ if (joinCourseForm) {
       });
       if (!confirmed) return;
 
-      const idToken = await auth.currentUser.getIdToken();
-      const response = await fetch("/api/course?action=enroll", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ courseCode: code }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(
-          `__JOIN_ERR__${result.error || "Unable to join course."}`,
-        );
-
-      // The onSnapshot listener watches the courses collection, NOT subcollections.
-      // It won't fire when members/ changes. A student can only read their own
-      // member doc (not the full collection), so we update local state directly
-      // using the data we already have from the join — no extra Firestore read needed.
-      const myMatric = normalizeMatric(currentUser ? currentUser.matric : "");
-      const existingIdx = courses.findIndex((c) => c.id === result.courseId);
-      if (existingIdx >= 0) {
-        // Add student's own matric to enrolled[] in local state
-        const alreadyIn = (courses[existingIdx].enrolled || [])
-          .map(normalizeMatric)
-          .includes(myMatric);
-        if (!alreadyIn) {
-          courses[existingIdx] = {
-            ...courses[existingIdx],
-            enrolled: [...(courses[existingIdx].enrolled || []), myMatric],
-          };
-        }
-      } else {
-        // Course wasn't in local array yet — fetch the full course doc and add it
-        const courseDocSnap = await getDoc(doc(db, "courses", result.courseId));
-        if (courseDocSnap.exists()) {
-          courses.push({
-            id: courseDocSnap.id,
-            ...courseDocSnap.data(),
-            // Seed with at least the current student so the card shows
-            enrolled: [...(courseDocSnap.data().enrolled || []), myMatric],
-            assistants: courseDocSnap.data().assistants || [],
-            members: [],
+      await withBusyOnce(
+        "Joining the course…",
+        "enroll:" + normalizeMatric(studentMatric) + ":" + code,
+        async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/course?action=enroll", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ courseCode: code }),
           });
-        }
-      }
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(
+              `__JOIN_ERR__${result.error || "Unable to join course."}`,
+            );
 
-      renderCourses();
-      toast.success(`You are now enrolled in ${found.name}!`, "Joined! 🎉");
+          // The onSnapshot listener watches the courses collection, NOT
+          // subcollections. It won't fire when members/ changes. A student
+          // can only read their own member doc (not the full collection), so we
+          // update local state directly using the data we already have from
+          // the join — no extra Firestore read needed.
+          const myMatric = normalizeMatric(
+            currentUser ? currentUser.matric : "",
+          );
+          const existingIdx = courses.findIndex(
+            (c) => c.id === result.courseId,
+          );
+          if (existingIdx >= 0) {
+            // Add student's own matric to enrolled[] in local state
+            const alreadyIn = (courses[existingIdx].enrolled || [])
+              .map(normalizeMatric)
+              .includes(myMatric);
+            if (!alreadyIn) {
+              courses[existingIdx] = {
+                ...courses[existingIdx],
+                enrolled: [...(courses[existingIdx].enrolled || []), myMatric],
+              };
+            }
+          } else {
+            // Course wasn't in local array yet — fetch the full course doc
+            // and add it
+            const courseDocSnap = await getDoc(doc(db, "courses", result.courseId));
+            if (courseDocSnap.exists()) {
+              courses.push({
+                id: courseDocSnap.id,
+                ...courseDocSnap.data(),
+                // Seed with at least the current student so the card shows
+                enrolled: [...(courseDocSnap.data().enrolled || []), myMatric],
+                assistants: courseDocSnap.data().assistants || [],
+                members: [],
+              });
+            }
+          }
+
+          renderCourses();
+          toast.success(`You are now enrolled in ${found.name}!`, "Joined! 🎉");
+        },
+      );
     } catch (error) {
       console.error("Join course error:", error);
       if (error.message && error.message.startsWith("__JOIN_ERR__")) {
@@ -6442,40 +6677,48 @@ window.removeStudentFromCourse = async function (matric) {
     })
   ) {
     try {
-      const idToken = await auth.currentUser.getIdToken();
-      const response = await fetch("/api/course?action=remove", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
+      // 🔒 Removing a student is a decision the rep makes about a real
+      // person, and it logs an entry. Locked per course+matric.
+      await withBusyOnce(
+        "Removing the student…",
+        "removeStudent:" + activeCourse.id + ":" + normalizeMatric(matric),
+        async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/course?action=remove", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              courseId: activeCourse.id,
+              targetMatric: matric,
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok)
+            throw new Error(result.error || "Unable to remove student.");
+
+          // Update local state to reflect the removal immediately
+          const targetMatric = normalizeMatric(matric);
+          if (activeCourse.enrolled) {
+            activeCourse.enrolled = activeCourse.enrolled
+              .map(normalizeMatric)
+              .filter((m) => m !== targetMatric);
+          }
+          if (activeCourse.assistants) {
+            activeCourse.assistants = activeCourse.assistants
+              .map(normalizeMatric)
+              .filter((m) => m !== targetMatric);
+          }
+
+          renderPortalState();
+          renderAssistantDropdownAndList();
+          toast.info(
+            `Student [${targetMatric}] has been removed.`,
+            "Student Removed",
+          );
         },
-        body: JSON.stringify({
-          courseId: activeCourse.id,
-          targetMatric: matric,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Unable to remove student.");
-
-      // Update local state to reflect the removal immediately
-      const targetMatric = normalizeMatric(matric);
-      if (activeCourse.enrolled) {
-        activeCourse.enrolled = activeCourse.enrolled
-          .map(normalizeMatric)
-          .filter((m) => m !== targetMatric);
-      }
-      if (activeCourse.assistants) {
-        activeCourse.assistants = activeCourse.assistants
-          .map(normalizeMatric)
-          .filter((m) => m !== targetMatric);
-      }
-
-      renderPortalState();
-      renderAssistantDropdownAndList();
-      toast.info(
-        `Student [${targetMatric}] has been removed.`,
-        "Student Removed",
       );
     } catch (error) {
       console.error("Remove student error:", error);
@@ -7262,29 +7505,39 @@ async function createSession(managerMatric, locData = {}) {
   // unrotatable class.
   let started;
   try {
-    const idToken = await auth.currentUser.getIdToken();
-    const res = await fetch("/api/session?action=startSession", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+    // 🔒 Starting a session mints the PIN every student must type. Two
+    // concurrent starts would leave the screen showing a PIN the server
+    // never told anyone, so this is locked as well as blocked.
+    started = await withBusyOnce(
+      "Starting the class…",
+      "startSession",
+      async () => {
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch("/api/session?action=startSession", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            courseId: activeCourse.id,
+            managerMatric,
+            lat: typeof locData.lat === "number" ? locData.lat : null,
+            lon: typeof locData.lon === "number" ? locData.lon : null,
+            radius: typeof locData.radius === "number" ? locData.radius : 80,
+            hallName: locData.name || null,
+            durationSeconds: 300,
+            locationMode: locationMode,
+            qrMode: locData.qrMode === true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Could not start the session.");
+        }
+        return data;
       },
-      body: JSON.stringify({
-        courseId: activeCourse.id,
-        managerMatric,
-        lat: typeof locData.lat === "number" ? locData.lat : null,
-        lon: typeof locData.lon === "number" ? locData.lon : null,
-        radius: typeof locData.radius === "number" ? locData.radius : 80,
-        hallName: locData.name || null,
-        durationSeconds: 300,
-        locationMode: locationMode,
-        qrMode: locData.qrMode === true,
-      }),
-    });
-    started = await res.json();
-    if (!res.ok) {
-      throw new Error(started.error || "Could not start the session.");
-    }
+    );
   } catch (error) {
     console.error("Failed to start session:", error);
     toast.error(error.message, "Session Not Started");
@@ -7373,38 +7626,49 @@ function startSessionTimer() {
       // serverTimestamp(), neither of which the client can influence. The
       // response hands back the resolved epoch ms — the client never has to
       // touch the Timestamp sentinel itself.
-      try {
-        const idToken = await auth.currentUser.getIdToken();
-        const res = await fetch("/api/session?action=rotatePin", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ courseId: activeCourse.id }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Rotation failed");
-
-        const oldPin = session.pin;
-        session.previousPin = data.previousPin || oldPin;
-        session.pin = data.pin;
-        // A number, already resolved server-side.
-        session.pinRotationTime = data.pinRotationTime || Date.now();
-        // Re-sync against the server clock rather than this device's, so a
-        // rep whose phone clock is wrong still rotates on time.
-        if (typeof data.serverNow === "number") {
-          session.clockOffsetMs = data.serverNow - Date.now();
-        }
-        console.log("PIN rotated (server):", oldPin, "→", data.pin);
-        renderPortalState();
-      } catch (error) {
-        // The PIN is unchanged on the server, so keep showing the current one
-        // rather than desyncing the screen from what students must type.
-        console.error("Failed to rotate PIN on server:", error);
-        // Back off so a failing endpoint is not hammered every second; the
-        // next tick will retry.
+      // Skip rather than queue: a rotation that arrives while the last one is
+      // still open is already stale. The next tick will rotate anyway.
+      if (pinRotateInFlight) {
         session.pinRotationTime = Date.now();
+      } else {
+        pinRotateInFlight = true;
+        try {
+          const idToken = await auth.currentUser.getIdToken();
+          const res = await fetch("/api/session?action=rotatePin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ courseId: activeCourse.id }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Rotation failed");
+
+          const oldPin = session.pin;
+          session.previousPin = data.previousPin || oldPin;
+          session.pin = data.pin;
+          // A number, already resolved server-side.
+          session.pinRotationTime = data.pinRotationTime || Date.now();
+          // Re-sync against the server clock rather than this device's, so a
+          // rep whose phone clock is wrong still rotates on time.
+          if (typeof data.serverNow === "number") {
+            session.clockOffsetMs = data.serverNow - Date.now();
+          }
+          console.log("PIN rotated (server):", oldPin, "→", data.pin);
+          renderPortalState();
+        } catch (error) {
+          // The PIN is unchanged on the server, so keep showing the current one
+          // rather than desyncing the screen from what students must type.
+          console.error("Failed to rotate PIN on server:", error);
+          // Back off so a failing endpoint is not hammered every second; the
+          // next tick will retry.
+          session.pinRotationTime = Date.now();
+        } finally {
+          // Cleared in a finally, like every other guard here: a thrown
+          // response parse must not wedge rotation off for the whole class.
+          pinRotateInFlight = false;
+        }
       }
     } else {
       // Update rotation countdown display
@@ -7490,41 +7754,47 @@ if (checkInForm) {
     if (isNoGps) {
       toast.info("Submitting attendance...", "Checking In");
       try {
-        const idToken = await auth.currentUser.getIdToken();
-        const response = await fetch("/api/attendance?action=submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            courseId: activeCourse.id,
-            pin: enteredPin,
-            deviceId: deviceId,
-          }),
-        });
+        // 🔒 withBusyOnce, not withBusy: a second check-in for the same
+        // course is not a redundant request, it is a duplicate attendance
+        // row. The lock key is shared with the GPS path below, so the two
+        // routes can never both be in flight.
+        await withBusyOnce("Checking you in…", "checkin", async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/attendance?action=submit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              courseId: activeCourse.id,
+              pin: enteredPin,
+              deviceId: deviceId,
+            }),
+          });
 
-        const result = await response.json();
-        if (!response.ok) {
-          explainCheckInError(result, response.status);
-          // Only count a strike for a genuine wrong PIN. A rate-limit or
-          // geofence rejection is the server's verdict, not a student typo,
-          // and double-counting it would escalate a legitimate retry.
-          if (
-            !result.rateLimited &&
-            !result.outOfRange &&
-            !result.needsLocation
-          ) {
-            recordCheckInFailure(activeCourse.id);
+          const result = await response.json();
+          if (!response.ok) {
+            explainCheckInError(result, response.status);
+            // Only count a strike for a genuine wrong PIN. A rate-limit or
+            // geofence rejection is the server's verdict, not a student typo,
+            // and double-counting it would escalate a legitimate retry.
+            if (
+              !result.rateLimited &&
+              !result.outOfRange &&
+              !result.needsLocation
+            ) {
+              recordCheckInFailure(activeCourse.id);
+            }
+            return;
           }
-          return;
-        }
 
-        // Success instantly clears the hidden strike counter.
-        resetCheckInFailures(activeCourse.id);
-        showCheckInSuccess();
-        toast.success("Your attendance has been recorded!", "Checked In! 🎉");
-        checkInForm.reset();
+          // Success instantly clears the hidden strike counter.
+          resetCheckInFailures(activeCourse.id);
+          showCheckInSuccess();
+          toast.success("Your attendance has been recorded!", "Checked In! 🎉");
+          checkInForm.reset();
+        });
       } catch (error) {
         toast.error(error.message);
         console.error(error);
@@ -7555,43 +7825,50 @@ if (checkInForm) {
       }
 
       try {
-        const idToken = await auth.currentUser.getIdToken();
-        const response = await fetch("/api/attendance?action=submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({
-            courseId: activeCourse.id,
-            pin: enteredPin,
-            lat: studentLat,
-            lon: studentLon,
-            accuracy: accuracy,
-            deviceId: deviceId,
-          }),
-        });
+        // Same "checkin" lock as the no-GPS path above, and deliberately
+        // scoped to the SUBMIT only: the GPS lock itself can take up to
+        // 12s and already reports progress via its own toast, so holding
+        // the full-screen blocker across it would be a 12s blank wait for
+        // something the user is already watching.
+        await withBusyOnce("Checking you in…", "checkin", async () => {
+          const idToken = await auth.currentUser.getIdToken();
+          const response = await fetch("/api/attendance?action=submit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              courseId: activeCourse.id,
+              pin: enteredPin,
+              lat: studentLat,
+              lon: studentLon,
+              accuracy: accuracy,
+              deviceId: deviceId,
+            }),
+          });
 
-        const result = await response.json();
-        if (!response.ok) {
-          explainCheckInError(result, response.status);
-          // See the no-GPS path: a server verdict (rate limit, geofence) is
-          // not a student typo, so it must not also burn a local strike.
-          if (
-            !result.rateLimited &&
-            !result.outOfRange &&
-            !result.needsLocation
-          ) {
-            recordCheckInFailure(activeCourse.id);
+          const result = await response.json();
+          if (!response.ok) {
+            explainCheckInError(result, response.status);
+            // See the no-GPS path: a server verdict (rate limit, geofence) is
+            // not a student typo, so it must not also burn a local strike.
+            if (
+              !result.rateLimited &&
+              !result.outOfRange &&
+              !result.needsLocation
+            ) {
+              recordCheckInFailure(activeCourse.id);
+            }
+            return;
           }
-          return;
-        }
 
-        // Success instantly clears the hidden strike counter.
-        resetCheckInFailures(activeCourse.id);
-        showCheckInSuccess();
-        toast.success("Your attendance has been recorded!", "Checked In! 🎉");
-        checkInForm.reset();
+          // Success instantly clears the hidden strike counter.
+          resetCheckInFailures(activeCourse.id);
+          showCheckInSuccess();
+          toast.success("Your attendance has been recorded!", "Checked In! 🎉");
+          checkInForm.reset();
+        });
       } catch (error) {
         toast.error(error.message);
         console.error(error);
@@ -7730,25 +8007,29 @@ window.flagStudentAbsent = async function (matric) {
   });
   if (!ok) return;
   try {
-    const idToken = await auth.currentUser.getIdToken();
-    const response = await fetch("/api/attendance?action=flagAbsent", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        courseId: activeCourse.id,
-        targetUid: member.uid,
-      }),
+    // 🔒 "Flagging" is a final, permanently-logged decision, so a double
+    // execution would fire two emergency alerts at the same student.
+    await withBusyOnce("Flagging absent…", "flagAbsent", async () => {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch("/api/attendance?action=flagAbsent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          courseId: activeCourse.id,
+          targetUid: member.uid,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Unable to flag student.");
+      toast.success(
+        result.message || "Student flagged — emergency alert sent.",
+        "Flagged 🚩",
+      );
     });
-    const result = await response.json();
-    if (!response.ok)
-      throw new Error(result.error || "Unable to flag student.");
-    toast.success(
-      result.message || "Student flagged — emergency alert sent.",
-      "Flagged 🚩",
-    );
   } catch (error) {
     console.error("Flag absent error:", error);
     toast.error(error.message);
@@ -7757,22 +8038,27 @@ window.flagStudentAbsent = async function (matric) {
 
 async function closeSessionRequest(courseId, physicalHeadcount = null) {
   if (!auth.currentUser) throw new Error("Not signed in.");
-  const idToken = await auth.currentUser.getIdToken();
-  const response = await fetch("/api/session?action=close", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({ courseId, physicalHeadcount }),
+  // 🔒 Closing archives the attendance record. Two concurrent closes would
+  // archive the same session twice and the second would find nothing to
+  // write. Locked by course so closing one class never blocks another.
+  return withBusyOnce("Closing the class…", "closeSession:" + courseId, async () => {
+    const idToken = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/session?action=close", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ courseId, physicalHeadcount }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(result.error || "Unable to close the session.");
+      error.code = result.code;
+      throw error;
+    }
+    return result;
   });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(result.error || "Unable to close the session.");
-    error.code = result.code;
-    throw error;
-  }
-  return result;
 }
 
 const closeClassBtn = document.getElementById("closeClassBtn");
@@ -7838,27 +8124,34 @@ if (endSemesterBtn) {
       })
     ) {
       try {
-        const idToken = await auth.currentUser.getIdToken();
-        const response = await fetch("/api/semester?action=endSemester", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
+        // 🔒 Destroys a semester's attendance. Locked per course.
+        await withBusyOnce(
+          "Ending the semester…",
+          "endSemester:" + activeCourse.id,
+          async () => {
+            const idToken = await auth.currentUser.getIdToken();
+            const response = await fetch("/api/semester?action=endSemester", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${idToken}`,
+              },
+              body: JSON.stringify({ courseId: activeCourse.id }),
+            });
+            const result = await response.json();
+            if (!response.ok)
+              throw new Error(result.error || "Unable to end semester.");
+
+            activeCourse.attendanceHistory = [];
+            activeCourse.activeSession = null;
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            renderPortalState();
+            toast.success(
+              "All records have been cleared. New semester ready.",
+              "Semester Ended 🎓",
+            );
           },
-          body: JSON.stringify({ courseId: activeCourse.id }),
-        });
-        const result = await response.json();
-        if (!response.ok)
-          throw new Error(result.error || "Unable to end semester.");
-
-        activeCourse.attendanceHistory = [];
-        activeCourse.activeSession = null;
-        if (countdownInterval) clearInterval(countdownInterval);
-
-        renderPortalState();
-        toast.success(
-          "All records have been cleared. New semester ready.",
-          "Semester Ended 🎓",
         );
       } catch (error) {
         console.error("End semester error:", error);
@@ -8750,31 +9043,53 @@ function adviserClearMessage() {
   }
 }
 
+// 🛡️ Every roster write goes through here, so the guard lives HERE rather than
+// being repeated at six call sites — and `adviserApi` previously had NO guard
+// at all, which is how a double-tap on "Name this rep" could write two rep
+// changes into the history trail.
+const ADVISER_BUSY = {
+  importRoster: "Importing the roster…",
+  chooseRep: "Saving the rep…",
+  endAcademicSession: "Closing the session…",
+};
+
 async function adviserApi(action, body) {
   if (!auth.currentUser) throw new Error("Not signed in.");
-  const idToken = await auth.currentUser.getIdToken();
-  const res = await fetch(`/api/roster?action=${encodeURIComponent(action)}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(body || {}),
-  });
-  let data = {};
-  try {
-    data = await res.json();
-  } catch (_) {
-    data = {};
-  }
-  if (!res.ok) {
-    const err = new Error(data.error || "Something went wrong.");
-    err.code = data.code;
-    err.status = res.status;
-    err.payload = data;
-    throw err;
-  }
-  return data;
+  // `getRoster` is a READ that runs on every dashboard paint. Blockering it
+  // would dim the screen on a background refresh the user never asked for, so
+  // only genuine writes are gated.
+  const run = async () => {
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch(`/api/roster?action=${encodeURIComponent(action)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(body || {}),
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) {
+      data = {};
+    }
+    if (!res.ok) {
+      const err = new Error(data.error || "Something went wrong.");
+      err.code = data.code;
+      err.status = res.status;
+      err.payload = data;
+      throw err;
+    }
+    return data;
+  };
+
+  const label = ADVISER_BUSY[action];
+  if (!label) return run();
+  // Locked per action: naming a rep must not block a roster import, but a
+  // second "Name this rep" while the first is saving must be refused, because
+  // both would append to the rep-change history.
+  return withBusyOnce(label, "adviser:" + action, run);
 }
 
 function renderAdviserLog(changes) {

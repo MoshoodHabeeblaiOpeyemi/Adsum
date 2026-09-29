@@ -1201,6 +1201,124 @@ input:focus::placeholder {
   background: linear-gradient(135deg, var(--violet), var(--teal));
 }
 
+/* ============================================================
+   GLOBAL BUSY OVERLAY
+   ------------------------------------------------------------
+   WHY A SCRIM AND NOT A BLUR
+   `backdrop-filter: blur()` over a whole phone viewport is one of
+   the most expensive things a browser can be asked to do, and this
+   app runs on the low-end Android hardware its users actually own.
+   A full-screen blur on EVERY action risks dropped frames and a
+   drained battery mid-lecture, so the scrim is deliberately opaque
+   with NO backdrop-filter: visually almost identical against the
+   dark glass design, and effectively free.
+   ============================================================ */
+#busyOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9750;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(5, 6, 15, 0.82);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s;
+}
+
+#busyOverlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+#busyOverlay.hidden {
+  display: none;
+}
+
+.busy-card {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 28px 24px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  transform: scale(0.95);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#busyOverlay.show .busy-card {
+  transform: scale(1);
+}
+
+/* A CSS spinner, not a Lucide icon: it animates without JS, cannot
+   fail to render because an icon set has not loaded yet, and keeps
+   animating even if the main thread is briefly busy. */
+.busy-spinner {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 16px;
+  border: 3px solid var(--border);
+  border-top-color: var(--violet);
+  border-radius: 50%;
+  animation: busySpin 0.8s linear infinite;
+}
+
+@keyframes busySpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.busy-label {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.busy-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.busy-hint.hidden,
+.busy-cancel.hidden {
+  display: none;
+}
+
+.busy-cancel {
+  margin-top: 16px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.busy-cancel:hover {
+  color: var(--text-primary);
+  border-color: var(--violet);
+}
+
+/* Respect the OS setting. The spinner is the only thing conveying
+   "still working", so it keeps its rotation — only the decorative
+   card transition is dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .busy-card {
+    transition: none;
+  }
+}
+
 /* --- SECURITY OVERLAY STYLING --- */
 #securityOverlay {
   backdrop-filter: blur(10px);

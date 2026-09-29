@@ -433,6 +433,28 @@ async function handleChooseRep(req, res, decoded) {
           ) || null;
         const accountUid = accountDoc ? accountDoc.id : null;
 
+        // 🔒 IDEMPOTENT NO-OP. Re-choosing the student who is ALREADY the rep,
+        // with the same linked account, is not a change and must not be
+        // recorded as one.
+        //
+        // Without this, a double-tapped "Name this rep" appended a second
+        // "unchanged" row to `repChanges` — so the adviser's history showed a
+        // phantom decision that never happened, and the audit trail (the very
+        // thing this collection exists for) could no longer be trusted to say
+        // how many times a rep was actually named. The client-side lock makes
+        // the repeat unlikely; this makes it impossible, including from a
+        // second tab or a direct call.
+        //
+        // Placed HERE, after `accountUid` is resolved, because the comparison
+        // needs it — a real account that has since signed up would otherwise
+        // look like a change and be logged as one.
+        if (
+          roster.chosenRepMatric === wanted &&
+          (roster.chosenRepUid || null) === accountUid
+        ) {
+          throw new Error("REP_UNCHANGED");
+        }
+
         // 🔒 The outgoing rep may already have an account. "Old rep becomes a
         // regular student" is only true if their profile actually says so, so
         // the demotion happens here rather than being assumed. A null
@@ -512,6 +534,23 @@ async function handleChooseRep(req, res, decoded) {
           error:
             "That matric is not on this level's roster. Import the roster first, or pick a student from the list.",
           code: "NOT_ON_ROSTER",
+        });
+      }
+      // A repeat of the decision already stored is a SUCCESS, not a failure:
+      // the rep the adviser wanted IS the rep on the roster. Answering 409 or
+      // 500 here would make a correct double-tap look like a broken app, and
+      // the whole point of the check is that the second tap changes nothing.
+      if (txErr.message === "REP_UNCHANGED") {
+        const current = (await rosterRef.get()).data() || {};
+        return res.status(200).json({
+          success: true,
+          alreadyChosen: true,
+          chosenRepMatric: current.chosenRepMatric || null,
+          chosenRepName: current.chosenRepName || null,
+          chosenRepUid: current.chosenRepUid || null,
+          repChanges: Array.isArray(current.repChanges)
+            ? current.repChanges
+            : [],
         });
       }
       throw txErr;

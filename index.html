@@ -1544,6 +1544,28 @@
   <!-- TOAST CONTAINER -->
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
+  <!-- ============================================================
+       GLOBAL BUSY OVERLAY — one element for every server action.
+       z-index is deliberately 9750: ABOVE the app, the drawer (9500)
+       and the scanner (9700), but BELOW toasts (9999), the confirm
+       dialog (10000) and the security overlay (99999), so a failure
+       message and a "did you mean...?" prompt are never hidden by
+       the thing that reported them.
+       ============================================================ -->
+  <div id="busyOverlay" class="hidden" role="status" aria-live="assertive"
+    aria-busy="true" aria-labelledby="busyLabel">
+    <div class="busy-card">
+      <div class="busy-spinner" aria-hidden="true"></div>
+      <p id="busyLabel" class="busy-label">Working…</p>
+      <!-- Shown only after SLOW_AFTER_MS; explains WHY it is taking so
+           long and what the user can do about it. -->
+      <p id="busyHint" class="busy-hint hidden">This is taking longer than usual. Check your connection — you have not lost anything.</p>
+      <!-- Escape hatch. A blocker you cannot leave is a worse bug than
+           the double-tap we are preventing. -->
+      <button type="button" id="busyCancel" class="busy-cancel hidden">Stop waiting</button>
+    </div>
+  </div>
+
   <!-- SECURITY OVERLAY (Screenshot/Recording Prevention) -->
   <div id="securityOverlay" class="hidden"
     style="position: fixed; inset: 0; z-index: 99999; background: rgba(5, 6, 15, 0.95); display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px;">
