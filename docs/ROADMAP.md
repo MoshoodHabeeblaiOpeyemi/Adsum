@@ -211,6 +211,12 @@ mystery.
   The lookup is a one-field `matric` equality, which uses the automatic
   single-field index; a multi-field query would have needed an index to finish
   building first, which is the wrong moment to be fragile.
+- **Removing a rep revokes for real too.** `clear` nulled the roster fields but
+  left the account holding `role: "rep"` + `repGrantedByAdviser: true` — and
+  `firestore.rules` reads `isAdviserGrantedRep()` off the **profile**, not the
+  roster. So "Remove rep" removed the name and nothing else, and the removed rep
+  could still create a course. It now demotes in the same transaction, from the
+  uid already in hand.
 - `utils/rosters.js` owns the roster id so the writer and the reader cannot
   derive different documents. Its `normSegment()` collapses `"200L"`, `"200 L"`
   and `"200-L"` to one level — without it, an adviser who typed `200 L` and a

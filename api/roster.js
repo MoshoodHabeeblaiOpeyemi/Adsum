@@ -352,6 +352,25 @@ async function handleChooseRep(req, res, decoded) {
               by: decoded.uid,
             }),
           });
+          // 🔒 AND THE ACCOUNT LOSES THE ROLE TOO.
+          //
+          // Nulling the roster fields alone left the stood-down rep holding
+          // `role: "rep"` + `repGrantedByAdviser: true`. firestore.rules reads
+          // isAdviserGrantedRep() off the PROFILE, not the roster, so "Remove
+          // rep" removed the name and nothing else — the removed rep could
+          // still create a course, and the dashboard would show "Not chosen"
+          // while their account still held the powers. A revoke that does not
+          // revoke is worse than no revoke, because it reads as done.
+          //
+          // The uid is already in hand from the roster read above, so this
+          // costs no extra read and cannot fail on a missing account.
+          if (roster.chosenRepUid) {
+            tx.update(db.collection("users").doc(roster.chosenRepUid), {
+              role: ROLE.STUDENT,
+              isRep: false,
+              repGrantedByAdviser: false,
+            });
+          }
           return;
         }
 
