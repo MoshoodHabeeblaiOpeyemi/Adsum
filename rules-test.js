@@ -1,4 +1,4 @@
-// VeriPresenX — Firestore rules smoke test
+// Adsum — Firestore rules smoke test
 //
 // WHY THIS EXISTS
 // ---------------

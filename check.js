@@ -1,4 +1,4 @@
-// VeriPresenX — syntax validator
+// Adsum — syntax validator
 //
 // WHY THIS EXISTS
 // ---------------

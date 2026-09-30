@@ -1,19 +1,23 @@
-# VeriPresenX
+# Adsum
 
-**Verified Presence.** A browser-based, server-authoritative attendance system for
+**I am present.** A browser-based, server-authoritative attendance system for
 Nigerian universities. Students check in against a rotating code that is only legible
 from inside the hall, and every check-in is an atomic server-side transaction.
 
-> Formerly **Attendify**. The app was renamed for trademark safety — several unrelated
-> products already use that name. The Firebase project ID remains `attendify-4c93d`;
-> see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+> *Adsum* is Latin for "I am present" — the answer a Roman student gave when called
+> during roll call.
+>
+> Formerly **VeriPresenX**, and before that **Attendify** — both renamed for
+> trademark safety, since unrelated products already used those names. The Firebase
+> project ID remains `attendify-4c93d`; see
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
 ## The problem it actually solves
 
 Proxy attendance — "I signed for you" — is the core failure of paper and QR systems.
-VeriPresenX attacks it at four independent points, so defeating one is not enough:
+Adsum attacks it at four independent points, so defeating one is not enough:
 
 | Control | What it stops |
 | --- | --- |

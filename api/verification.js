@@ -68,9 +68,9 @@ async function deliverCode({ to, code, institutionId }) {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: "Your VeriPresenX verification code",
+      subject: "Your Adsum verification code",
       text:
-        `Your VeriPresenX verification code is ${code}.\n\n` +
+        `Your Adsum verification code is ${code}.\n\n` +
         `It expires in 10 minutes. Institution: ${institutionId}\n` +
         `If you did not request this, ignore this email.`,
     }),

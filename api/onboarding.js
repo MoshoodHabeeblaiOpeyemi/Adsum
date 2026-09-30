@@ -1,4 +1,4 @@
-// VeriPresenX — server-side onboarding (Phase 3).
+// Adsum — server-side onboarding (Phase 3).
 //
 // WHY THIS FILE EXISTS
 // --------------------

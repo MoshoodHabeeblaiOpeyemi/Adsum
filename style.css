@@ -240,16 +240,14 @@ html { color-scheme: light; }
 }
 
 .brand-wordmark {
-  height: 26px;
+  height: 30px;
   width: auto;
   display: block;
-  /* Tames any lingering 1px light fringe from the keyed PNG:
-     blend the bitmap edges into the page instead of showing a halo. */
-  mix-blend-mode: screen;
-}
-
-[data-theme="light"] .brand-wordmark {
-  mix-blend-mode: multiply;
+  /* No mix-blend-mode here any more. screen/multiply existed because the old
+     wordmark was a PNG keyed from BLACK, so the black had to be blended away
+     to hide a 1px fringe. The Adsum assets are true alpha with a bright
+     cyan-to-violet gradient, and screening that against a dark navbar blows the
+     gradient out to white. Normal alpha compositing is correct for them. */
 }
 
 .brand-text {
@@ -313,13 +311,11 @@ html { color-scheme: light; }
 }
 
 .splash-wordmark {
-  height: 44px;
+  height: 84px;
   width: auto;
-  mix-blend-mode: screen;
-}
-
-[data-theme="light"] .splash-wordmark {
-  mix-blend-mode: multiply;
+  max-width: 78vw;
+  /* True-alpha asset, so normal compositing -- see .brand-wordmark for why
+     the old screen/multiply pairing had to go. */
 }
 
 /* Thin premium divider that draws itself under the wordmark. */
@@ -1498,7 +1494,7 @@ input:focus::placeholder {
   }
 
   .brand-wordmark {
-    height: 22px;
+    height: 24px;
   }
 
   .splash-logo {
@@ -1506,7 +1502,7 @@ input:focus::placeholder {
   }
 
   .splash-wordmark {
-    height: 34px;
+    height: 66px;
     max-width: 78vw;
   }
 

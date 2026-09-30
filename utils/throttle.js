@@ -1,4 +1,4 @@
-// VeriPresenX — server-side throttling for PIN submission.
+// Adsum — server-side throttling for PIN submission.
 //
 // WHY A TRANSACTION
 // -----------------

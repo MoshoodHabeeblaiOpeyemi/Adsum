@@ -1,6 +1,6 @@
 {
-  "name": "VeriPresenX — Verified Attendance",
-  "short_name": "VeriPresenX",
+  "name": "Adsum — Verified Attendance",
+  "short_name": "Adsum",
   "description": "Server-authoritative, anti-proxy attendance for Nigerian universities.",
   "start_url": "/",
   "display": "standalone",

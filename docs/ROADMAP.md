@@ -89,7 +89,7 @@ Retires every gap in [SECURITY_MODEL.md](SECURITY_MODEL.md#known-gaps) that the 
 
 ## Phase 6 — Level Anchor + composite verification · 3–5 days
 
-The feature that makes an institution trust VeriPresenX.
+The feature that makes an institution trust Adsum.
 
 **An anchor is tied to a LEVEL, not a whole department.** Geology has 100L, 200L, 300L,
 400L, 500L; each level has its own anchor, because that is how Nigerian universities
@@ -344,7 +344,7 @@ freshness, same device lock, same atomic transaction. Different input source onl
 These are the no-hardware alternatives, and for most institutions they are simply better:
 nothing to buy, install, maintain or replace.
 
-| What hardware schools have | VeriPresenX's alternative |
+| What hardware schools have | Adsum's alternative |
 | --- | --- |
 | Fingerprint scanner | WebAuthn — the student's own phone biometric |
 | RFID card tap | Web NFC — phone taps a tag at the door |

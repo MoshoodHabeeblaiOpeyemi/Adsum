@@ -1,5 +1,7 @@
-// Bump this version string on EVERY deploy so the SW refreshes automatically
-const CACHE_NAME = "veripresenx-static-v49";
+// Bump this version string on EVERY deploy so the SW refreshes automatically.
+// It doubles as the brand: the cache key is the first thing to change on a
+// rebrand, because a stale cache would keep serving the previous logo.
+const CACHE_NAME = "adsum-static-v50";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -10,7 +12,9 @@ const STATIC_ASSETS = [
   "/manifest.json",
   "/brand/mark-64-cutout.png",
   "/brand/mark-256-cutout.png",
-  "/brand/veripresenx-wordmark.png",
+  "/brand/adsum-wordmark.png",
+  "/brand/adsum-monogram.png",
+  "/brand/adsum-text.png",
   "/brand/favicon-32.png",
   "/brand/apple-touch-icon-180.png",
 ];

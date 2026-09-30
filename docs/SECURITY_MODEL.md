@@ -2,7 +2,7 @@
 
 **Read this before changing anything in `api/` or `firestore.rules`.**
 
-VeriPresenX has been through four internal audit rounds. The rules below are not
+Adsum has been through four internal audit rounds. The rules below are not
 suggestions; each one closes a specific attack that was found and fixed. Reverting one
 reopens a hole that is invisible in normal use — the app will keep working perfectly
 while the anti-cheat property it depended on quietly disappears.
@@ -146,11 +146,17 @@ and `devices/{u_uid}` maps one physical device to one identity. `deviceFlags` th
 (`app.js:7255`) rather than by student — a phone shared by six accounts is one finding,
 not six.
 
-**⚠️ The localStorage keys are deliberately still `attendify_*` in two places.**
-`app.js` reads the new key, falls back to the old one, and rewrites it
-(`readLocalWithMigration`). `attendify_device_uuid` feeds this device lock — renaming it
-without the migration would make every existing user look like a brand-new device, which
-is indistinguishable from the fraud this feature exists to detect. Keep the migration.
+**⚠️ The localStorage keys carry a rename chain, and it must not be shortened.**
+The app has been renamed twice, so `readLocalWithMigration(newKey, legacyKey, olderLegacyKey)`
+walks three generations: `adsum_*` → `veripresenx_*` → `attendify_*`. `adsum_device_uuid`
+feeds this device lock — dropping a generation would make every existing user look like a
+brand-new device, which is indistinguishable from the fraud this feature exists to detect.
+
+The same chain now protects `adsum_account_created`, the device-tracked "has this device
+ever signed up" flag. That one is a convenience regression rather than a security hole, but
+it is the same bug shape: a returning user silently lands on the role picker instead of Sign
+in. When a fourth rename happens, add its key as the new `legacyKey` and push the current
+one down — do not replace the legacy argument.
 
 ---
 

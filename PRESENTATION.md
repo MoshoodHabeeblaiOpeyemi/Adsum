@@ -6,7 +6,8 @@
 > student signs for a friend. A screenshot of a QR code circulates in a group chat. The
 > lecturer has no way to tell.
 >
-> VeriPresenX verifies **presence**, not attendance. The code rotates every ten seconds
+> Adsum verifies **presence**, not attendance. *Adsum* is Latin for "I am present" — what a
+> Roman student said when called during roll call. The code rotates every ten seconds
 > and only exists on the rep's screen inside the hall. Every check-in is an atomic
 > server-side transaction, and one phone cannot sign in a group of friends.
 >
@@ -31,8 +32,9 @@
 
 ### 1. The splash (15 s)
 
-Open the deployed URL. The splash shows the VeriPresenX mark and "Click anywhere to
-continue". Note the install prompt — it is a PWA, so it installs from the browser.
+Open the deployed URL. The splash shows the Adsum "A" monogram and the tagline "I am
+present", then "Click anywhere to continue". Note the install prompt — it is a PWA, so it
+installs from the browser.
 
 **Say:** "No app store, no install friction. It is a website that behaves like an app."
 
@@ -106,17 +108,18 @@ physical headcount on close, which is why it exists."
 ## LinkedIn post
 
 > I have been building an anti-proxy attendance system for months. It has been called
-> Attendify. But I recently discovered that name is used by several other products, so I
-> am rebranding.
+> Attendify, and then VeriPresenX. Both names turned out to belong to other products, so I
+> am renaming it again.
 >
-> New name: **VeriPresenX** — because that is what it does. Verifies presence. Not just a
-> login. Not just a code. Actual, physical, verified presence.
+> New name: **Adsum** — Latin for "I am present". What a Roman student said when the roll
+> was called. Because that is what it does: it verifies presence. Not just a login. Not
+> just a code. Actual, physical, verified presence.
 >
 > The problem is old and embarrassing. A student signs for a friend. A QR code screenshot
 > travels through a group chat. Every lecturer in Nigeria knows it happens and has no way
 > to prove it.
 >
-> What VeriPresenX does differently:
+> What Adsum does differently:
 >
 > - The check-in code rotates every 10 seconds, and only exists on the rep's screen inside
 >   the hall. A forwarded code is dead on arrival.
@@ -133,7 +136,7 @@ physical headcount on close, which is why it exists."
 
 ### Shorter variant
 
-> Rebranding: Attendify → **VeriPresenX**.
+> Rebranding again: Attendify → VeriPresenX → **Adsum**. *Adsum* is Latin for "I am present".
 >
 > Same mission — verifies physical presence, not logins. A rotating code that dies in 10
 > seconds, atomic server-side check-ins, and one device that cannot sign in a group.

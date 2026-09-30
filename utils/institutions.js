@@ -1,4 +1,4 @@
-// VeriPresenX — institution ↔ official email-domain registry.
+// Adsum — institution ↔ official email-domain registry.
 //
 // Shared by api/verification.js and api/onboarding.js so the two can never
 // disagree about which addresses count as "staff".

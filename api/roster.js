@@ -1,4 +1,4 @@
-// VeriPresenX — adviser roster management (Phase 4).
+// Adsum — adviser roster management (Phase 4).
 //
 // The trust chain, in three backend moves:
 //   1. adviser imports the level's master list        → this file, importLevelRoster

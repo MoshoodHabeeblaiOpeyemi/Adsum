@@ -1,7 +1,7 @@
 // 🔖 BUILD MARKER — proves which version of app.js the browser is running.
 // If your console does NOT print "build 256052f-drawer", the running JS is stale.
 console.log(
-  "%cVeriPresenX build: premium-design-system (palette refresh, button micro-interactions, success celebration, skeleton shimmer, toast slide-in)",
+  "%cAdsum build: premium-design-system (palette refresh, button micro-interactions, success celebration, skeleton shimmer, toast slide-in)",
   "color:#7C6CF0;font-weight:bold",
 );
 
@@ -149,7 +149,7 @@ let currentNavView = "auth";
 function replaceNavState(view) {
   currentNavView = view;
   try {
-    history.replaceState({ veripresenx: true, view }, "");
+    history.replaceState({ adsum: true, view }, "");
   } catch (e) {
     /* older browsers — ignore */
   }
@@ -158,7 +158,7 @@ function replaceNavState(view) {
 function pushNavTrap(view) {
   currentNavView = view;
   try {
-    history.pushState({ veripresenx: true, view }, "");
+    history.pushState({ adsum: true, view }, "");
   } catch (e) {
     /* ignore */
   }
@@ -175,9 +175,9 @@ window.addEventListener("popstate", (event) => {
   if (openModal) {
     if (
       openModal.id === "confirm-overlay" &&
-      window.__veripresenxCancelConfirm
+      window.__adsumCancelConfirm
     ) {
-      window.__veripresenxCancelConfirm();
+      window.__adsumCancelConfirm();
       pushNavTrap(currentNavView);
       return;
     }
@@ -187,7 +187,7 @@ window.addEventListener("popstate", (event) => {
   }
 
   // Mission-Control drawer open? Back closes the drawer first.
-  if (window.__veripresenxCloseDrawer && window.__veripresenxCloseDrawer()) {
+  if (window.__adsumCloseDrawer && window.__adsumCloseDrawer()) {
     pushNavTrap(currentNavView);
     return;
   }
@@ -197,16 +197,16 @@ window.addEventListener("popstate", (event) => {
     return;
   }
 
-  if (currentNavView === "portal" && window.__veripresenxReturnToDashboard) {
+  if (currentNavView === "portal" && window.__adsumReturnToDashboard) {
     // Back from a course portal → return to the dashboard.
-    window.__veripresenxReturnToDashboard();
+    window.__adsumReturnToDashboard();
     return;
   }
 
   if (currentNavView === "dashboard") {
     showConfirm({
       title: "Log out?",
-      message: "Do you want to log out of VeriPresenX?",
+      message: "Do you want to log out of Adsum?",
       okText: "Yes, Log out",
       cancelText: "Stay",
       icon: "log-out",
@@ -222,7 +222,7 @@ window.addEventListener("popstate", (event) => {
 
   // Auth screen — the user is about to leave the app entirely.
   showConfirm({
-    title: "Leave VeriPresenX?",
+    title: "Leave Adsum?",
     message: "You are about to exit the app. Are you sure?",
     okText: "Leave",
     cancelText: "Stay",
@@ -644,8 +644,8 @@ function showConfirmDialog({
       cancelBtn.removeEventListener("click", onCancel);
       overlay.removeEventListener("click", onOverlayClick);
       document.removeEventListener("keydown", onKeydown);
-      if (window.__veripresenxCancelConfirm === onCancel) {
-        window.__veripresenxCancelConfirm = null;
+      if (window.__adsumCancelConfirm === onCancel) {
+        window.__adsumCancelConfirm = null;
       }
       if (previousFocus && typeof previousFocus.focus === "function")
         previousFocus.focus();
@@ -675,7 +675,7 @@ function showConfirmDialog({
     cancelBtn.addEventListener("click", onCancel, { once: true });
     overlay.addEventListener("click", onOverlayClick);
     document.addEventListener("keydown", onKeydown);
-    window.__veripresenxCancelConfirm = onCancel;
+    window.__adsumCancelConfirm = onCancel;
     refreshIcons();
     okBtn.focus();
   });
@@ -1035,20 +1035,33 @@ function getBestGpsPosition(timeoutMs = 8000, onProgress = null) {
   });
 }
 
-// 🔁 BRAND MIGRATION — this app shipped as "Attendify" before the VeriPresenX
-// rebrand, so existing users still hold their device UUID and theme under the
-// old "attendify_*" keys. Read-through migration preserves that identity instead
-// of silently minting a fresh device UUID (which the server's device lock would
-// treat as a brand-new device) and resetting every user to the default theme.
-function readLocalWithMigration(newKey, legacyKey) {
+// 🔁 BRAND MIGRATION — this app has now been renamed TWICE, so the read-through
+// walks three generations of keys: "adsum_*", then "veripresenx_*", then
+// "attendify_*". Existing users still hold their device UUID and theme under the
+// older keys.
+//
+// This matters far more than it looks for the device UUID: minting a fresh one
+// would make the server's device lock treat every returning user as a
+// brand-new device, which is indistinguishable from the proxying this app
+// exists to detect. One rename lost would silently disable the device lock for
+// the entire existing userbase.
+function readLocalWithMigration(newKey, legacyKey, olderLegacyKey) {
   try {
     const current = localStorage.getItem(newKey);
     if (current !== null) return current;
-    const legacy = localStorage.getItem(legacyKey);
-    if (legacy === null) return null;
-    localStorage.setItem(newKey, legacy);
-    localStorage.removeItem(legacyKey);
-    return legacy;
+    // Oldest-first would be wrong: if a device somehow carries BOTH legacy
+    // keys, the more recent one is the truthful value, so the newest legacy
+    // key is adopted and only the ones older than it are cleared.
+    for (const key of [legacyKey, olderLegacyKey]) {
+      if (!key) continue;
+      const legacy = localStorage.getItem(key);
+      if (legacy !== null) {
+        localStorage.setItem(newKey, legacy);
+        localStorage.removeItem(key);
+        return legacy;
+      }
+    }
+    return null;
   } catch (_) {
     return null; // private mode / storage disabled → treat as "no stored value"
   }
@@ -1056,6 +1069,7 @@ function readLocalWithMigration(newKey, legacyKey) {
 
 function getOrCreateDeviceId() {
   let deviceId = readLocalWithMigration(
+    "adsum_device_uuid",
     "veripresenx_device_uuid",
     "attendify_device_uuid",
   );
@@ -1068,7 +1082,7 @@ function getOrCreateDeviceId() {
         Math.random().toString(36).substring(2, 12) +
         Date.now().toString(36);
     }
-    localStorage.setItem("veripresenx_device_uuid", deviceId);
+    localStorage.setItem("adsum_device_uuid", deviceId);
   }
   return deviceId;
 }
@@ -1085,7 +1099,7 @@ async function seedServerDevice() {
     });
     const result = await response.json();
     if (result && result.deviceId && typeof result.deviceId === "string") {
-      const key = "veripresenx_device_uuid";
+      const key = "adsum_device_uuid";
       if (!localStorage.getItem(key)) {
         localStorage.setItem(key, result.deviceId);
       }
@@ -1105,7 +1119,7 @@ const MANUAL_OVERRIDE_STRIKES_REQUIRED = 3;
 
 function getFailureState(courseId) {
   try {
-    const raw = localStorage.getItem(`veripresenx_failures_${courseId}`);
+    const raw = localStorage.getItem(`adsum_failures_${courseId}`);
     const parsed = raw ? JSON.parse(raw) : null;
     return parsed && typeof parsed.count === "number"
       ? parsed
@@ -1118,7 +1132,7 @@ function getFailureState(courseId) {
 function setFailureState(courseId, state) {
   try {
     localStorage.setItem(
-      `veripresenx_failures_${courseId}`,
+      `adsum_failures_${courseId}`,
       JSON.stringify(state),
     );
   } catch (e) {
@@ -1297,6 +1311,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Falls back to the HTML attribute default ("dark") if nothing is stored.
   // Uses the branded-key migration so a theme chosen pre-rebrand still applies.
   const savedTheme = readLocalWithMigration(
+    "adsum_theme",
     "veripresenx_theme",
     "attendify_theme",
   );
@@ -1521,7 +1536,7 @@ if (themeToggleBtn) {
     const currentTheme = htmlElement.getAttribute("data-theme");
     const newTheme = currentTheme === "light" ? "dark" : "light";
     htmlElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("veripresenx_theme", newTheme);
+    localStorage.setItem("adsum_theme", newTheme);
     themeToggleBtn.innerHTML =
       newTheme === "dark"
         ? '<i data-lucide="sun"></i>'
@@ -1811,10 +1826,19 @@ const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 // 🔒 This is a DISPLAY preference stored per device. It grants nothing: the
 // role actually stored on any account is decided server-side, so hiding the
 // picker cannot change anyone's privileges.
-const ACCOUNT_EXISTS_KEY = "veripresenx_account_created";
+const ACCOUNT_EXISTS_KEY = "adsum_account_created";
 const accountWasCreated = () => {
+  // Read through the rename chain: without this, every device that signed up
+  // under Attendify or Adsum would land back on the role picker instead of
+  // Sign in, because the flag it looks for no longer exists.
   try {
-    return localStorage.getItem(ACCOUNT_EXISTS_KEY) === "1";
+    return (
+      readLocalWithMigration(
+        ACCOUNT_EXISTS_KEY,
+        "veripresenx_account_created",
+        "attendify_account_created",
+      ) === "1"
+    );
   } catch (_) {
     return false;
   }
@@ -2580,7 +2604,7 @@ if (signupForm) {
         );
       } else {
         toast.success(
-          "Your account is ready. Welcome to VeriPresenX!",
+          "Your account is ready. Welcome to Adsum!",
           "Account Created 🎉",
         );
       }
@@ -2912,11 +2936,14 @@ document
             throw new Error(hint);
           }
 
+          localStorage.removeItem("adsum_device_uuid");
+          localStorage.removeItem("adsum_theme");
+          // Clear every pre-rebrand key too, in case this device never
+          // triggered a read-through migration before the account was
+          // deleted. Both older generations must go, or a leftover UUID would
+          // be re-adopted as if it were the live one.
           localStorage.removeItem("veripresenx_device_uuid");
           localStorage.removeItem("veripresenx_theme");
-          // Clear any pre-rebrand keys too, in case this device never
-          // triggered a read-through migration before the account was
-          // deleted.
           localStorage.removeItem("attendify_device_uuid");
           localStorage.removeItem("attendify_theme");
           // 🧭 Deleting the account untracks the device, so a genuinely new
@@ -4218,7 +4245,7 @@ function buildQrPayload(pin) {
   )}&qrpin=${encodeURIComponent(pin)}&t=${nonce}`;
 }
 
-// 🎨 Brand QR: stamp the VeriPresenX logo dead-center. Error-correction
+// 🎨 Brand QR: stamp the Adsum logo dead-center. Error-correction
 // level "H" tolerates ~30% occlusion, so a logo occupying ≤22% of the area
 // still scans reliably (same trick restaurant menu codes use).
 const QR_LOGO_SRC = "/brand/mark-256.png";
@@ -4726,7 +4753,7 @@ function tryHandlePendingQrScan() {
 
 // ============================================================
 // 📸 IN-APP QR SCANNER — students scan the class QR from their seat,
-// inside VeriPresenX (no third-party camera app). Uses the browser's
+// inside Adsum (no third-party camera app). Uses the browser's
 // native BarcodeDetector (supported by every Android Chrome — the
 // student population's reality). Unsupported/denied browsers get a
 // clear message and fall back to the camera-app deep-link flow.
@@ -4757,7 +4784,7 @@ function handleScannedQrText(text) {
     const pin = (url.searchParams.get("qrpin") || "").trim();
     if (!code || !/^\d{4}$/.test(pin)) {
       toast.warning(
-        "That QR isn't an VeriPresenX class code. Point at the QR shown by your Course Rep.",
+        "That QR isn't an Adsum class code. Point at the QR shown by your Course Rep.",
         "Wrong Code",
       );
       return false; // keep scanning
@@ -4802,7 +4829,7 @@ window.openQrScanner = async function () {
     console.error("QR scanner camera error:", err);
     stopQrScanner();
     toast.error(
-      "Camera access was blocked. Allow camera permission for VeriPresenX, or type the PIN below.",
+      "Camera access was blocked. Allow camera permission for Adsum, or type the PIN below.",
       "Camera Blocked",
     );
     return;
@@ -4811,7 +4838,7 @@ window.openQrScanner = async function () {
   // G4 📱 FULL SCANNER COVERAGE: Android Chrome uses the native
   // BarcodeDetector. Everywhere else (iOS Safari etc.) we lazily load the
   // tiny jsQR decoder from a CDN and decode canvas frames in-app — so no
-  // student is ever forced out of VeriPresenX to scan. If the CDN is
+  // student is ever forced out of Adsum to scan. If the CDN is
   // unreachable, the clear fallback message still appears.
   const useNative = "BarcodeDetector" in window;
   if (!useNative) {
@@ -4825,7 +4852,7 @@ window.openQrScanner = async function () {
     if (!window.__jsQR) {
       stopQrScanner();
       toast.info(
-        "This browser can't scan in-app right now (scanner engine unreachable). Use your camera app on the class QR — VeriPresenX opens and checks you in automatically — or type the PIN below.",
+        "This browser can't scan in-app right now (scanner engine unreachable). Use your camera app on the class QR — Adsum opens and checks you in automatically — or type the PIN below.",
         "Scanner Unavailable",
       );
       return;
@@ -4842,7 +4869,7 @@ window.openQrScanner = async function () {
     console.error("BarcodeDetector setup error:", err);
     stopQrScanner();
     toast.info(
-      "Scanning isn't supported here. Use your camera app on the class QR — VeriPresenX opens and checks you in automatically.",
+      "Scanning isn't supported here. Use your camera app on the class QR — Adsum opens and checks you in automatically.",
       "Scanner Unavailable",
     );
     return;
@@ -5019,7 +5046,7 @@ function returnToDashboard() {
   stopPortalListeners();
   replaceNavState("dashboard");
 }
-window.__veripresenxReturnToDashboard = returnToDashboard;
+window.__adsumReturnToDashboard = returnToDashboard;
 
 // --- CREATE COURSE FORM ---
 const createCourseForm = document.getElementById("createCourseForm");
@@ -5492,7 +5519,7 @@ function pinDrawerTab() {
 // One-time cleanup: a position stored by the draggable build can only ever
 // restore the tab to an edge and offset we no longer support, so the keys are
 // dropped rather than migrated.
-["veripresenx_drawer_tab_v5", "veripresenx_drawer_tab_v4"].forEach((key) => {
+["adsum_drawer_tab_v5", "adsum_drawer_tab_v4"].forEach((key) => {
   try {
     localStorage.removeItem(key);
   } catch (e) {
@@ -5518,7 +5545,7 @@ if (drawerTab && typeof MutationObserver === "function") {
 }
 
 // Expose for back-button: drawer open → close drawer (modal-like trap).
-window.__veripresenxCloseDrawer = () => {
+window.__adsumCloseDrawer = () => {
   if (isDrawerOpen) {
     closePortalDrawer();
     return true;
@@ -5528,8 +5555,8 @@ window.__veripresenxCloseDrawer = () => {
 
 // Whenever the portal is closed, reset to the default view and hide the tab.
 const _drwReturnToDashboard =
-  window.__veripresenxReturnToDashboard || function () {};
-window.__veripresenxReturnToDashboard = function () {
+  window.__adsumReturnToDashboard || function () {};
+window.__adsumReturnToDashboard = function () {
   closePortalDrawer();
   syncDrawerTabVisibility();
   _drwReturnToDashboard();
@@ -6888,7 +6915,7 @@ function renderLectureHallOptions() {
 
   const halls = activeCourse.savedHalls || [];
   const storedPreference = localStorage.getItem(
-    `veripresenx_last_hall_${activeCourse.id}`,
+    `adsum_last_hall_${activeCourse.id}`,
   );
   // Legacy values ("no_gps"/"live_gps") used to live in this dropdown —
   // they are attendance-mode choices now, so ignore them here.
@@ -6934,7 +6961,7 @@ function renderLectureHallOptions() {
       selectEl.value = val;
     }
     if (val.startsWith("hall_")) {
-      localStorage.setItem(`veripresenx_last_hall_${activeCourse.id}`, val);
+      localStorage.setItem(`adsum_last_hall_${activeCourse.id}`, val);
     }
     if (!badgeEl) return;
     const hId = String(val).replace("hall_", "");
@@ -7000,7 +7027,7 @@ const GPS_DISABLED_REASON =
 function getQrDisplayChoice() {
   if (!activeCourse) return "projector";
   return (
-    localStorage.getItem(`veripresenx_qrdisplay_${activeCourse.id}`) ||
+    localStorage.getItem(`adsum_qrdisplay_${activeCourse.id}`) ||
     "projector"
   );
 }
@@ -7031,7 +7058,7 @@ function initQrDisplayChoice() {
     const btn = e.target.closest("button[data-qr-display]");
     if (!btn || !activeCourse) return;
     localStorage.setItem(
-      `veripresenx_qrdisplay_${activeCourse.id}`,
+      `adsum_qrdisplay_${activeCourse.id}`,
       btn.dataset.qrDisplay,
     );
     syncQrDisplayChoiceUI();
@@ -7044,7 +7071,7 @@ function getSelectedAttendanceMode() {
   if (!activeCourse) return "pin_only";
   const halls = activeCourse.savedHalls || [];
   let mode =
-    localStorage.getItem(`veripresenx_mode_${activeCourse.id}`) ||
+    localStorage.getItem(`adsum_mode_${activeCourse.id}`) ||
     (halls.length > 0 ? "full_combo" : "pin_only");
   // Prototype gating: GPS modes are unavailable while the toggle is off —
   // silently fall back to the strongest non-GPS mode so a stale saved
@@ -7084,7 +7111,7 @@ function renderModeCards() {
         toast.info(GPS_DISABLED_REASON, "Not available on web");
         return;
       }
-      localStorage.setItem(`veripresenx_mode_${activeCourse.id}`, mode);
+      localStorage.setItem(`adsum_mode_${activeCourse.id}`, mode);
       renderModeCards();
       syncModeUI();
     });

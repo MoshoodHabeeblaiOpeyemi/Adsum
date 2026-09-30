@@ -1,4 +1,4 @@
-// VeriPresenX — prune adviser accounts that were never verified (Phase 5 UX).
+// Adsum — prune adviser accounts that were never verified (Phase 5 UX).
 //
 // WHY THIS EXISTS
 // ---------------

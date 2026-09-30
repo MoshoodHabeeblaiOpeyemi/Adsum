@@ -1,4 +1,4 @@
-// VeriPresenX — roster CSV parsing.
+// Adsum — roster CSV parsing.
 //
 // Split out from api/roster.js so it can be unit-tested without Firestore, and
 // so a malformed upload is reported as a DATA problem rather than a server

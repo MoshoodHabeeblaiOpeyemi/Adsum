@@ -209,8 +209,10 @@ would mean a new Firestore database, new Auth users and re-issued service-accoun
 a full data migration, in exchange for a string that no end user ever sees. The project's
 *display* name can be changed in the console if that matters.
 
-The rename was applied with a **case-sensitive** `Attendify` → `VeriPresenX` sweep, which
-is why the lowercase project ID survived by construction rather than by luck.
+Both renames were applied with a **case-sensitive** `Attendify` → `VeriPresenX` → `Adsum`
+sweep, which is why the lowercase project ID survived by construction rather than by luck.
+Case matters: `Attendify` (display name) and `attendify-4c93d` (project ID) differ only in
+the first letter, so an insensitive sweep would have rewritten the config and broken deploys.
 
 ---
 

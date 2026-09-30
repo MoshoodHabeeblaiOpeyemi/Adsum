@@ -1,4 +1,4 @@
-// VeriPresenX — adviser verification mail (Resend over plain HTTPS, no SDK).
+// Adsum — adviser verification mail (Resend over plain HTTPS, no SDK).
 //
 // Shared by api/verification.js (resend / retry a code) and api/onboarding.js
 // (send the very first code at signup). Keeping one implementation means the
@@ -30,9 +30,9 @@ async function sendVerificationCode({ to, code, institutionId, level, department
       body: JSON.stringify({
         from,
         to: [to],
-        subject: "Your VeriPresenX adviser verification code",
+        subject: "Your Adsum adviser verification code",
         text:
-          `Your VeriPresenX verification code is ${code}\n\n` +
+          `Your Adsum verification code is ${code}\n\n` +
           `Level: ${scope || "your department"}\n` +
           `It expires in 10 minutes. Enter it in the app to activate your\n` +
           `Level Adviser account.\n\n` +

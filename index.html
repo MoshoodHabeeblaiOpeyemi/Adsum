@@ -5,10 +5,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description"
-    content="VeriPresenX — verified, server-authoritative attendance for Nigerian universities. Anti-proxy check-in by live QR, PIN and GPS, with course reps and level advisers in one trust chain.">
+    content="Adsum — verified, server-authoritative attendance for Nigerian universities. Anti-proxy check-in by live QR, PIN and GPS, with course reps and level advisers in one trust chain.">
   <meta name="theme-color" content="#7C6CF0" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0A0B14" media="(prefers-color-scheme: dark)">
-  <title>VeriPresenX | Verified Attendance Platform</title>
+  <title>Adsum | Verified Attendance Platform</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
   <link rel="stylesheet" href="style.css">
@@ -20,11 +20,14 @@
 
 <body>
 
-  <!-- SPLASH SCREEN -->
+  <!-- SPLASH SCREEN
+       The A monogram carries the splash on its own, and the text block below
+       it is the brand WITHOUT the mark — using the full lockup here would
+       print the A twice, once as .splash-logo and again inside the wordmark. -->
   <div id="splashScreen">
     <div class="splash-brand">
-      <img src="/brand/mark-256-cutout.png" alt="VeriPresenX Logo" class="splash-logo" />
-      <img src="/brand/veripresenx-wordmark.png" alt="VeriPresenX" class="splash-wordmark" />
+      <img src="/brand/adsum-monogram.png" alt="Adsum" class="splash-logo" />
+      <img src="/brand/adsum-text.png" alt="Adsum — I am present" class="splash-wordmark" />
     </div>
     <div class="splash-rule" aria-hidden="true"><span></span></div>
     <span class="splash-hint">Click anywhere to continue...</span>
@@ -33,7 +36,7 @@
   <!-- NAVBAR -->
   <header class="navbar">
     <div class="brand">
-      <img src="/brand/veripresenx-wordmark.png" alt="VeriPresenX" class="brand-wordmark" />
+      <img src="/brand/adsum-wordmark.png" alt="Adsum — I am present" class="brand-wordmark" />
     </div>
 
     <div style="display: flex; align-items: center; gap: 10px;">
@@ -49,7 +52,7 @@
       <button id="openSettingsBtn" class="theme-btn hidden" title="Account Settings" style="padding: 8px 12px;">
         <i data-lucide="settings"></i>
       </button>
-      <button id="openGuideBtn" class="theme-btn" title="How VeriPresenX Works"
+      <button id="openGuideBtn" class="theme-btn" title="How Adsum Works"
         style="padding: 8px 12px; font-weight: 600;">
         <i data-lucide="book-open"></i> Guide
       </button>
@@ -71,7 +74,7 @@
       <!-- ROLE PICKER — browse freely, nothing locks until signup succeeds -->
       <section id="rolePicker" aria-label="Choose your role">
         <div class="role-hero">
-          <span class="role-eyebrow"><i data-lucide="sparkles"></i> Join VeriPresenX</span>
+          <span class="role-eyebrow"><i data-lucide="sparkles"></i> Join Adsum</span>
           <h2>Who are you joining as?</h2>
           <p class="role-sub">Swipe through the cards and explore. Nothing is locked until you create your account.</p>
         </div>
@@ -1022,7 +1025,7 @@
             Can't see it? Check your spam folder.
           </strong>
           <span style="font-size:0.79rem; color:var(--text-muted); line-height:1.55;">
-            VeriPresenX sends from a new email address, so the code often lands in
+            Adsum sends from a new email address, so the code often lands in
             <strong>Spam</strong> or <strong>Promotions</strong>. Open that folder,
             find the email from us, and mark it <strong>"Not Spam"</strong> —
             otherwise every future code goes there too.
@@ -1256,7 +1259,7 @@
 
       <h3 style="margin-bottom: 4px;"><i data-lucide="book-open"></i> Quick Guide</h3>
       <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 14px;">
-        How accounts, course reps, and attendance work in VeriPresenX.
+        How accounts, course reps, and attendance work in Adsum.
       </p>
 
       <div class="guide-section">
@@ -1490,7 +1493,7 @@
     <canvas id="qrCanvas" style="background: #ffffff; border-radius: 16px; padding: 18px;"></canvas>
     <div id="qrPinText" style="color: #ffffff; font-size: 1.4rem; letter-spacing: 8px; font-weight: bold;">----</div>
     <p style="color: rgba(255, 255, 255, 0.65); font-size: 0.85rem; margin: 0; max-width: 420px;">
-      Students: scan this with your camera app — it opens VeriPresenX and checks you in automatically.
+      Students: scan this with your camera app — it opens Adsum and checks you in automatically.
       The code refreshes on its own; screenshots expire with it.
     </p>
     <p id="qrRotationHint" style="color: #28a745; font-size: 0.8rem; margin: 0; font-weight: 600;">Next code in: --s</p>
@@ -1644,7 +1647,7 @@
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })
           .then((reg) => reg.update())
-          .then(() => console.log("VeriPresenX service worker updated"))
+          .then(() => console.log("Adsum service worker updated"))
           .catch((err) => console.log("Service Worker registration failed", err));
       });
     }

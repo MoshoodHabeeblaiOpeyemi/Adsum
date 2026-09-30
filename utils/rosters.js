@@ -1,4 +1,4 @@
-// VeriPresenX — the ONE definition of a level roster's identity.
+// Adsum — the ONE definition of a level roster's identity.
 //
 // A roster is addressed by (institution, department, level) — all free-text
 // fields on a profile. api/roster.js writes the document and api/onboarding.js

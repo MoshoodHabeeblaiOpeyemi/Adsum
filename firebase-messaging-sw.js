@@ -1,4 +1,4 @@
-// VeriPresenX FCM background handler — delivers emergency push notifications
+// Adsum FCM background handler — delivers emergency push notifications
 // (e.g. "flagged absent — see your Rep") even when the app tab is closed.
 // Registered as a module service worker from app.js when the user enables
 // push notifications in Account Settings.
@@ -20,11 +20,11 @@ const messaging = getMessaging(app);
 onBackgroundMessage(messaging, (payload) => {
   const notification = payload.notification || {};
   const data = payload.data || {};
-  self.registration.showNotification(notification.title || "VeriPresenX", {
+  self.registration.showNotification(notification.title || "Adsum", {
     body:
       notification.body ||
-      "You have a new attendance alert. Open VeriPresenX to review it.",
-    tag: data.type || "veripresenx-alert",
+      "You have a new attendance alert. Open Adsum to review it.",
+    tag: data.type || "adsum-alert",
     data: { link: data.link || "/" },
     vibrate: [200, 100, 200],
     requireInteraction: data.type === "absent_flag",

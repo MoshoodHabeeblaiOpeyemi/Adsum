@@ -1,4 +1,4 @@
-// VeriPresenX — server-authoritative time, distance and PIN generation.
+// Adsum — server-authoritative time, distance and PIN generation.
 //
 // Shared by api/attendance.js and api/session.js so the two can never disagree
 // about when a PIN was rotated or how far a student is from the hall.

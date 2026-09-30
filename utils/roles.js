@@ -1,4 +1,4 @@
-// VeriPresenX — the ONE definition of role and verification state.
+// Adsum — the ONE definition of role and verification state.
 //
 // WHY THIS FILE EXISTS
 // --------------------
