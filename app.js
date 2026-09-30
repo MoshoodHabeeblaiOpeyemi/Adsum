@@ -2853,12 +2853,20 @@ onAuthStateChanged(auth, (user) => {
   handleAuthState(user);
 });
 
-// 🗑 DELETE ACCOUNT — wired for BOTH surfaces.
+// 🗑 DELETE ACCOUNT
 //
-// The student dashboard has #deleteAccountBtn; the adviser dashboard has a
-// [data-delete-account] button, because hiding the settings gear for advisers
-// also hides the only copy of this control they could reach. Both routes run
-// the same handler so the two can never drift apart.
+// ONE surface: the bottom of #dashboardSection.
+//
+// It used to exist twice — here, and again inside the Semester Attendance
+// Report — with the second copy justified as an adviser escape hatch, since
+// the settings gear is hidden for advisers (see checkAuth). That reasoning
+// did not hold: checkAuth reveals #dashboardSection for every signed-in
+// user, advisers included, so #deleteAccountBtn was already reachable. The
+// duplicate only dragged a destructive account action into a read-only
+// course analytics table.
+//
+// The [data-delete-account] selector is kept so any future surface can opt in
+// without touching the handler, but nothing in index.html uses it today.
 document
   .querySelectorAll("#deleteAccountBtn, [data-delete-account]")
   .forEach((deleteBtn) => {
@@ -4997,6 +5005,10 @@ if (backToDashboardBtn) {
 function returnToDashboard() {
   if (portalSection) portalSection.classList.add("hidden");
   if (dashboardSection) dashboardSection.classList.remove("hidden");
+  // The report pane is a sibling of the portal, so hiding the portal does NOT
+  // hide it. Tear it down explicitly, or the rep walks away from a course
+  // still carrying that course's table of student percentages.
+  syncSemesterReportPanel();
 
   hideAllManagementPanels();
   const mgmtToolbarBack = document.getElementById("managementToolbar");
@@ -5434,185 +5446,76 @@ function syncDrawerTabVisibility() {
   syncStudentNav();
 }
 
-// Draggable tab — pointer + touch, moves along the chosen axis, clamps to
-// the viewport, and remembers its edge + offset for next time.
-let tabDragState = null;
-
-function startTabDrag(e, pointer) {
-  if (!drawerTab) return;
-  const edge = drawerTab.dataset.edge || "right";
-  const horizontalEdge = edge === "top" || edge === "bottom";
-  // Base = where the tab's offset ACTUALLY is right now (inline value, or
-  // the CSS default for this edge). Deltas apply on top of this — the old
-  // code seeded from the raw pointer point, so every grab teleported the
-  // tab and repeated taps walked it down the screen.
-  let base = parseFloat(drawerTab.style.getPropertyValue("--tab-offset"));
-  const hadCustom = !Number.isNaN(base);
-  if (!hadCustom) {
-    base = horizontalEdge
-      ? Math.round(window.innerWidth * 0.4)
-      : window.innerWidth >= 768
-        ? 84
-        : 76;
-  }
-  tabDragState = {
-    edge,
-    horizontalEdge,
-    start: pointer,
-    base,
-    hadCustom,
-    moved: false,
-  };
-  drawerTab.classList.add("dragging");
-  drawerTab.setPointerCapture?.(e.pointerId);
-}
-
-// The tab lives in a fixed band near the top: never above the sticky
-// navbar, never below ~55% of the viewport. Enforced on drag, restore
-// AND resize — it can never sink out of sight again.
-const TAB_MIN = 72;
+// 🛑 THE TAB IS PINNED — right edge, just below the sticky navbar, always
+// inside the viewport.
+//
+// It used to be draggable across four edges and persisted the result to
+// localStorage. That is precisely how it ended up stranded mid-screen on the
+// LEFT: restore() honoured the v4 fallback key, so an edge + offset saved by
+// an older build (or on a different screen size) was re-applied forever, and
+// tabMaxOffset() let it sit anywhere down to 55% of the viewport height. The
+// saved position outlived the layout it was measured against.
+//
+// So the moving parts are gone. The position is measured from the live navbar
+// and clamped into the viewport on every layout change, which is the only way
+// to guarantee the one property that matters: you can always see it, and you
+// always know where it is.
+const TAB_GAP = 10; // breathing room between the navbar and the handle
+const TAB_MIN = 8; // never tucked under the navbar, even on a tiny viewport
 
 function tabMaxOffset() {
   const h = (drawerTab && drawerTab.offsetHeight) || 80;
-  return Math.max(
-    TAB_MIN + 40,
-    Math.min(
-      Math.round(window.innerHeight * 0.55),
-      window.innerHeight - h - 16,
-    ),
-  );
+  // The handle must fit fully inside the viewport at every size.
+  return Math.max(TAB_MIN, window.innerHeight - h - 8);
 }
 
-function clampTabToViewport() {
+function pinDrawerTab() {
   if (!drawerTab) return;
-  const edge = drawerTab.dataset.edge || "right";
-  if (edge === "top" || edge === "bottom") return; // flush to an edge = always visible
-  const raw = parseFloat(drawerTab.style.getPropertyValue("--tab-offset"));
-  if (Number.isNaN(raw)) return; // nothing custom set — CSS default (near top) applies
+  // Always the right edge. data-edge still drives the border radius and is
+  // asserted rather than assumed, so a value written by an older build (or
+  // left behind in the DOM) can never dock the tab somewhere else.
+  drawerTab.dataset.edge = "right";
+  // Clear any inline geometry a previous drag left on the element.
+  drawerTab.style.removeProperty("left");
+  drawerTab.style.removeProperty("bottom");
+  drawerTab.style.removeProperty("transform");
+
+  const nav = document.querySelector(".navbar");
+  const navBottom = nav ? nav.getBoundingClientRect().bottom : 60;
+  const wanted = Math.round(navBottom + TAB_GAP);
   drawerTab.style.setProperty(
     "--tab-offset",
-    `${Math.max(TAB_MIN, Math.min(tabMaxOffset(), raw))}px`,
+    `${Math.max(TAB_MIN, Math.min(wanted, tabMaxOffset()))}px`,
   );
 }
 
-function updateTabDrag(pointer) {
-  if (!tabDragState || !drawerTab) return;
-  // Move uses the drag delta applied to the grab-time base: the tab follows
-  // the finger 1:1 with no teleport. Track whether it actually moved so a
-  // plain tap can still open the drawer (click fires after pointerup).
-  const horizontalEdge = tabDragState.horizontalEdge;
-  const delta = horizontalEdge
-    ? pointer.x - tabDragState.start.x
-    : pointer.y - tabDragState.start.y;
-  if (Math.abs(delta) > 6) tabDragState.moved = true;
-  // Keep the tab in the visible band below the navbar — and never below
-  // the top ~55% of the screen, so it can't sink out of sight.
-  const max = horizontalEdge ? window.innerWidth - 60 : tabMaxOffset();
-  const pos = Math.max(TAB_MIN, Math.min(max, tabDragState.base + delta));
-  drawerTab.style.setProperty("--tab-offset", `${pos}px`);
-}
-
-function endTabDrag() {
-  if (!tabDragState || !drawerTab) return;
-  tabDragState = null;
-  drawerTab.classList.remove("dragging");
+// One-time cleanup: a position stored by the draggable build can only ever
+// restore the tab to an edge and offset we no longer support, so the keys are
+// dropped rather than migrated.
+["veripresenx_drawer_tab_v5", "veripresenx_drawer_tab_v4"].forEach((key) => {
   try {
-    drawerTab.releasePointerCapture?.();
+    localStorage.removeItem(key);
   } catch (e) {
-    /* ignore */
+    /* private mode */
   }
-  persistTabPosition();
-}
+});
 
-function persistTabPosition() {
-  if (!drawerTab) return;
-  const edge = drawerTab.dataset.edge || "right";
-  const offsetVal = drawerTab.style.getPropertyValue("--tab-offset");
-  try {
-    localStorage.setItem(
-      "veripresenx_drawer_tab_v5",
-      JSON.stringify({ edge, offset: offsetVal }),
-    );
-  } catch (e) {
-    /* ignore */
-  }
-}
+pinDrawerTab();
+// Zoom, resize and orientation all change the CSS viewport — re-pin so the
+// tab can never end up off-screen, or hidden behind a reflowed navbar.
+window.addEventListener("resize", pinDrawerTab);
+window.addEventListener("orientationchange", pinDrawerTab);
 
-function restoreTabPosition() {
-  if (!drawerTab) return;
-  try {
-    const raw =
-      localStorage.getItem("veripresenx_drawer_tab_v5") ||
-      localStorage.getItem("veripresenx_drawer_tab_v4");
-    const saved = raw ? JSON.parse(raw) : null;
-    if (saved && saved.edge) {
-      drawerTab.dataset.edge = saved.edge;
-      if (saved.offset) {
-        // Clamp the saved offset to the CURRENT viewport — a position
-        // stored on a different screen size (or before an edge rotation)
-        // could otherwise restore the tab off-screen, hiding it forever.
-        const val = parseFloat(saved.offset);
-        if (!Number.isNaN(val)) {
-          const horizontalEdge =
-            saved.edge === "top" || saved.edge === "bottom";
-          const max = horizontalEdge ? window.innerWidth - 60 : tabMaxOffset();
-          const clamped = Math.max(TAB_MIN, Math.min(max, val));
-          drawerTab.style.setProperty("--tab-offset", `${clamped}px`);
-        }
-      }
-    }
-  } catch (e) {
-    /* ignore */
-  }
-}
-
-// Mouse dragging.
-if (drawerTab) {
-  drawerTab.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 && e.pointerType === "mouse") return;
-    startTabDrag(e, { x: e.clientX, y: e.clientY });
-  });
-  drawerTab.addEventListener("pointermove", (e) => {
-    if (!tabDragState) return;
-    updateTabDrag({ x: e.clientX, y: e.clientY });
-    if (e.pointerType === "touch") e.preventDefault();
-  });
-  drawerTab.addEventListener("pointerup", () => {
-    // No drag happened → plain tap: leave the offset exactly as it was (a
-    // few px of finger wobble stays inside the 6px dead zone), then let the
-    // normal click handler open the drawer. Only real drags are persisted.
-    const wasTap = tabDragState && !tabDragState.moved;
-    const hadCustom = tabDragState && tabDragState.hadCustom;
-    endTabDrag();
-    // endTabDrag persisted our (unchanged) offset — but a pure tap must not
-    // CREATE a stored position out of nothing: without a custom offset
-    // before, keep the CSS default.
-    if (wasTap && !hadCustom) {
-      drawerTab.style.removeProperty("--tab-offset");
-      try {
-        localStorage.removeItem("veripresenx_drawer_tab_v5");
-      } catch (e) {
-        /* ignore */
-      }
-    }
-  });
-  drawerTab.addEventListener("pointercancel", endTabDrag);
-  // Long-press / right-click rotates the docked edge.
-  drawerTab.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    const edges = ["right", "bottom", "left", "top"];
-    const next =
-      edges[(edges.indexOf(drawerTab.dataset.edge || "right") + 1) % 4];
-    drawerTab.dataset.edge = next;
-    drawerTab.style.removeProperty("--tab-offset");
-    persistTabPosition();
+// The tab's click handler lives with the rest of the drawer wiring further
+// down; the only thing left here is to re-pin whenever it is revealed,
+// because offsetHeight is 0 while the tab is hidden — so the first pin after
+// a page load measures a collapsed element and under-clamps.
+if (drawerTab && typeof MutationObserver === "function") {
+  new MutationObserver(pinDrawerTab).observe(drawerTab, {
+    attributes: true,
+    attributeFilter: ["class"],
   });
 }
-
-restoreTabPosition();
-// Zoom / window resize changes the CSS viewport — re-clamp so the tab can
-// never end up off-screen after the window changes shape.
-window.addEventListener("resize", clampTabToViewport);
 
 // Expose for back-button: drawer open → close drawer (modal-like trap).
 window.__veripresenxCloseDrawer = () => {
@@ -6761,14 +6664,60 @@ window.revokeAssistant = async function (matric) {
 window.removeStudentFromCourse = async function (matric) {
   if (!activeCourse) return;
 
+  // ── TRANSPARENCY BEFORE THE TAP ────────────────────────────────────────
+  // Removing someone is a decision about a real person, so the rep is shown
+  // the three facts that decide whether to press the button at all:
+  //
+  //   1. WHO it is. A matric alone is an identifier, not a person. The app
+  //      already has a "Name (MATRIC) everywhere a human reads a list" rule,
+  //      and removing a student is the least forgiving place to break it.
+  //   2. WHAT IT DOES to their record. History is KEPT. A rep who believes
+  //      removal erases attendance will "remove" a student to tidy away a bad
+  //      number — and the number survives anyway, so the attempt buys nothing
+  //      and quietly produces a permanent removal entry.
+  //   3. WHAT IT IS NOT. This is not a ban; they rejoin instantly with the
+  //      course code. Anyone who needs a student kept out of a class uses
+  //      🚩 Flag Absent on the roster, which IS permanent and tells the
+  //      student. Removal only tidies the roster.
+  const targetMatric = normalizeMatric(matric);
+  const studentName = nameForMatric(targetMatric);
+  let semesterLine = "No classes held yet";
+  if (lastSemesterReport && lastSemesterReport.sessions) {
+    const row = (lastSemesterReport.rows || []).find(
+      (r) => normalizeMatric(r.matric) === targetMatric,
+    );
+    if (row) {
+      semesterLine = `${row.attended} of ${row.total} classes (${row.percent}%)`;
+    }
+  }
+
   if (
     await showConfirm({
-      title: "Remove Student",
-      message: `Remove [${matric}] from ${activeCourse.name}? They can rejoin using the course code.`,
-      okText: "Remove",
+      title: "Remove Student From Roster",
+      message: `Remove ${studentName} from ${activeCourse.name}?`,
+      okText: "Remove from roster",
       cancelText: "Cancel",
-      icon: "🚪",
+      // A lucide name, not the 🚪 emoji the old dialog passed: the confirm
+      // dialog only renders icon names matching /^[a-z][a-z0-9-]*$/i, so the
+      // emoji silently fell back to a generic warning triangle.
+      icon: "door-open",
       danger: true,
+      details: [
+        { label: "Student", value: `${studentName} (${targetMatric})` },
+        { label: "This semester", value: semesterLine },
+        {
+          label: "Their attendance history",
+          value: "Kept — removal never erases past classes",
+        },
+        {
+          label: "Audit log",
+          value: "A permanent record of this removal is written",
+        },
+        {
+          label: "They can rejoin",
+          value: "Yes, immediately, with the course code",
+        },
+      ],
     })
   ) {
     try {
@@ -6794,8 +6743,10 @@ window.removeStudentFromCourse = async function (matric) {
           if (!response.ok)
             throw new Error(result.error || "Unable to remove student.");
 
-          // Update local state to reflect the removal immediately
-          const targetMatric = normalizeMatric(matric);
+          // Update local state to reflect the removal immediately. `members`
+          // is included because the Semester Report is built from it — without
+          // this the removed student kept a row in the report until some
+          // unrelated listener happened to fire and re-render it.
           if (activeCourse.enrolled) {
             activeCourse.enrolled = activeCourse.enrolled
               .map(normalizeMatric)
@@ -6806,18 +6757,40 @@ window.removeStudentFromCourse = async function (matric) {
               .map(normalizeMatric)
               .filter((m) => m !== targetMatric);
           }
+          if (Array.isArray(activeCourse.members)) {
+            activeCourse.members = activeCourse.members.filter(
+              (m) => normalizeMatric(m.matric) !== targetMatric,
+            );
+          }
 
           renderPortalState();
           renderAssistantDropdownAndList();
-          toast.info(
-            `Student [${targetMatric}] has been removed.`,
+          // Neither of these is re-rendered by renderPortalState(), and both
+          // read state the removal just changed — so without these two calls
+          // the screen keeps showing a student who is no longer on the roster.
+          renderSemesterReport();
+          renderAuditSection();
+          // Report what actually happened rather than that a button was
+          // pressed: history intact, record permanent, and not a ban. The rep
+          // should never have to guess which of those three this was.
+          toast.success(
+            `${studentName} (${targetMatric}) is off the roster. Their attendance history is kept, the removal is recorded in the audit log, and they can rejoin with the course code.`,
             "Student Removed",
           );
         },
       );
     } catch (error) {
       console.error("Remove student error:", error);
-      toast.error("Unable to remove student. Please try again.");
+      // 🛑 Show WHY it failed. The old fixed message buried the one answer the
+      // rep actually needs: the server refuses removal while a session is LIVE
+      // ("Cannot remove during live session. Flag absent instead."). Being told
+      // to "try again" sent them into a retry loop that could never succeed.
+      toast.error(
+        error && error.message
+          ? error.message
+          : "Unable to remove the student. Please try again.",
+        "Not Removed",
+      );
     }
   }
 };
@@ -6880,7 +6853,38 @@ function renderAssistantDropdownAndList() {
 function renderLectureHallOptions() {
   const selectEl = document.getElementById("repHallSelect");
   const badgeEl = document.getElementById("hallInfoBadge");
-  if (!selectEl || !activeCourse) return;
+  if (!activeCourse) return;
+
+  // 🛑 GPS IS OFF — SO A HALL IS DEAD CHROME.
+  //
+  // Every attendance mode that reads a saved hall is locked while the GPS
+  // prototype toggle is false, so nothing set here can affect a session.
+  //
+  // This function was also an accidental modal trigger: with no halls saved it
+  // pre-selected the "add_new" option (below) and then updateBadge() saw
+  // "add_new" and called openManageHallsModal(). So a rep was hit with an
+  // unrequested "set your hall location" popup the moment they opened a course
+  // — the dialog in the screenshot, appearing with no tap behind it.
+  //
+  // The block is hidden outright rather than disabled: a control that cannot
+  // change any outcome should not be offered at all.
+  if (!GPS_PROTOTYPE_ENABLED) {
+    const block = document.getElementById("hallSetupBlock");
+    if (block) block.classList.add("hidden");
+    if (selectEl) {
+      selectEl.innerHTML = "";
+      selectEl.disabled = true;
+    }
+    if (badgeEl) {
+      badgeEl.className = "hall-info-chip";
+      badgeEl.innerHTML = "";
+    }
+    renderModeCards();
+    syncModeUI();
+    return;
+  }
+
+  if (!selectEl) return;
 
   const halls = activeCourse.savedHalls || [];
   const storedPreference = localStorage.getItem(
@@ -7101,7 +7105,11 @@ function syncModeUI() {
   }
   if (hint) {
     if (!usesLocation) {
-      hint.innerHTML = `📍 <em>Location is not used in this mode — the hall dropdown is disabled. Switch to a GPS mode to use a saved hall.</em>`;
+      // 🛑 Never point a rep at a GPS mode they cannot select — that reads as
+      // a broken promise. Say plainly that location is simply not in play.
+      hint.innerHTML = GPS_PROTOTYPE_ENABLED
+        ? `📍 <em>Location is not used in this mode — the hall dropdown is disabled. Switch to a GPS mode to use a saved hall.</em>`
+        : `📍 <em>Location is not used in any mode available here. Verification is QR or PIN plus device lock, so no lecture hall is needed.</em>`;
     } else if (mode === "live_gps") {
       hint.innerHTML = `📍 Your current position will be captured the moment you generate the PIN.`;
     } else {
@@ -7114,6 +7122,11 @@ function syncModeUI() {
 }
 
 function openManageHallsModal() {
+  // 🛑 Nothing may open this while GPS is off. The dialog used to be reachable
+  // two ways that had nothing to do with intent — the "add_new" option firing
+  // during render, and the "Manage Halls" link — so with the feature disabled
+  // both were dead ends. The door is simply not there any more.
+  if (!GPS_PROTOTYPE_ENABLED) return;
   const modal = document.getElementById("manageHallsModal");
   if (!modal || !activeCourse) return;
   renderSavedHallsList();
@@ -7178,6 +7191,10 @@ const setLocationBtn = document.getElementById("setLocationBtn");
 const setLocationStatus = document.getElementById("setLocationStatus");
 if (setLocationBtn) {
   setLocationBtn.addEventListener("click", async () => {
+    // 🛑 Capturing a GPS anchor is meaningless while every GPS mode is locked.
+    // The whole hall block is hidden when GPS is off, so this guard is the
+    // backstop for a stale tap on an element that is still in the DOM.
+    if (!GPS_PROTOTYPE_ENABLED) return;
     if (!activeCourse) return;
 
     if (!navigator.geolocation) {
@@ -8710,6 +8727,19 @@ function renderPortalState() {
       enrolledListDiv.style.cssText =
         "margin-top: 20px; background: var(--bg); padding: 20px; border-radius: 12px; border: 1.5px solid var(--border); margin-bottom: 20px;";
 
+      // 🛑 Delegation is wired ONCE, at creation. It used to be attached after
+      // every innerHTML rebuild — a fresh listener on every
+      // renderPortalState() call — so the Nth render fired N confirm dialogs
+      // for a single tap, and the rep confirmed the same removal over and
+      // over. One listener per element is the whole fix.
+      enrolledListDiv.addEventListener("click", (e) => {
+        const removeBtn = e.target.closest(".remove-student-btn");
+        if (removeBtn) {
+          e.preventDefault();
+          removeStudentFromCourse(removeBtn.dataset.matric);
+        }
+      });
+
       const targetParent = portalSection;
       targetParent.appendChild(enrolledListDiv);
     }
@@ -8724,9 +8754,12 @@ function renderPortalState() {
         enrolledMatrics.forEach((matric) => {
           const isRepMatric = userMatric === normalizeMatric(matric);
           const safeMatric = escapeHTML(matric);
+          // "Name (MATRIC)" — a bare matric forces the rep to identify the
+          // person by memory at the exact moment they remove them.
+          const safeLabel = escapeHTML(nameForMatric(matric));
           studentRowsHTML += `
             <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg); border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem;">
-              <span>🎓 <strong>${safeMatric}</strong> ${isRepMatric ? "(You - Rep)" : ""}</span>
+              <span>🎓 <strong>${safeLabel}</strong> ${isRepMatric ? "(You - Rep)" : ""}</span>
               ${!isRepMatric ? `<button data-matric="${safeMatric}" class="remove-student-btn" style="background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem; font-weight: bold;">Remove 🚪❌</button>` : ""}
             </li>
           `;
@@ -8735,20 +8768,12 @@ function renderPortalState() {
 
       enrolledListDiv.innerHTML = `
         <h4 style="color: var(--navy); margin-bottom: 10px; font-size: 1rem;">👥 Manage Enrolled Students (${enrolledMatrics.length})</h4>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 10px;">Remove unauthorized students who joined your course code. While a session is LIVE, removals are blocked — use 🚩 Flag Absent on the roster instead.</p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Remove students who joined your course code but should not be on the roster.</p>
+        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 10px;"><strong>What removal does:</strong> takes them off the roster and off check-in, and writes a permanent entry to the audit log. <strong>What it does not do:</strong> erase their past attendance — and they can rejoin immediately with the course code. While a session is LIVE, removal is blocked; use 🚩 Flag Absent on the roster instead.</p>
         <ul style="list-style: none; padding: 0; max-height: 180px; overflow-y: auto;">
           ${studentRowsHTML}
         </ul>
       `;
-
-      // Event delegation for remove buttons (XSS-safe: matric from data attribute)
-      enrolledListDiv.addEventListener("click", (e) => {
-        const removeBtn = e.target.closest(".remove-student-btn");
-        if (removeBtn) {
-          e.preventDefault();
-          removeStudentFromCourse(removeBtn.dataset.matric);
-        }
-      });
     }
   }
 
@@ -9961,9 +9986,20 @@ function initSemesterReport() {
 // which is exactly the sort of thing a student must not be able to read from
 // the client. The data is already gated by the rules, but hiding the panel
 // too means a student never sees a control they cannot use.
+//
+// It is also PORTAL-scoped, and that is not cosmetic. #semesterReport is a
+// SIBLING of #portalSection, not a child, so hiding the portal does not hide
+// the report — which meant the moment a rep opened any course, the report
+// stayed rendered on the dashboard and every other view, trailing a full
+// table of student percentages behind them.
 function syncSemesterReportPanel() {
   const panel = document.getElementById("semesterReport");
   if (!panel) return;
+  const inPortal = Boolean(
+    activeCourse &&
+    portalSection &&
+    !portalSection.classList.contains("hidden"),
+  );
   const isStaff = Boolean(
     activeCourse &&
     currentUser &&
@@ -9974,8 +10010,9 @@ function syncSemesterReportPanel() {
           (m.role === "assistant" || m.role === "session_assistant"),
       )),
   );
-  panel.classList.toggle("hidden", !isStaff);
-  if (isStaff) renderSemesterReport();
+  const show = inPortal && isStaff;
+  panel.classList.toggle("hidden", !show);
+  if (show) renderSemesterReport();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

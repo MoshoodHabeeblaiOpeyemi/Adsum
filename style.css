@@ -1790,7 +1790,7 @@ input:focus::placeholder {
   border-top: 1px solid var(--border);
 }
 
-/* The protruding handle — docked to an edge, dragged to move it. */
+/* The protruding handle — pinned to the right edge (see the block below). */
 .drawer-tab {
   position: fixed;
   z-index: 9500;
@@ -1804,9 +1804,14 @@ input:focus::placeholder {
   background: var(--violet);
   color: #fff;
   border: none;
-  cursor: grab;
+  /* Not `grab` any more — it is no longer a drag handle, and promising a
+     drag the app no longer performs is how a control stops feeling honest. */
+  cursor: pointer;
   box-shadow: 0 4px 14px rgba(11, 13, 23, 0.35);
-  touch-action: none;
+  /* Not `none` any more: that existed to feed pointermove to the drag, and
+     left in place it silently swallowed page scrolls started on the tab.
+     `manipulation` keeps taps instant while still allowing scroll/pan. */
+  touch-action: manipulation;
   animation: drawerTabPulse 2.4s ease-in-out infinite;
 }
 @keyframes drawerTabPulse {
@@ -1836,34 +1841,24 @@ input:focus::placeholder {
   opacity: 0.9;
 }
 .drawer-tab:active {
-  cursor: grabbing;
+  cursor: pointer;
 }
-.drawer-tab.dragging {
-  transition: none;
-}
-/* --tab-offset on side edges = the tab's TOP edge in px (no centering
-   transform), so the default reads as "just below the sticky navbar". */
-.drawer-tab[data-edge="right"] {
+/* 🛑 THE TAB IS PINNED — right edge, just below the sticky navbar, always
+   inside the viewport.
+
+   It used to be draggable across four edges and remembered its position in
+   localStorage, which is exactly how it ended up stranded mid-screen on the
+   LEFT: a position saved by an older build (or on a different screen size)
+   was restored forever, because restore() honoured the v4 fallback key. A
+   control whose location you cannot predict is a control you cannot trust,
+   so the moving parts are gone and the position is derived from the live
+   navbar on every layout change (see pinDrawerTab in app.js).
+
+   --tab-offset is the tab's TOP edge in px (no centering transform). */
+.drawer-tab {
   right: 0;
   top: var(--tab-offset, 76px);
   border-radius: 12px 0 0 12px;
-}
-.drawer-tab[data-edge="left"] {
-  left: 0;
-  top: var(--tab-offset, 76px);
-  border-radius: 0 12px 12px 0;
-}
-.drawer-tab[data-edge="top"] {
-  top: 66px; /* below the sticky navbar — flush top hid it behind the bar on mobile */
-  left: var(--tab-offset, 40%);
-  transform: translateX(-50%);
-  border-radius: 0 0 10px 10px;
-}
-.drawer-tab[data-edge="bottom"] {
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  left: var(--tab-offset, 40%);
-  transform: translateX(-50%);
-  border-radius: 10px 10px 0 0;
 }
 /* Desktop: same spot, just scaled up for the bigger screen. */
 @media (min-width: 768px) {
@@ -1878,8 +1873,7 @@ input:focus::placeholder {
   .drawer-tab .tab-label {
     font-size: 0.68rem;
   }
-  .drawer-tab[data-edge="right"],
-  .drawer-tab[data-edge="left"] {
+  .drawer-tab {
     top: var(--tab-offset, 84px);
   }
 }
@@ -1889,7 +1883,12 @@ input:focus::placeholder {
 .drawer-tab-badge {
   position: absolute;
   top: -5px;
-  right: -7px;
+  /* 🛑 The tab is always right-docked, so the badge sits on the INNER side
+     (toward the content) and never under the browser scrollbar that hugs the
+     right screen edge. Asserted unconditionally — keying this off
+     data-edge="right" meant a stale "left" value silently flipped the badge
+     back out over the scrollbar. */
+  left: -7px;
   min-width: 17px;
   height: 17px;
   border-radius: 999px;
@@ -1905,12 +1904,6 @@ input:focus::placeholder {
   border: 2px solid #fff;
   animation: badgePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   transform-origin: center;
-}
-/* Right-docked tab: the badge sits on the INNER side (toward the content),
-   never under the browser scrollbar that hugs the right screen edge. */
-.drawer-tab[data-edge="right"] .drawer-tab-badge {
-  right: auto;
-  left: -7px;
 }
 
 /* 📡 HOTSPOT MODE — a session hotspot's ONLY job is displaying the QR.

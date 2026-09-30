@@ -369,6 +369,7 @@
 
             <!-- LECTURE LOCATION SELECTOR -->
             <div
+              id="hallSetupBlock"
               style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
               <div class="hall-actions-row">
                 <label for="repHallSelect"
@@ -991,20 +992,6 @@
           </table>
         </div>
         <p class="adviser-foot" id="reportNote"></p>
-      </div>
-
-      <!-- 🗑️ ESCAPE HATCH
-         Hiding the settings gear (an adviser has no matric to edit) also hides
-         "Delete My Account", which lives on the student dashboard they never
-         see. So it is restated here — an account you cannot delete is an
-         account you are stuck with, and advisers are exactly the people who
-         need an exit: an adviser who applied for the wrong level is locked into
-         it for life unless they can delete. -->
-      <div style="margin-top: 36px; text-align: center;">
-        <button data-delete-account
-          style="background: transparent; border: none; color: var(--danger); text-decoration: underline; cursor: pointer; font-size: 0.85rem;">
-          <i data-lucide="alert-triangle"></i> Delete My Account
-        </button>
       </div>
     </section>
     <!-- CODE SENT ACKNOWLEDGEMENT ------------------------------------------
