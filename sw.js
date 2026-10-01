@@ -12,9 +12,7 @@ const STATIC_ASSETS = [
   "/manifest.json",
   "/brand/mark-64-cutout.png",
   "/brand/mark-256-cutout.png",
-  "/brand/adsum-wordmark.png",
-  "/brand/adsum-monogram.png",
-  "/brand/adsum-text.png",
+  "/brand/adsum-logo-full.png",
   "/brand/favicon-32.png",
   "/brand/apple-touch-icon-180.png",
 ];
