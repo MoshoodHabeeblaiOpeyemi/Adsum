@@ -133,8 +133,34 @@ Enforced in `firestore.rules`, not in the client:
 | `courses/{id}/hotspotLog` | `allow write: if false` | Transparency log |
 | `matricRegistry/*` | `allow read, write: if false` | Claim integrity |
 
-Removal is also logged: `api/course.js:166` writes `removalLog` so a student cannot be
-quietly deleted from a roster.
+Removal is also logged: `api/roster.js` (`removeCourseStudent`) writes `removalLog` so a
+student cannot be quietly deleted from a roster.
+
+### 4a. Reps cannot remove students
+
+A course rep used to be able to remove any student from their roster via
+`api/course.js?action=remove`. **That endpoint no longer exists.** The handler was
+deleted rather than gated, because a hidden button is not a revoked permission: while
+the route existed, a rep could have kept calling it directly from devtools regardless of
+what the UI showed. `action=remove` now falls through to the 400 "Invalid action" branch.
+
+The ability moved up the trust chain to the **Level Adviser**
+(`api/roster.js?action=removeCourseStudent`), who is the root of trust for the level
+and outranks a rep. Three properties make the move safe rather than a lateral swap:
+
+| Property | Why it matters |
+| --- | --- |
+| Scope from the server's profile | `loadAdviserScope` reads institution/department/level from Firestore, never the request body, so an adviser cannot address another adviser's level |
+| Course scope re-checked per request | `courseId` only ever *selects* a target; the course's own institution/department/level are compared against the adviser's before anything is written, so passing someone else's `courseId` fails on scope rather than succeeding |
+| Rep is not removable | A rep is stood down through `chooseRep` (which has its own change log), not by silently emptying their own roster |
+
+The rep keeps 🚩 Flag Absent on the Live Roster, which is the better tool anyway: it is
+permanent, alerts the student immediately, and cannot be quietly undone. Removal is
+refused mid-session (`SESSION_LIVE`) because deleting someone during a lecture would
+silently rewrite who is counted present.
+
+`removalLog` entries now carry `removedByRole: "level_adviser"`, so the audit trail
+distinguishes the two eras rather than leaving old rep-attributed removals ambiguous.
 
 ---
 

@@ -654,6 +654,271 @@ async function handleGetRoster(req, res, decoded) {
   }
 }
 
+/**
+ * Remove a student from a COURSE roster.
+ *
+ * WHY THIS LIVES HERE AND NOT IN api/course.js
+ * ---------------------------------------------
+ * A course rep used to be able to do this. That ability was revoked at the
+ * server boundary rather than hidden in the UI, because hiding a button does
+ * not remove the permission underneath it — a rep could have kept POSTing to
+ * the old endpoint from devtools. Roster membership is the Level Adviser's
+ * to give, so the power moved to the adviser, who is the trust root for the
+ * level and outranks a rep in the chain.
+ *
+ * THE SCOPE CHECK IS THE WHOLE POINT
+ * `loadAdviserScope` reads institution/department/level from the SERVER's
+ * copy of the profile, and this handler compares them against the COURSE's
+ * own values. The courseId and matric arrive as parameters, but they only
+ * ever SELECT a target — they never define the authority. An adviser who
+ * passes another adviser's courseId is rejected on scope, not on a missing
+ * permission check. That is what stops horizontal privilege escalation
+ * between advisers.
+ */
+async function handleRemoveCourseStudent(req, res, decoded) {
+  try {
+    const scope = await loadAdviserScope(decoded.uid);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
+
+    const { courseId, targetMatric } = req.body || {};
+    if (!courseId || !targetMatric)
+      return res.status(400).json({
+        error: "Course ID and student matric are required.",
+        code: "MISSING_PARAMS",
+      });
+
+    const courseRef = db.collection("courses").doc(courseId);
+    const courseSnap = await courseRef.get();
+    if (!courseSnap.exists)
+      return res.status(404).json({ error: "Course not found." });
+
+    const course = courseSnap.data();
+
+    // 🔒 Scope gate. Runs BEFORE anything is written.
+    if (course.institution && norm(course.institution) !== scope.institution)
+      return res.status(403).json({
+        error: "That course belongs to a different institution.",
+        code: "SCOPE_INSTITUTION",
+      });
+    if (course.department && norm(course.department) !== scope.department)
+      return res.status(403).json({
+        error: "That course belongs to a different department.",
+        code: "SCOPE_DEPARTMENT",
+      });
+    if (course.level && norm(course.level) !== scope.level)
+      return res.status(403).json({
+        error: "That course belongs to a different level.",
+        code: "SCOPE_LEVEL",
+      });
+
+    const normalizedTarget = norm(targetMatric);
+
+    // The rep is not removable here. An adviser who loses the class should be
+    // replaced through the rep-selection flow (chooseRep), which is logged
+    // separately — not by silently emptying their own roster.
+    if (course.repUid) {
+      const repMemberSnap = await courseRef
+        .collection("members")
+        .doc(course.repUid)
+        .get();
+      if (
+        repMemberSnap.exists &&
+        norm(repMemberSnap.data().matric) === normalizedTarget
+      )
+        return res.status(409).json({
+          error:
+            "That student is the course rep. Change the rep instead of removing them.",
+          code: "TARGET_IS_REP",
+        });
+    }
+
+    // Same live-session guard the rep's version had: removing someone
+    // mid-lecture would silently rewrite who is counted present.
+    const liveSnap = await courseRef.collection("session").doc("live").get();
+    if (
+      liveSnap.exists &&
+      liveSnap.data().expiresAt &&
+      liveSnap.data().expiresAt > Date.now()
+    )
+      return res.status(409).json({
+        error: "Cannot remove during a live session. Wait for the class to close.",
+        code: "SESSION_LIVE",
+      });
+
+    let removed = null;
+    try {
+      await db.runTransaction(async (tx) => {
+        const membersSnap = await tx.get(courseRef.collection("members"));
+        const target = membersSnap.docs.find(
+          (d) => norm(d.data().matric) === normalizedTarget,
+        );
+        if (!target) throw new Error("STUDENT_NOT_FOUND");
+
+        removed = {
+          name: String(target.data().name || "").trim() || normalizedTarget,
+        };
+
+        tx.delete(target.ref);
+        tx.update(courseRef, {
+          enrolled: FieldValue.arrayRemove(normalizedTarget),
+          assistants: FieldValue.arrayRemove(normalizedTarget),
+        });
+      });
+    } catch (txErr) {
+      if (txErr.message === "STUDENT_NOT_FOUND")
+        return res.status(404).json({
+          error: "That student is not on this roster.",
+          code: "NOT_ENROLLED",
+        });
+      throw txErr;
+    }
+
+    // 🔒 The audit trail survives the removal. `removalLog` stays
+    // backend-only (`allow write: if false` in firestore.rules), so nobody can
+    // quietly erase the fact that this happened. `removedByRole` is recorded
+    // alongside the uid because "who" is now always an adviser.
+    try {
+      await courseRef.collection("removalLog").doc().set({
+        matric: normalizedTarget,
+        name: removed.name,
+        removedBy: decoded.uid,
+        removedByRole: "level_adviser",
+        removedFromCourse: courseId,
+        removedAt: FieldValue.serverTimestamp(),
+      });
+    } catch (logErr) {
+      // A failed audit write must not be reported as a failed removal, but it
+      // must never be silent either.
+      console.error("removalLog write failed:", logErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${removed.name} removed from ${course.name || "the course"}.`,
+      matric: normalizedTarget,
+    });
+  } catch (error) {
+    console.error("removeCourseStudent error:", error);
+    return res
+      .status(500)
+      .json({ error: "Unable to remove the student. Please try again." });
+  }
+}
+
+/**
+ * The courses inside the adviser's own (institution, department, level).
+ *
+ * This exists so `removeCourseStudent` is reachable from the UI: an adviser
+ * cannot be handed a courseId, and Firestore will not let the client query
+ * across courses, so the server has to hand back the list of courses this
+ * adviser is actually entitled to act on. Filtering happens HERE, against the
+ * server's copy of the profile — the client never supplies a filter, so it
+ * cannot widen its own scope.
+ */
+async function handleListScopedCourses(req, res, decoded) {
+  try {
+    const scope = await loadAdviserScope(decoded.uid);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
+
+    // A level adviser can run a few courses at most. The cap is a guard
+    // against a malformed scope turning this into an unbounded collection
+    // read; it is not expected to ever be reached.
+    const snap = await db
+      .collection("courses")
+      .where("institution", "==", scope.institution)
+      .limit(50)
+      .get();
+
+    const courses = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter(
+        (c) =>
+          (!c.department || norm(c.department) === scope.department) &&
+          (!c.level || norm(c.level) === scope.level),
+      )
+      .map((c) => ({
+        id: c.id,
+        name: c.name || "Unnamed course",
+        code: c.code || "",
+        rep: c.rep || "",
+        enrolledCount: Array.isArray(c.enrolled) ? c.enrolled.length : 0,
+        matric: c.repMatric || null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return res.status(200).json({ success: true, courses });
+  } catch (error) {
+    console.error("listScopedCourses error:", error);
+    return res.status(500).json({ error: "Unable to load your courses." });
+  }
+}
+
+/**
+ * The enrolled students on one course, for the adviser's removal UI.
+ *
+ * Scope is re-checked against the COURSE (not just the courseId being
+ * well-formed) for the same reason as in removeCourseStudent: knowing a
+ * course id is not permission to read its roster.
+ */
+async function handleListCourseStudents(req, res, decoded) {
+  try {
+    const scope = await loadAdviserScope(decoded.uid);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
+
+    const { courseId } = req.body || {};
+    if (!courseId)
+      return res
+        .status(400)
+        .json({ error: "Course ID is required.", code: "MISSING_PARAMS" });
+
+    const courseRef = db.collection("courses").doc(courseId);
+    const courseSnap = await courseRef.get();
+    if (!courseSnap.exists)
+      return res.status(404).json({ error: "Course not found." });
+    const course = courseSnap.data();
+
+    if (course.institution && norm(course.institution) !== scope.institution)
+      return res
+        .status(403)
+        .json({ error: "That course is outside your scope.", code: "SCOPE" });
+    if (course.department && norm(course.department) !== scope.department)
+      return res
+        .status(403)
+        .json({ error: "That course is outside your scope.", code: "SCOPE" });
+    if (course.level && norm(course.level) !== scope.level)
+      return res
+        .status(403)
+        .json({ error: "That course is outside your scope.", code: "SCOPE" });
+
+    const membersSnap = await courseRef.collection("members").get();
+    const students = membersSnap.docs
+      .map((d) => {
+        const data = d.data() || {};
+        return {
+          uid: d.id,
+          matric: norm(data.matric),
+          name: String(data.name || "").trim() || norm(data.matric),
+          role: data.role || "student",
+        };
+      })
+      .filter((s) => s.matric)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return res.status(200).json({
+      success: true,
+      course: { id: courseId, name: course.name || "Unnamed course" },
+      repUid: course.repUid || null,
+      students,
+    });
+  } catch (error) {
+    console.error("listCourseStudents error:", error);
+    return res.status(500).json({ error: "Unable to load the class list." });
+  }
+}
+
 async function handleEndAcademicSession(req, res, decoded) {
   try {
     const scope = await loadAdviserScope(decoded.uid);
@@ -718,12 +983,18 @@ module.exports = async (req, res) => {
         return handleChooseRep(req, res, decoded);
       case "getRoster":
         return handleGetRoster(req, res, decoded);
+      case "removeCourseStudent":
+        return handleRemoveCourseStudent(req, res, decoded);
+      case "listScopedCourses":
+        return handleListScopedCourses(req, res, decoded);
+      case "listCourseStudents":
+        return handleListCourseStudents(req, res, decoded);
       case "endAcademicSession":
         return handleEndAcademicSession(req, res, decoded);
       default:
         return res.status(400).json({
           error:
-            "Invalid action. Use: importRoster, chooseRep, getRoster, endAcademicSession",
+            "Invalid action. Use: importRoster, chooseRep, getRoster, removeCourseStudent, listScopedCourses, listCourseStudents, endAcademicSession",
         });
     }
   } catch (error) {

@@ -528,35 +528,12 @@
         <!-- 🎛️ The old stacked toolbar is gone — replaced by the Mission-Control
              drawer (tab on the screen edge). Rep views open one at a time. -->
 
-        <!-- BULK STUDENT IMPORT SECTION -->
-        <div id="bulkImportSection" class="hidden"
-          style="margin-top: 20px; background: var(--bg); padding: 20px; border-radius: 12px; border: 1.5px solid var(--border); margin-bottom: 20px;">
-          <h3 style="color: var(--navy); margin-bottom: 5px;">
-            <i data-lucide="upload"></i> Bulk Student Import
-          </h3>
-          <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Upload a CSV file with matric numbers
-            to auto-enroll students. Format: one matric per line, or with headers.</p>
-
-          <div style="margin-bottom: 15px;">
-            <label for="csvFileInput"
-              style="font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 8px;">Select CSV
-              File:</label>
-            <input type="file" id="csvFileInput" accept=".csv"
-              style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.9rem;">
-          </div>
-
-          <button id="importCsvBtn" class="btn" style="font-size: 0.85rem; padding: 10px 16px;">
-            <i data-lucide="upload-cloud"></i> Import Students
-          </button>
-
-          <div id="importProgress" class="hidden"
-            style="margin-top: 15px; padding: 12px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border);">
-            <div style="font-size: 0.85rem; color: var(--text);">
-              <span id="importStatus">Processing...</span>
-              <div id="importResults" style="margin-top: 8px; font-size: 0.8rem; color: var(--muted);"></div>
-            </div>
-          </div>
-        </div>
+        <!-- 🛑 BULK STUDENT IMPORT REMOVED
+             The rep no longer bulk-enrolls students from a CSV. The Level
+             Adviser owns the level roster (Adviser dashboard → Import
+             Roster), which is the one authoritative list of who belongs to
+             the level; letting a rep paste a second, parallel list into one
+             course is how rosters drift apart. -->
 
         <!-- HOLIDAY/EXEMPTION MANAGEMENT SECTION -->
         <div id="exemptionManagementSection" class="hidden"
@@ -1144,6 +1121,20 @@
       </div>
 
       <div class="adviser-card">
+        <h3 class="adviser-card-h3"><i data-lucide="user-x"></i> Remove a Student From a Class</h3>
+        <p class="adviser-card-p">This is the only way to take someone off a course roster — the course
+          rep cannot do it. Use it when a student joined a course code but should not be in the class.
+          Their attendance history is kept, the removal is written to a permanent audit log, and they
+          can rejoin with the course code at any time.
+        </p>
+        <select id="adviserCourseSelect" class="adviser-select" disabled>
+          <option value="">Loading your courses…</option>
+        </select>
+        <div id="adviserClassList" class="adviser-preview hidden"></div>
+        <div class="adviser-msg hidden" id="adviserRemoveMsg"></div>
+      </div>
+
+      <div class="adviser-card">
         <h3 class="adviser-card-h3"><i data-lucide="calendar-range"></i> End Academic Session</h3>
         <p class="adviser-card-p">An academic session covers two semesters. Ending it clears only this level's imported
           student list so you can prepare the next session. The selected course rep and all course attendance records
@@ -1613,9 +1604,7 @@
       <button class="drawer-item staff-only" data-view="rosterView">👥 Live Roster
         <span class="drawer-badge hidden" id="badgeRoster">0</span>
       </button>
-      <button class="drawer-item staff-only" data-view="studentsView">🎓 Students</button>
       <button class="drawer-item staff-only" data-view="assistantsView">⭐ Assistants &amp; Groups</button>
-      <button class="drawer-item staff-only" data-view="bulkView">📥 Bulk Import</button>
       <button class="drawer-item staff-only" data-view="exemptionsView">🛡️ Exemptions</button>
       <button class="drawer-item staff-only" data-view="archiveView">📚 Archive &amp; Audit</button>
       <button class="drawer-item staff-only" data-view="analyticsView">📊 Analytics</button>

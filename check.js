@@ -147,13 +147,16 @@ for (const d of ["api", "utils"]) {
   }
   if (!dups.length) ok(`index.html has ${seen.size} ids, none duplicated`);
 
-  // Lookups in app.js that match no element. Two are created at runtime by the
-  // very code that looks them up; the third is an `if (el)`-guarded lookup for
+  // Lookups in app.js that match no element. One is created at runtime by the
+  // very code that looks it up; the other is an `if (el)`-guarded lookup for
   // an element that has since left the markup. Anything NOT on this list is a
   // reference renamed on one side only — the bug above in a new costume, and
   // the reason this list stays explicit rather than being a wildcard.
+  //
+  // `repEnrolledStudentsSection` used to be on this list. It is gone entirely
+  // now — the rep's student panel was removed along with the removal feature,
+  // so there is no longer a lookup to excuse.
   const INTENTIONALLY_ABSENT = new Set([
-    "repEnrolledStudentsSection", // created on demand, then appended
     "personalLogContainer", // created on demand, then appended
     "managementToolbar", // guarded; element removed from the markup
   ]);

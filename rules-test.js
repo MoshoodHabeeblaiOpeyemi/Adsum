@@ -223,6 +223,22 @@ async function main() {
   check("AA. unknown collection is denied by default",
     await req("GET", "/somethingElse/x", { uid: "student1" }), 403);
 
+  // ---- REPS CANNOT REMOVE STUDENTS (regression) ----
+  // `api/course.js?action=remove` was deleted, but that alone did NOT revoke the
+  // rep's power: the members rule still read
+  //   allow delete: if isCourseRep(courseId) || ...
+  // so a rep could `deleteDoc(...)` any student straight from the client SDK and
+  // never touch the API. These two checks exist so that second door cannot be
+  // quietly reopened. They run LAST because the second one deletes a member.
+  check("Z1. rep CANNOT delete another member (removal revoked)",
+    await req("DELETE", "/courses/courseA/members/student1", { uid: "rep1" }), 403);
+
+  // Self-removal stays legal — it is not a privilege, it is a student closing
+  // their own membership, and api/course.js?action=leave does the same thing
+  // transactionally with enrolled[] cleaned up.
+  check("Z2. a member CAN delete their OWN membership (self-leave still works)",
+    await req("DELETE", "/courses/courseA/members/student1", { uid: "student1" }), 200);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }

@@ -19,7 +19,9 @@ try {
 
 const db = getFirestore();
 
-// COURSE ACTIONS - enroll, leave, remove, delete.
+// COURSE ACTIONS - enroll, leave, delete.
+// (`remove` was here until the rep lost that power; see the note above
+// handleDelete for where it went and why.)
 const norm = (v) => String(v || "").trim().toUpperCase();
 
 // Firestore document IDs cannot contain "/", but matric numbers often do
@@ -133,45 +135,29 @@ async function handleLeave(req, res, decoded) {
   }
 }
 
-async function handleRemove(req, res, decoded) {
-  try {
-    const { courseId, targetMatric } = req.body || {};
-    if (!courseId || !targetMatric) return res.status(400).json({ error: "Course ID and matric required." });
-    const matric = targetMatric;
-    const courseRef = db.collection("courses").doc(courseId);
-    const courseSnap = await courseRef.get();
-    if (!courseSnap.exists) return res.status(404).json({ error: "Course not found." });
-    if (courseSnap.data().repUid !== decoded.uid)
-      return res.status(403).json({ error: "Only the rep can remove students." });
-    const liveSnap = await courseRef.collection("session").doc("live").get();
-    if (liveSnap.exists && liveSnap.data().expiresAt && liveSnap.data().expiresAt > Date.now())
-      return res.status(409).json({ error: "Cannot remove during live session. Flag absent instead." });
-    const normalizedTarget = norm(matric);
-    let targetMemberDoc = null;
-    try {
-      await db.runTransaction(async (tx) => {
-        const membersSnap = await tx.get(courseRef.collection("members"));
-        const target = membersSnap.docs.find((d) => norm(d.data().matric) === normalizedTarget);
-        if (!target) throw new Error("STUDENT_NOT_FOUND");
-        targetMemberDoc = target;
-        tx.delete(target.ref);
-        tx.update(courseRef, { enrolled: FieldValue.arrayRemove(normalizedTarget), assistants: FieldValue.arrayRemove(normalizedTarget) });
-      });
-    } catch (txErr) {
-      if (txErr.message === "STUDENT_NOT_FOUND") return res.status(404).json({ error: "Student not found." });
-      throw txErr;
-    }
-    if (targetMemberDoc) {
-      try {
-        await courseRef.collection("removalLog").doc().set({ matric: normalizedTarget, removedBy: decoded.uid, removedAt: FieldValue.serverTimestamp() });
-      } catch (logErr) { console.warn("Removal log:", logErr.message); }
-    }
-    return res.status(200).json({ success: true, message: "Student removed." });
-  } catch (error) {
-    console.error("Remove error:", error);
-    return res.status(500).json({ error: "Unable to remove the student. Please try again." });
-  }
-}
+// 🛑 handleRemove USED TO LIVE HERE and it is gone on purpose.
+//
+// Course reps can no longer remove students from a roster. Hiding the button
+// would not have been enough: this endpoint granted the power SERVER-SIDE to
+// anyone whose uid matched `repUid`, so a rep could have kept calling
+// `POST /api/course?action=remove` straight from devtools. The ability is
+// revoked here, at the boundary, rather than in the UI.
+//
+// WHY IT MOVED RATHER THAN DISAPPEARED
+// A rep still needs a way to deal with someone who joined the course code
+// but should not be in the class. That power now belongs to the Level
+// Adviser — the trust root for the level — via
+// `api/roster.js -> removeCourseStudent`, which checks the adviser's own
+// (institution, department, level) against the COURSE's, so one adviser can
+// never reach another's class.
+//
+// WHAT THE REP STILL HAS
+// 🚩 Flag Absent, on the Live Roster. It is permanent, it alerts the student
+// immediately, and it cannot be quietly undone — which is why it was the
+// better tool for the job in the first place.
+//
+// `removalLog` is retained and still written to (by the adviser action), so
+// the audit trail of every past removal stays readable forever.
 
 async function handleDelete(req, res, decoded) {
   try {
@@ -222,9 +208,12 @@ module.exports = async (req, res) => {
     switch (action) {
       case "enroll": return handleEnroll(req, res, decoded);
       case "leave": return handleLeave(req, res, decoded);
-      case "remove": return handleRemove(req, res, decoded);
       case "delete": return handleDelete(req, res, decoded);
-      default: return res.status(400).json({ error: "Invalid action. Use: enroll, leave, remove, delete" });
+      default:
+        return res.status(400).json({
+          error:
+            "Invalid action. Use: enroll, leave, delete. Removing a student is a Level Adviser action now — see api/roster.js?action=removeCourseStudent.",
+        });
     }
   } catch (error) {
     console.error("Course API error:", error);

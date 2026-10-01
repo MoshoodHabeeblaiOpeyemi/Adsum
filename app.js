@@ -5185,10 +5185,8 @@ if (createCourseForm) {
 // portal is short. Each toolbar button opens exactly one and closes the rest.
 function hideAllManagementPanels() {
   [
-    "bulkImportSection",
     "exemptionManagementSection",
     "assistantManagementSection",
-    "repEnrolledStudentsSection",
     "repArchiveSection",
   ].forEach((id) => {
     const el = document.getElementById(id);
@@ -5246,9 +5244,7 @@ let isDrawerOpen = false;
 const drawerUnseen = {
   checkin: 0,
   roster: 0,
-  students: 0,
   assistants: 0,
-  bulk: 0,
   exemptions: 0,
   archive: 0,
   analytics: 0,
@@ -5306,10 +5302,8 @@ function showDrawerView(view) {
   const allSections = [
     "sessionSetupCard",
     "liveSessionCard",
-    "bulkImportSection",
     "exemptionManagementSection",
     "assistantManagementSection",
-    "repEnrolledStudentsSection",
     "repArchiveSection",
     "studentAnalyticsSection",
     "rosterSection",
@@ -5336,11 +5330,6 @@ function showDrawerView(view) {
       if (el) el.classList.remove("hidden");
       break;
     }
-    case "bulk": {
-      const el = document.getElementById("bulkImportSection");
-      if (el) el.classList.remove("hidden");
-      break;
-    }
     case "exemptions": {
       const el = document.getElementById("exemptionManagementSection");
       if (el) el.classList.remove("hidden");
@@ -5348,11 +5337,6 @@ function showDrawerView(view) {
     }
     case "assistants": {
       const el = document.getElementById("assistantManagementSection");
-      if (el) el.classList.remove("hidden");
-      break;
-    }
-    case "students": {
-      const el = document.getElementById("repEnrolledStudentsSection");
       if (el) el.classList.remove("hidden");
       break;
     }
@@ -5376,10 +5360,8 @@ function showDrawerView(view) {
     {
       checkin: "liveSessionCard",
       roster: "rosterSection",
-      bulk: "bulkImportSection",
       exemptions: "exemptionManagementSection",
       assistants: "assistantManagementSection",
-      students: "repEnrolledStudentsSection",
       archive: "repArchiveSection",
       analytics: "studentAnalyticsSection",
     }[view] || "sessionSetupCard",
@@ -5895,193 +5877,11 @@ if (joinCourseForm) {
   });
 }
 
-// --- BULK STUDENT IMPORT LOGIC ---
-const importCsvBtn = document.getElementById("importCsvBtn");
-const csvFileInput = document.getElementById("csvFileInput");
-const importProgress = document.getElementById("importProgress");
-const importStatus = document.getElementById("importStatus");
-const importResults = document.getElementById("importResults");
-
-if (importCsvBtn && csvFileInput) {
-  importCsvBtn.addEventListener("click", async () => {
-    if (!activeCourse || !auth.currentUser) {
-      toast.error("No active course selected.");
-      return;
-    }
-
-    const file = csvFileInput.files[0];
-    if (!file) {
-      toast.warning("Please select a CSV file first.");
-      return;
-    }
-
-    if (!file.name.endsWith(".csv")) {
-      toast.error("Please upload a CSV file.");
-      return;
-    }
-
-    try {
-      if (importProgress) importProgress.classList.remove("hidden");
-      if (importStatus) importStatus.textContent = "Reading CSV file...";
-      if (importResults) importResults.textContent = "";
-
-      const csvText = await file.text();
-      const lines = csvText
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line);
-
-      // Parse CSV - handle both header and no-header formats
-      let matrics = [];
-      const hasHeader =
-        lines[0].toLowerCase().includes("matric") ||
-        lines[0].toLowerCase().includes("number");
-
-      const startIndex = hasHeader ? 1 : 0;
-      for (let i = startIndex; i < lines.length; i++) {
-        const line = lines[i];
-        // Handle comma-separated or just one matric per line
-        const parts = line
-          .split(",")
-          .map((part) => part.trim())
-          .filter((part) => part);
-        if (parts.length > 0) {
-          // Take the first non-empty part as the matric
-          matrics.push(normalizeMatric(parts[0]));
-        }
-      }
-
-      if (matrics.length === 0) {
-        throw new Error("No valid matric numbers found in CSV.");
-      }
-
-      if (importStatus)
-        importStatus.textContent = `Found ${matrics.length} matric numbers. Processing...`;
-
-      // Filter out already enrolled students
-      const currentEnrolled = (activeCourse.enrolled || []).map(
-        normalizeMatric,
-      );
-      const newMatrics = matrics.filter((m) => !currentEnrolled.includes(m));
-
-      if (newMatrics.length === 0) {
-        if (importStatus)
-          importStatus.textContent = "All students already enrolled.";
-        if (importResults)
-          importResults.textContent = `${matrics.length} total, 0 new.`;
-        toast.info("All students from CSV are already enrolled.");
-        return;
-      }
-
-      const confirmed = await showConfirm({
-        title: "Import students into this course?",
-        message:
-          "Each new matric number will be added to the course roster. Already-enrolled students will be skipped.",
-        okText: "Import students",
-        cancelText: "Cancel",
-        danger: false,
-        icon: "users-round",
-        details: [
-          { label: "Course", value: activeCourse.name || activeCourse.code },
-          { label: "New students", value: newMatrics.length },
-          {
-            label: "Already enrolled",
-            value: matrics.length - newMatrics.length,
-          },
-        ],
-      });
-      if (!confirmed) {
-        if (importStatus) importStatus.textContent = "Import cancelled.";
-        return;
-      }
-
-      // Process in batches to avoid overwhelming Firestore
-      const batchSize = 10;
-      let successCount = 0;
-      let failCount = 0;
-      const failedMatrics = [];
-
-      for (let i = 0; i < newMatrics.length; i += batchSize) {
-        const batch = newMatrics.slice(i, i + batchSize);
-        const batchPromises = batch.map(async (matric) => {
-          try {
-            // Generate a temporary UID for the student (they'll bind their real account on first login)
-            const tempUid = `temp_${matric.replace(/[^a-zA-Z0-9]/g, "")}_${Date.now()}`;
-
-            await setDoc(
-              doc(db, "courses", activeCourse.id, "members", tempUid),
-              {
-                uid: tempUid,
-                matric: matric,
-                name: matric, // Placeholder name until they register
-                role: "student",
-                joinedAt: Date.now(),
-                pendingRegistration: true, // Flag to indicate they need to register
-              },
-            );
-            return { success: true, matric };
-          } catch (error) {
-            console.error(`Failed to add ${matric}:`, error);
-            return { success: false, matric, error: error.message };
-          }
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        batchResults.forEach((result) => {
-          if (result.success) {
-            successCount++;
-          } else {
-            failCount++;
-            failedMatrics.push(result.matric);
-          }
-        });
-
-        // Update progress
-        const processed = Math.min(i + batchSize, newMatrics.length);
-        if (importStatus)
-          importStatus.textContent = `Processed ${processed}/${newMatrics.length} students...`;
-      }
-
-      // Update course document with new enrolled list
-      activeCourse.enrolled = [
-        ...currentEnrolled,
-        ...newMatrics.filter((m) => {
-          return failedMatrics.indexOf(m) === -1;
-        }),
-      ];
-      await updateCourseInFirestore();
-
-      // Show results
-      if (importStatus) importStatus.textContent = "Import completed!";
-      if (importResults) {
-        importResults.innerHTML = `
-            <div>✅ Successfully enrolled: ${successCount}</div>
-            <div>❌ Failed: ${failCount}</div>
-            ${failedMatrics.length > 0 ? `<div style="margin-top: 4px; color: var(--danger);">Failed: ${failedMatrics.slice(0, 5).join(", ")}${failedMatrics.length > 5 ? "..." : ""}</div>` : ""}
-          `;
-      }
-
-      toast.success(
-        `Successfully imported ${successCount} students. ${failCount > 0 ? `${failCount} failed.` : ""}`,
-        "Import Complete 📥",
-      );
-
-      // Refresh the UI
-      renderPortalState();
-      renderAssistantDropdownAndList();
-    } catch (error) {
-      console.error("CSV Import Error:", error);
-      if (importStatus) importStatus.textContent = "Import failed.";
-      if (importResults) importResults.textContent = error.message;
-      toast.error(error.message || "Failed to import CSV file.");
-    } finally {
-      // Hide progress after a delay
-      setTimeout(() => {
-        if (importProgress) importProgress.classList.add("hidden");
-      }, 5000);
-    }
-  });
-}
+// 🛑 BULK STUDENT IMPORT LOGIC REMOVED.
+// The rep-side CSV enrol flow is gone. Enrollment now comes from two places
+// only: a student joining with the course code, or the Level Adviser'"'"'s
+// authoritative level roster. A rep pasting their own CSV created a second,
+// competing source of truth for who is in the class.
 
 // --- HOLIDAY/EXEMPTION MANAGEMENT LOGIC ---
 const addExemptionBtn = document.getElementById("addExemptionBtn");
@@ -6688,139 +6488,13 @@ window.revokeAssistant = async function (matric) {
   }
 };
 
-window.removeStudentFromCourse = async function (matric) {
-  if (!activeCourse) return;
-
-  // ── TRANSPARENCY BEFORE THE TAP ────────────────────────────────────────
-  // Removing someone is a decision about a real person, so the rep is shown
-  // the three facts that decide whether to press the button at all:
-  //
-  //   1. WHO it is. A matric alone is an identifier, not a person. The app
-  //      already has a "Name (MATRIC) everywhere a human reads a list" rule,
-  //      and removing a student is the least forgiving place to break it.
-  //   2. WHAT IT DOES to their record. History is KEPT. A rep who believes
-  //      removal erases attendance will "remove" a student to tidy away a bad
-  //      number — and the number survives anyway, so the attempt buys nothing
-  //      and quietly produces a permanent removal entry.
-  //   3. WHAT IT IS NOT. This is not a ban; they rejoin instantly with the
-  //      course code. Anyone who needs a student kept out of a class uses
-  //      🚩 Flag Absent on the roster, which IS permanent and tells the
-  //      student. Removal only tidies the roster.
-  const targetMatric = normalizeMatric(matric);
-  const studentName = nameForMatric(targetMatric);
-  let semesterLine = "No classes held yet";
-  if (lastSemesterReport && lastSemesterReport.sessions) {
-    const row = (lastSemesterReport.rows || []).find(
-      (r) => normalizeMatric(r.matric) === targetMatric,
-    );
-    if (row) {
-      semesterLine = `${row.attended} of ${row.total} classes (${row.percent}%)`;
-    }
-  }
-
-  if (
-    await showConfirm({
-      title: "Remove Student From Roster",
-      message: `Remove ${studentName} from ${activeCourse.name}?`,
-      okText: "Remove from roster",
-      cancelText: "Cancel",
-      // A lucide name, not the 🚪 emoji the old dialog passed: the confirm
-      // dialog only renders icon names matching /^[a-z][a-z0-9-]*$/i, so the
-      // emoji silently fell back to a generic warning triangle.
-      icon: "door-open",
-      danger: true,
-      details: [
-        { label: "Student", value: `${studentName} (${targetMatric})` },
-        { label: "This semester", value: semesterLine },
-        {
-          label: "Their attendance history",
-          value: "Kept — removal never erases past classes",
-        },
-        {
-          label: "Audit log",
-          value: "A permanent record of this removal is written",
-        },
-        {
-          label: "They can rejoin",
-          value: "Yes, immediately, with the course code",
-        },
-      ],
-    })
-  ) {
-    try {
-      // 🔒 Removing a student is a decision the rep makes about a real
-      // person, and it logs an entry. Locked per course+matric.
-      await withBusyOnce(
-        "Removing the student…",
-        "removeStudent:" + activeCourse.id + ":" + normalizeMatric(matric),
-        async () => {
-          const idToken = await auth.currentUser.getIdToken();
-          const response = await fetch("/api/course?action=remove", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({
-              courseId: activeCourse.id,
-              targetMatric: matric,
-            }),
-          });
-          const result = await response.json();
-          if (!response.ok)
-            throw new Error(result.error || "Unable to remove student.");
-
-          // Update local state to reflect the removal immediately. `members`
-          // is included because the Semester Report is built from it — without
-          // this the removed student kept a row in the report until some
-          // unrelated listener happened to fire and re-render it.
-          if (activeCourse.enrolled) {
-            activeCourse.enrolled = activeCourse.enrolled
-              .map(normalizeMatric)
-              .filter((m) => m !== targetMatric);
-          }
-          if (activeCourse.assistants) {
-            activeCourse.assistants = activeCourse.assistants
-              .map(normalizeMatric)
-              .filter((m) => m !== targetMatric);
-          }
-          if (Array.isArray(activeCourse.members)) {
-            activeCourse.members = activeCourse.members.filter(
-              (m) => normalizeMatric(m.matric) !== targetMatric,
-            );
-          }
-
-          renderPortalState();
-          renderAssistantDropdownAndList();
-          // Neither of these is re-rendered by renderPortalState(), and both
-          // read state the removal just changed — so without these two calls
-          // the screen keeps showing a student who is no longer on the roster.
-          renderSemesterReport();
-          renderAuditSection();
-          // Report what actually happened rather than that a button was
-          // pressed: history intact, record permanent, and not a ban. The rep
-          // should never have to guess which of those three this was.
-          toast.success(
-            `${studentName} (${targetMatric}) is off the roster. Their attendance history is kept, the removal is recorded in the audit log, and they can rejoin with the course code.`,
-            "Student Removed",
-          );
-        },
-      );
-    } catch (error) {
-      console.error("Remove student error:", error);
-      // 🛑 Show WHY it failed. The old fixed message buried the one answer the
-      // rep actually needs: the server refuses removal while a session is LIVE
-      // ("Cannot remove during live session. Flag absent instead."). Being told
-      // to "try again" sent them into a retry loop that could never succeed.
-      toast.error(
-        error && error.message
-          ? error.message
-          : "Unable to remove the student. Please try again.",
-        "Not Removed",
-      );
-    }
-  }
-};
+// 🛑 removeStudentFromCourse REMOVED.
+// Course reps can no longer take a student off a roster. The permission was
+// revoked in api/course.js (the `remove` action is gone), not just hidden
+// here — a hidden button is not a revoked permission. Removal is now a Level
+// Adviser action: api/roster.js?action=removeCourseStudent.
+// The rep'"'"'s remaining per-student tool is Flag Absent on the Live Roster,
+// which is permanent and notifies the student.
 
 function renderAssistantDropdownAndList() {
   if (!activeCourse) return;
@@ -8744,66 +8418,6 @@ function renderPortalState() {
     renderSecurityEventsPanel();
   }
 
-  if (isRep) {
-    let enrolledListDiv = document.getElementById("repEnrolledStudentsSection");
-
-    if (!enrolledListDiv && portalSection) {
-      enrolledListDiv = document.createElement("div");
-      enrolledListDiv.id = "repEnrolledStudentsSection";
-      enrolledListDiv.className = "hidden";
-      enrolledListDiv.style.cssText =
-        "margin-top: 20px; background: var(--bg); padding: 20px; border-radius: 12px; border: 1.5px solid var(--border); margin-bottom: 20px;";
-
-      // 🛑 Delegation is wired ONCE, at creation. It used to be attached after
-      // every innerHTML rebuild — a fresh listener on every
-      // renderPortalState() call — so the Nth render fired N confirm dialogs
-      // for a single tap, and the rep confirmed the same removal over and
-      // over. One listener per element is the whole fix.
-      enrolledListDiv.addEventListener("click", (e) => {
-        const removeBtn = e.target.closest(".remove-student-btn");
-        if (removeBtn) {
-          e.preventDefault();
-          removeStudentFromCourse(removeBtn.dataset.matric);
-        }
-      });
-
-      const targetParent = portalSection;
-      targetParent.appendChild(enrolledListDiv);
-    }
-
-    if (enrolledListDiv) {
-      const enrolledMatrics = activeCourse.enrolled || [];
-      let studentRowsHTML = "";
-
-      if (enrolledMatrics.length === 0) {
-        studentRowsHTML = `<p style="color: var(--muted); font-size: 0.85rem;">No students enrolled yet.</p>`;
-      } else {
-        enrolledMatrics.forEach((matric) => {
-          const isRepMatric = userMatric === normalizeMatric(matric);
-          const safeMatric = escapeHTML(matric);
-          // "Name (MATRIC)" — a bare matric forces the rep to identify the
-          // person by memory at the exact moment they remove them.
-          const safeLabel = escapeHTML(nameForMatric(matric));
-          studentRowsHTML += `
-            <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--bg); border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem;">
-              <span>🎓 <strong>${safeLabel}</strong> ${isRepMatric ? "(You - Rep)" : ""}</span>
-              ${!isRepMatric ? `<button data-matric="${safeMatric}" class="remove-student-btn" style="background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem; font-weight: bold;">Remove 🚪❌</button>` : ""}
-            </li>
-          `;
-        });
-      }
-
-      enrolledListDiv.innerHTML = `
-        <h4 style="color: var(--navy); margin-bottom: 10px; font-size: 1rem;">👥 Manage Enrolled Students (${enrolledMatrics.length})</h4>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;">Remove students who joined your course code but should not be on the roster.</p>
-        <p style="font-size: 0.8rem; color: var(--muted); margin-bottom: 10px;"><strong>What removal does:</strong> takes them off the roster and off check-in, and writes a permanent entry to the audit log. <strong>What it does not do:</strong> erase their past attendance — and they can rejoin immediately with the course code. While a session is LIVE, removal is blocked; use 🚩 Flag Absent on the roster instead.</p>
-        <ul style="list-style: none; padding: 0; max-height: 180px; overflow-y: auto;">
-          ${studentRowsHTML}
-        </ul>
-      `;
-    }
-  }
-
   const repArchiveSection = document.getElementById("repArchiveSection");
   if (isRep && repArchiveSection) {
     const totalClassesCount = document.getElementById("totalClassesCount");
@@ -9169,6 +8783,9 @@ function adviserEls() {
     logWrap: document.getElementById("repLogWrap"),
     log: document.getElementById("repLog"),
     endSession: document.getElementById("endAcademicSessionBtn"),
+    courseSelect: document.getElementById("adviserCourseSelect"),
+    classList: document.getElementById("adviserClassList"),
+    removeMsg: document.getElementById("adviserRemoveMsg"),
   };
 }
 
@@ -9198,6 +8815,10 @@ const ADVISER_BUSY = {
   importRoster: "Importing the roster…",
   chooseRep: "Saving the rep…",
   endAcademicSession: "Closing the session…",
+  // 🔒 Locked per action for the same reason as the others: a double-tap on
+  // "Remove" would otherwise fire two confirmations and could write a second
+  // removalLog entry for one decision.
+  removeCourseStudent: "Removing the student…",
 };
 
 async function adviserApi(action, body) {
@@ -9398,6 +9019,155 @@ async function loadAdviserRoster() {
       return;
     }
     adviserMessage("err", escapeHTML(err.message));
+  }
+}
+
+// ── REMOVE A STUDENT FROM A COURSE (adviser-only) ────────────────────────────
+//
+// This replaces the rep's removed "Manage Enrolled Students" panel. The rep
+// can no longer take anyone off a roster at all — that permission is gone
+// from api/course.js — so this screen is the single remaining route.
+//
+// Every value rendered here is escaped. The matric travels as a data
+// attribute and is re-read from it on click, never from innerHTML.
+
+function adviserRemoveMessage(kind, html) {
+  const el = adviserEls().removeMsg;
+  if (!el) return;
+  el.className = "adviser-msg " + kind;
+  el.innerHTML = html;
+  el.classList.remove("hidden");
+}
+
+async function loadAdviserScopedCourses() {
+  const el = adviserEls();
+  if (!el.courseSelect) return;
+  try {
+    const data = await adviserApi("listScopedCourses", {});
+    const courses = Array.isArray(data.courses) ? data.courses : [];
+    el.courseSelect.innerHTML = "";
+    if (!courses.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No courses in your scope yet";
+      el.courseSelect.appendChild(opt);
+      el.courseSelect.disabled = true;
+      return;
+    }
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Choose a course…";
+    el.courseSelect.appendChild(placeholder);
+    courses.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      const count = Number(c.enrolledCount) || 0;
+      opt.textContent = `${c.name}${c.code ? " (" + c.code + ")" : ""} — ${count} enrolled`;
+      el.courseSelect.appendChild(opt);
+    });
+    el.courseSelect.disabled = false;
+  } catch (err) {
+    el.courseSelect.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Could not load your courses";
+    el.courseSelect.appendChild(opt);
+    el.courseSelect.disabled = true;
+    adviserRemoveMessage("err", escapeHTML(err.message));
+  }
+}
+
+async function loadAdviserCourseStudents(courseId) {
+  const el = adviserEls();
+  if (!el.classList) return;
+  if (!courseId) {
+    el.classList.classList.add("hidden");
+    el.classList.innerHTML = "";
+    return;
+  }
+  try {
+    const data = await adviserApi("listCourseStudents", { courseId });
+    const students = Array.isArray(data.students) ? data.students : [];
+    const repUid = data.repUid || null;
+
+    if (!students.length) {
+      el.classList.innerHTML =
+        '<div class="adviser-preview-head">No students on this roster yet.</div>';
+      el.classList.remove("hidden");
+      return;
+    }
+
+    // The rep's own row is shown but carries no button: the server refuses to
+    // remove the rep, so offering the control would be a dead button. The row
+    // still appears because the adviser needs to see who the rep is.
+    const rows = students
+      .map((s) => {
+        const isRep = repUid && s.uid === repUid;
+        const action = isRep
+          ? '<span style="font-size: 0.72rem; color: var(--teal-ink); font-weight: 700;">Course rep</span>'
+          : `<button type="button" class="adviser-remove-student-btn" data-remove-matric="${escapeHTML(s.matric)}" data-remove-name="${escapeHTML(s.name)}" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; cursor: pointer;">Remove</button>`;
+        return `<tr><td>${escapeHTML(s.matric)}</td><td>${escapeHTML(s.name)}</td><td style="text-align: right;">${action}</td></tr>`;
+      })
+      .join("");
+
+    el.classList.innerHTML =
+      `<div class="adviser-preview-head">${escapeHTML(
+        (data.course && data.course.name) || "Class",
+      )} — ${students.length} enrolled</div>` +
+      `<div class="adviser-preview-scroll"><table><thead><tr><th>Matric</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    el.classList.remove("hidden");
+  } catch (err) {
+    el.classList.add("hidden");
+    el.classList.innerHTML = "";
+    adviserRemoveMessage("err", escapeHTML(err.message));
+  }
+}
+
+async function removeAdviserCourseStudent(matric, name) {
+  const el = adviserEls();
+  if (!matric || !el.courseSelect) return;
+  const courseId = el.courseSelect.value;
+  if (!courseId) return;
+
+  // Same "transparency before the tap" rule the rep's version followed: this
+  // is a decision about a real person, and the three facts that decide it are
+  // shown BEFORE the button is pressed, not after.
+  const ok = await showConfirm({
+    title: "Remove Student From Class",
+    message: `Remove ${name} (${matric}) from this class?`,
+    okText: "Remove from roster",
+    cancelText: "Cancel",
+    icon: "door-open",
+    danger: true,
+    details: [
+      { label: "Student", value: `${name} (${matric})` },
+      {
+        label: "Their attendance history",
+        value: "Kept — removal never erases past classes",
+      },
+      { label: "Audit log", value: "A permanent record is written" },
+      { label: "They can rejoin", value: "Yes, immediately, with the course code" },
+    ],
+  });
+  if (!ok) return;
+
+  try {
+    const res = await adviserApi("removeCourseStudent", {
+      courseId,
+      targetMatric: matric,
+    });
+    adviserRemoveMessage(
+      "ok",
+      escapeHTML(res.message || "Student removed.") +
+        " Their history was kept and the removal is recorded in the audit log.",
+    );
+    toast.success(res.message || "Student removed.", "Removed");
+    await loadAdviserCourseStudents(courseId);
+  } catch (err) {
+    // 🛑 Surface WHY. The server distinguishes "outside your scope", "that is
+    // the rep" and "session is live" — collapsing them into "try again" is what
+    // sent the old rep flow into an unresolvable retry loop.
+    adviserRemoveMessage("err", escapeHTML(err.message || "Unable to remove."));
   }
 }
 
@@ -9763,6 +9533,26 @@ function initAdviserDashboard() {
   if (el.repClear) el.repClear.addEventListener("click", clearChosenRep);
   if (el.endSession)
     el.endSession.addEventListener("click", endAdviserAcademicSession);
+
+  // ── Remove-a-student wiring ──
+  if (el.courseSelect) {
+    el.courseSelect.addEventListener("change", () => {
+      loadAdviserCourseStudents(el.courseSelect.value);
+    });
+  }
+  if (el.classList) {
+    // Delegation, wired once here — NOT after every innerHTML rebuild, which
+    // is how the old rep panel once fired N confirm dialogs for one tap.
+    el.classList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".adviser-remove-student-btn");
+      if (!btn) return;
+      e.preventDefault();
+      removeAdviserCourseStudent(
+        btn.dataset.removeMatric,
+        btn.dataset.removeName,
+      );
+    });
+  }
 }
 
 /** Show the dashboard only to a VERIFIED adviser, and only when signed in. */
@@ -9844,6 +9634,9 @@ function syncAdviserDashboard() {
   if (!show) return;
   renderAdviserIdentity();
   loadAdviserRoster();
+  // The rep lost the ability to remove students, so the adviser dashboard is
+  // now the only place that action exists. It has to load with the dashboard.
+  loadAdviserScopedCourses();
 }
 
 /** Populate the adviser's own details in the dashboard header. */

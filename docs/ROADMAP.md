@@ -138,6 +138,9 @@ rep from it, which is what turns the rep badge from *claimed* into *granted*.
 | `importRoster` | Parses the CSV and reports counts **without writing**; a confirmed `commit: true` stores it. All-or-nothing — a partial import would hide missing students until someone fails to check in |
 | `chooseRep` | The matric must already be on the roster. Runs in a transaction so a concurrent import cannot change the list underneath the check. `clear: true` stands the rep down |
 | `getRoster` | Read-only view: counts, the rep, last import. Capped at 200 entries |
+| `removeCourseStudent` | **Adviser-only.** Removes a student from one course roster. `courseId` only selects the target — the course's own institution/department/level are re-checked against the adviser's server-side profile, so one adviser cannot reach another's class. Refuses the rep (`TARGET_IS_REP`) and any live session (`SESSION_LIVE`); writes `removalLog` with `removedByRole` |
+| `listScopedCourses` | The adviser's own courses, filtered server-side. Exists so the UI can offer a course picker without the client ever supplying a scope filter |
+| `listCourseStudents` | One course's members for the removal UI. Scope re-checked against the course for the same reason |
 | `endAcademicSession` | Clears the imported level roster for the next academic session; the selected rep and course attendance history are preserved |
 
 Three decisions worth keeping:

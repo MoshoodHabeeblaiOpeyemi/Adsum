@@ -2,8 +2,9 @@
 // It doubles as the brand: the cache key is the first thing to change on a
 // rebrand, because a stale cache would keep serving the previous logo.
 //
-// v51: mobile density pass + palette re-derived from the logo artwork.
-const CACHE_NAME = "adsum-static-v51";
+// v52: rep loses student-removal (server + Firestore rules); Bulk Import and the
+// rep's Students panel removed; removal moves to the Level Adviser.
+const CACHE_NAME = "adsum-static-v52";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

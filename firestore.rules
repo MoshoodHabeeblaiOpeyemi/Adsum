@@ -315,8 +315,26 @@ service cloud.firestore {
             )
           );
 
-        allow delete: if isCourseRep(courseId)
-          || (signedIn() && request.auth.uid == memberUid);
+        // 🔒 REPS CANNOT REMOVE STUDENTS (see docs/SECURITY_MODEL.md §4a).
+        //
+        // This used to read `isCourseRep(courseId) || (signedIn() &&
+        // request.auth.uid == memberUid)`, which left the rep's removal power
+        // fully intact even after `api/course.js?action=remove` was deleted:
+        // a rep could call `deleteDoc(db, "courses", id, "members", uid)` from
+        // devtools and drop anyone off the roster. Revoking the endpoint was
+        // necessary but NOT sufficient — this rule was the second door.
+        //
+        // Now the ONLY client-side path is a student leaving their own
+        // account. Taking someone ELSE off a roster is a Level Adviser action
+        // (`api/roster.js?action=removeCourseStudent`), which runs with Admin
+        // credentials and therefore bypasses these rules entirely — and is
+        // scope-checked against the course's institution/department/level on
+        // the server.
+        //
+        // Self-removal is kept because it is not a privilege: it is a student
+        // deleting their OWN membership, and `api/course.js?action=leave` does
+        // the same thing transactionally with the enrolled[] array cleaned up.
+        allow delete: if signedIn() && request.auth.uid == memberUid;
       }
 
       match /session/live {

@@ -1679,7 +1679,6 @@ input:focus::placeholder {
      so !important is required to beat the inline style. */
   #repControls,
   #studentControls,
-  #bulkImportSection,
   #exemptionManagementSection,
   #assistantManagementSection,
   #studentAnalyticsSection,
@@ -1695,7 +1694,6 @@ input:focus::placeholder {
 
   #repControls h3,
   #studentControls h3,
-  #bulkImportSection h3,
   #exemptionManagementSection h3,
   #assistantManagementSection h3,
   #studentAnalyticsSection h3,
@@ -1726,7 +1724,6 @@ input:focus::placeholder {
      a 0.9rem line with a 20px inline margin, repeated twelve times. */
   #repControls p,
   #studentControls p,
-  #bulkImportSection p,
   #exemptionManagementSection p,
   #assistantManagementSection p,
   #classExemptionsSection p,
@@ -1742,7 +1739,6 @@ input:focus::placeholder {
   #hotspotStrip,
   #anchorHealthWarning,
   #absentFlagBanner,
-  #importProgress,
   #manualRequestStatus,
   #headcountComparison {
     padding: 10px !important;

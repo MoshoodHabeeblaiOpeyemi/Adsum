@@ -142,10 +142,10 @@ docs/                    architecture, security model, roadmap
 | `api/account.js` | `claimMatric`, `deleteAccount` |
 | `api/approval.js` | `requestManual`, `approveManual`, `grantHotspot` |
 | `api/attendance.js` | `submit`, `flagAbsent` |
-| `api/course.js` | `enroll`, `leave`, `remove`, `delete` |
+| `api/course.js` | `enroll`, `leave`, `delete` |
 | `api/onboarding.js` | `createProfile` |
 | `api/prune-advisers.js` | Scheduled cleanup of unverified adviser applications |
-| `api/roster.js` | `importRoster`, `chooseRep`, `getRoster`, `endAcademicSession` |
+| `api/roster.js` | `importRoster`, `chooseRep`, `getRoster`, `removeCourseStudent`, `listScopedCourses`, `listCourseStudents`, `endAcademicSession` |
 | `api/semester.js` | `endSemester` |
 | `api/session.js` | `close`, `registerDevice`, `rotatePin`, `startSession` |
 | `api/verification.js` | `sendCode`, `verifyCode`, `verifyNIN` |
