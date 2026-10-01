@@ -5,9 +5,11 @@ Static brand assets for **Adsum** (app icons, mark variations, and wordmarks).
 *Adsum* is Latin for "I am present" — what a Roman student said when called during roll
 call. The name, the "A" monogram and the tagline are one design.
 
-> Formerly VeriPresenX, before that Attendify. The `veripresenx-*` files are kept on disk
-> deliberately: they are the previous brand, not clutter, and the rebrand did not delete
-> them.
+> Formerly VeriPresenX, before that Attendify. Both previous brands' artwork has been
+> deleted from this folder — only Adsum ships. The rename history itself is still
+> recorded in the repo README and docs, because the `veripresenx_*` localStorage keys are
+> load-bearing migration state and must not be "tidied away" (see
+> [docs/SECURITY_MODEL.md](../docs/SECURITY_MODEL.md) §5).
 
 ## Two assets, exactly as designed
 
@@ -17,9 +19,34 @@ call. The name, the "A" monogram and the tagline are one design.
 | `adsum-logo-no-tag.png` | Held in `_master/` — the same lockup without the tagline, in case the navbar wants a cleaner line at small sizes |
 | `mark-256-cutout.png`, `mark-64-cutout.png` | The monogram on transparency |
 
-**The monogram is the icon.** `favicon-32.png`, `apple-touch-icon-180.png`, `icon-192.png`,
-`icon-512.png` and `icon-maskable-512.png` are all the "A" monogram, never the full lockup —
-an app tile has no room for a tagline, and the mark alone is what identifies the app at 32 px.
+**The monogram is the icon, and it is allowed to be loud.** `favicon-32.png`,
+`apple-touch-icon-180.png`, `icon-192.png`, `icon-512.png` and `icon-maskable-512.png` are
+all the "A" monogram, never the full lockup — an app tile has no room for a wordmark, and at
+32px the mark is the only thing that reads.
+
+| File | Plate | "A" fills |
+| --- | --- | --- |
+| `favicon-32.png` | **transparent** | 96% |
+| `apple-touch-icon-180.png` | opaque `#0B0D17` | 88% |
+| `icon-192.png`, `icon-512.png` | opaque `#0B0D17` | 86% |
+| `icon-maskable-512.png` | opaque `#0B0D17` | 60% (safe-zone constrained) |
+| `mark-64-cutout.png`, `mark-256-cutout.png` | transparent | 92% |
+
+The tab icon is the one that must be backgroundless: a browser tab is already sitting on a
+light or dark chrome, and an opaque plate just reads as a dark blob. The installable tiles
+stay opaque for the opposite reason — iOS composites transparency to **black**, so a
+transparent home-screen icon renders as a black square.
+
+`index.html` declares the favicon at both 32 and 256 so a high-DPI browser picks the crisp
+file instead of upscaling a 32px one.
+
+### The logo is trimmed to its ink
+
+`adsum-logo-full.png` is trimmed to its bounding box. The original export carried roughly a
+quarter of the canvas as empty transparent margin above and below the artwork, so a CSS
+`height` spent most of its box on nothing and the navbar logo looked tiny. Trimming changes
+no visible pixel — it only makes the box match the drawing, so `height: 44px` in `style.css`
+means 44px of actual logo.
 
 ### Do not split the lockup
 

@@ -240,7 +240,7 @@ html { color-scheme: light; }
 }
 
 .brand-wordmark {
-  height: 34px;
+  height: 44px;
   width: auto;
   display: block;
   /* No mix-blend-mode here any more. screen/multiply existed because the old
@@ -1489,7 +1489,7 @@ input:focus::placeholder {
   }
 
   .brand-wordmark {
-    height: 28px;
+    height: 36px;
   }
 
   .splash-logo {
