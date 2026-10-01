@@ -1,6 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
-/* --- DESIGN TOKENS --- */
+/* --- DESIGN TOKENS ---
+   THE PALETTE IS SAMPLED FROM THE LOGO, NOT GUESSED.
+   Reading brand/adsum-logo-full.png pixel-by-pixel, the lockup is one
+   continuous gradient running left→right:
+
+     cyan  #2BAEC2  →  mint #5FE0CE  →  violet #6E4DD0
+
+   Every accent below is a THEME-ADAPTED DERIVATION of those three stops.
+   The raw logo stops are artwork values: they are tuned to sit on the
+   transparent navy plate, and several are unreadable as UI text — the mint
+   scores just 1.61:1 against white. So the hue is kept and the lightness is
+   re-solved per theme for contrast. The brand is preserved; legibility is not
+   negotiable.
+
+   Two token families, because "this colour as a FILL carrying white text"
+   and "this colour as TEXT on a card" are different problems:
+     --teal / --violet      → fills, gradients, glows, borders
+     --teal-ink / --violet-ink → the same hue re-solved to be readable as
+                                text and to carry white label text          */
 :root {
   --bg-base: #F5F3FF;
   --bg-base-2: #E2E8F0;
@@ -10,17 +28,22 @@
   --border: rgba(15, 23, 42, 0.12);
 
   --text-primary: #0F172A;
-  --text-muted: #64748B;
-  --muted: #64748B;
+  --text-muted: #5A6782;
+  --muted: #5A6782;
   --navy: #1E293B;
 
-  --violet: #7C6CF0;
-  --violet-2: #9F8BFF;
-  --teal: #06D6A0;
-  --teal-glow: rgba(6, 214, 160, 0.28);
-  --accent-glow: rgba(124, 108, 240, 0.30);
-  --danger: #EF4444;
-  --success: #10B981;
+  /* ── Adsum brand ramp (light derivation) ─────────────────────────────── */
+  --cyan: #0F7A87;          /* logo stop 1, darkened: 5.06:1 on white */
+  --teal: #0C8074;          /* logo stop 2 (mint) as a FILL: white on it 4.82:1 */
+  --teal-ink: #0C8074;      /* …as TEXT on a light card: 4.82:1 */
+  --violet: #5B3FD4;        /* logo stop 3 as a FILL: white on it 6.76:1 */
+  --violet-2: #7C5AE8;
+  --violet-ink: #5B3FD4;    /* …as TEXT on a light card: 6.76:1 */
+
+  --teal-glow: rgba(12, 128, 116, 0.16);
+  --accent-glow: rgba(91, 63, 212, 0.22);
+  --danger: #DC2626;
+  --success: #0F9D6E;
 
   --shadow: 0 20px 45px -18px rgba(31, 22, 90, 0.22);
   --glass-blur: blur(18px);
@@ -49,13 +72,22 @@
   --muted: #94A3B8;
   --navy: #E2E8F0;
 
-  --violet: #7C6CF0;
-  --violet-2: #9F8BFF;
-  --teal: #06D6A0;
-  --teal-glow: rgba(6, 214, 160, 0.24);
-  --accent-glow: rgba(124, 108, 240, 0.32);
-  --danger: #EF4444;
-  --success: #10B981;
+  /* ── Adsum brand ramp (dark derivation) ────────────────────────────────
+     On a dark card the logo stops can be used almost verbatim, because the
+     problem inverts: they are now too BRIGHT to carry white text. So the
+     fill tokens take the deeper pair and the ink tokens take the raw logo
+     hues (mint 10.56:1, cyan 8.00:1, violet ink 7.14:1 on #181B2E). */
+  --cyan: #38C3D0;
+  --teal: #0F7D6E;          /* deeper: carries white label text (5.03:1) */
+  --teal-ink: #5FE0CE;      /* the logo's own mint, as text: 10.56:1 */
+  --violet: #6D51E0;        /* deeper: carries white label text (5.38:1) */
+  --violet-2: #9C8BFF;
+  --violet-ink: #A99BFF;    /* lightened: readable as text, 7.14:1 */
+
+  --teal-glow: rgba(95, 224, 206, 0.16);
+  --accent-glow: rgba(109, 81, 224, 0.30);
+  --danger: #F05252;
+  --success: #34D399;
 
   --shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65);
 }
@@ -439,8 +471,15 @@ html { color-scheme: light; }
   border-radius: inherit;
   padding: 1.5px;
   background: conic-gradient(from 0deg, var(--teal), var(--violet), transparent 35%);
+  /* Gradient-border trick. BOTH the prefixed and the standard form are
+     declared, prefixed first: `mask` is a shorthand that RESETS
+     mask-composite back to `add`, so each shorthand has to be followed by
+     its own composite or the second one silently undoes the first. The
+     standard declaration is what Firefox and other non-WebKit engines
+     actually read. */
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -499,20 +538,23 @@ input, select {
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
+/* The chevron is an inline SVG data-URI, so it cannot read var(--teal-ink) —
+   each theme has to carry its own literal hex. They are kept in step with
+   --teal-ink above: #0F7A87 light, #5FE0CE dark. */
 select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
   padding-right: 42px !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2316C4D9'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-hotspot: no-hotspot;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230F7A87'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   background-position: right 14px center;
   background-size: 16px;
+  background-repeat: no-repeat;
 }
 
 [data-theme="dark"] select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%232DE0C9'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%235FE0CE'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
 }
 
 select option, select optgroup {
@@ -587,9 +629,9 @@ input:focus::placeholder {
 }
 
 .hall-info-chip.badge-live {
-  background: rgba(22, 196, 217, 0.12);
-  border-color: rgba(22, 196, 217, 0.35);
-  color: var(--teal);
+  background: rgba(15, 122, 135, 0.12);
+  border-color: rgba(15, 122, 135, 0.35);
+  color: var(--teal-ink);
 }
 
 /* --- LUCIDE VECTOR ICONS STYLING --- */
@@ -616,7 +658,7 @@ input:focus::placeholder {
 .card h2 .lucide,
 .card h3 .lucide,
 .dashboard-header h2 .lucide {
-  color: var(--teal);
+  color: var(--teal-ink);
   vertical-align: -3px;
   margin-right: 8px;
 }
@@ -691,16 +733,34 @@ input:focus::placeholder {
   transform: translateY(0) scale(0.98);
 }
 
+/* Mobile buttons were being made BIGGER here — padding 15px → 16px 20px and
+   font 0.95rem → 1rem — which is exactly the opposite of what a phone needs.
+   The screen is ~360px wide; a 1rem label in a 20px-padded button eats the
+   row. Size is reduced instead, while `min-height` is held at 44px so the tap
+   target still clears the 44×44 accessibility minimum. Smaller type, same
+   reachability. */
 @media (max-width: 600px) {
   .btn {
-    padding: 16px 20px;
-    font-size: 1rem;
-    border-radius: 16px;
+    padding: 11px 14px;
+    font-size: 0.88rem;
+    border-radius: 12px;
+    min-height: 44px;
+    gap: 6px;
   }
 
   .btn-outline {
-    padding: 14px 18px;
-    font-size: 0.9rem;
+    padding: 10px 14px;
+    font-size: 0.84rem;
+    min-height: 42px;
+  }
+
+  /* The icon inside a button was sized for the desktop label and visually
+     outweighs the smaller text it now sits beside. */
+  .btn .lucide {
+    width: 15px;
+    height: 15px;
+    margin-right: 0;
+    vertical-align: -2px;
   }
 }
 
@@ -1388,8 +1448,8 @@ input:focus::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(108, 93, 211, 0.12);
-  color: var(--violet);
+  background: rgba(91, 63, 212, 0.12);
+  color: var(--violet-ink);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 4px 10px;
@@ -1447,8 +1507,8 @@ input:focus::placeholder {
 
 .manage-tool-btn.active {
   border: 2px solid var(--teal) !important;
-  background: rgba(45, 224, 201, 0.15) !important;
-  color: var(--teal) !important;
+  background: rgba(12, 128, 116, 0.15) !important;
+  color: var(--teal-ink) !important;
   box-shadow: none !important;
 }
 
@@ -1470,77 +1530,253 @@ input:focus::placeholder {
 }
 
 /* ============================================================
-   MOBILE / NARROW-SCREEN POLISH
+   MOBILE DENSITY PASS
+   ------------------------------------------------------------
+   THE PROBLEM BEING FIXED
+   On a 360px phone the course portal is a `.card` with 20px of
+   padding, containing ~12 panels that EACH carry another 20px of
+   inline padding. That is 40px of dead margin around a sentence,
+   so the controls read as a wall of boxes: the rep scrolls to find
+   "Generate PIN" while the actual content is only 9 words long.
+
+   THE RULE APPLIED THROUGHOUT
+   "Smaller" must not become "denser". Every value below moves in one
+   of two directions only:
+     · CONTENT shrinks  — type, padding, icon size, control height
+     · SPACE grows      — gap/margin between blocks increases
+   So each panel gets tighter, but the space BETWEEN panels opens up.
+   That is the difference between cluttered and calm: fewer, quieter
+   boxes with air around them, instead of one dense slab.
+
+   Touch targets are never reduced below 44px. The compactness here is
+   typographic and spatial, never a smaller hit area.
    ============================================================ */
 @media (max-width: 640px) {
-  /* App shell breathing room */
+  /* --- App shell: reclaim the outer margin ---------------------- */
   .container {
-    width: min(96%, 850px);
-    margin: 20px auto;
-    padding: 0 10px;
+    width: min(100%, 850px);
+    margin: 14px auto 28px;
+    padding: 0 12px;
   }
 
   .navbar {
-    padding: 12px 4%;
+    padding: 9px 14px;
   }
 
   .brand {
-    font-size: 1.25rem;
-  }
-
-  .brand-wordmark {
-    height: 36px;
-  }
-
-  .splash-logo {
-    width: min(72vw, 300px);
-  }
-
-  .card {
-    padding: 26px 20px;
-  }
-
-  .dashboard-header h2 {
-    font-size: 1.6rem;
-  }
-
-  .section-title {
     font-size: 1.1rem;
   }
 
+  /* The full lockup includes the "I am present" tagline; at 36px the
+     tagline is sub-pixel mush. 30px keeps the wordmark legible and
+     returns vertical space to the content below. */
+  .brand-wordmark {
+    height: 30px;
+  }
+
+  .hamburger-btn {
+    padding: 7px 10px;
+    font-size: 1.25rem;
+    border-radius: 10px;
+  }
+
+  .network-chip {
+    font-size: 0.64rem;
+    padding: 3px 8px;
+  }
+
+  .splash-logo {
+    width: min(66vw, 260px);
+  }
+
+  /* --- Cards: the single biggest win --------------------------- */
+  /* 26px 20px → 15px 14px. On a 360px screen this returns ~12px of
+     width to the actual content inside every nested panel. */
+  .card {
+    padding: 15px 14px;
+    border-radius: 18px;
+  }
+
+  .card h2 {
+    font-size: 1.25rem;
+    margin-bottom: 6px;
+  }
+
+  .card p {
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
+
+  .dashboard-header {
+    margin-bottom: 18px;
+  }
+
+  .dashboard-header h2 {
+    font-size: 1.3rem;
+    letter-spacing: -0.4px;
+  }
+
+  .section-title {
+    font-size: 0.98rem;
+    margin-bottom: 12px;
+  }
+
+  /* --- Grids & action rows -------------------------------------- */
   .course-grid {
-    gap: 16px;
+    /* minmax(280px,…) forced one course per row with a wide gutter on
+       a 360px screen. A single tight track fits the same information
+       into far less scrolling. */
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .course-grid .card {
+    padding: 14px 13px;
   }
 
   .action-buttons {
     flex-direction: column;
-    gap: 12px;
+    gap: 9px;
+    margin-bottom: 22px;
   }
 
-  /* Course Rep Control Center */
-  #repControls {
-    padding: 16px 14px !important;
+  /* --- Typography & control floor ------------------------------ */
+  /* Body copy in the portal is already 0.85–0.9rem; this trims the
+     oversized display sizes so the hierarchy survives on a small
+     screen instead of every level shouting at the same volume. */
+  .lucide {
+    width: 16px;
+    height: 16px;
   }
 
-  #repControls h3 {
-    font-size: 1.05rem;
+  label {
+    font-size: 0.8rem;
+    margin-bottom: 6px;
   }
 
-  #repControls > div,
-  #repControls .hall-info-chip {
-    margin-bottom: 14px;
+  input,
+  select {
+    padding: 11px 13px;
+    font-size: 0.9rem;
   }
 
+  .field {
+    margin-bottom: 15px;
+  }
+
+  /* ============================================================
+     THE COURSE PORTAL — the screen that was worst
+     Panels drop from 20px to 12px of padding while the gap BETWEEN
+     them grows to 14px. Tighter boxes, airier page.
+     ============================================================ */
+  #backToDashboard {
+    margin-bottom: 12px !important;
+    padding: 7px 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* These are the inline-styled `padding: 20px` blocks in index.html,
+     so !important is required to beat the inline style. */
+  #repControls,
+  #studentControls,
+  #bulkImportSection,
+  #exemptionManagementSection,
+  #assistantManagementSection,
+  #studentAnalyticsSection,
+  #classExemptionsSection,
+  #classReportsSection,
+  #repArchiveSection,
+  #gradeProjectionSection,
+  #rosterSection {
+    padding: 12px !important;
+    margin-top: 14px !important;
+    border-radius: 12px;
+  }
+
+  #repControls h3,
+  #studentControls h3,
+  #bulkImportSection h3,
+  #exemptionManagementSection h3,
+  #assistantManagementSection h3,
+  #studentAnalyticsSection h3,
+  #classExemptionsSection h3,
+  #classReportsSection h3,
+  #repArchiveSection h3 {
+    font-size: 0.95rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  #repControls h4,
+  #manualRequestsPanel h4,
+  #activePinDisplay p,
+  #liveSessionCard h4 {
+    font-size: 0.85rem !important;
+  }
+
+  /* Sub-panel boxes (hall setup, headcount, manual override) */
+  #hallSetupBlock,
+  #attendanceModeSection,
+  #headcountPanel,
+  #manualOverridePanel {
+    padding: 11px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Paragraphs inside panels are the single biggest source of height:
+     a 0.9rem line with a 20px inline margin, repeated twelve times. */
+  #repControls p,
+  #studentControls p,
+  #bulkImportSection p,
+  #exemptionManagementSection p,
+  #assistantManagementSection p,
+  #classExemptionsSection p,
+  #classReportsSection p,
+  #studentAnalyticsSection p {
+    font-size: 0.82rem !important;
+    margin-bottom: 10px !important;
+    line-height: 1.5;
+  }
+
+  /* Banners */
+  #sessionBanner,
+  #hotspotStrip,
+  #anchorHealthWarning,
+  #absentFlagBanner,
+  #importProgress,
+  #manualRequestStatus,
+  #headcountComparison {
+    padding: 10px !important;
+    margin-bottom: 12px !important;
+    font-size: 0.8rem !important;
+  }
+
+  #countdownTimer {
+    /* !important is REQUIRED here: index.html sets font-size: 1.2rem as an
+       inline style on this element, and an inline style outranks any
+       selector specificity — without this the rule is silently dead. */
+    font-size: 1.05rem !important;
+  }
+
+  /* The PIN is the one thing that MUST stay large — the rep reads it
+     across a hall and the class reads it off a projector. It is
+     deliberately EXEMPT from this density pass, and because its
+     2rem/8px is an inline style in index.html, that exemption holds
+     without needing to fight it. */
+  #activePinDisplay {
+    padding: 12px !important;
+  }
+
+  /* --- Rep control centre -------------------------------------- */
   .hall-actions-row {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
   }
 
   .hall-actions {
     width: 100%;
-    justify-content: center;
-    gap: 10px;
+    justify-content: stretch;
+    gap: 8px;
   }
 
   .hall-actions button {
@@ -1549,98 +1785,192 @@ input:focus::placeholder {
     font-size: 0.78rem;
   }
 
-  /* Attendance mode cards: single column, room to breathe */
   #modeCardsGrid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
   }
 
   #modeCardsGrid button[data-mode] {
-    padding: 12px 12px !important;
+    padding: 10px 11px !important;
     font-size: 0.78rem !important;
   }
 
   #modeCardsGrid button[data-mode] div {
-    margin-bottom: 4px !important;
+    margin-bottom: 3px !important;
+  }
+
+  #modeHint {
+    font-size: 0.72rem !important;
+    margin-top: 6px !important;
   }
 
   /* Headcount: input and button stack full-width */
-  .headcount-row {
+  .headcount-row,
+  .manual-request-actions {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .headcount-row input {
     flex: 1 1 100%;
   }
 
-  .headcount-row .btn {
-    width: 100% !important;
-    padding: 10px 14px !important;
-    font-size: 0.8rem !important;
-  }
-
-  /* Manual verification requests: full-width stacked actions */
-  .manual-request-actions {
-    flex-direction: column;
-  }
-
+  .headcount-row .btn,
   .manual-request-actions [data-approve-uid],
   .manual-request-actions [data-reject-uid] {
     width: 100% !important;
     padding: 10px 12px !important;
-    font-size: 0.78rem !important;
+    font-size: 0.8rem !important;
+    min-height: 42px;
   }
 
-  /* Lower sections: slightly tighter padding */
-  #assistantManagementSection,
-  #exemptionManagementSection,
-  #repArchiveSection,
-  #studentAnalyticsSection {
-    padding: 16px 14px !important;
+  /* --- Scrolling lists: a capped height plus per-row breathing room,
+         so a 40-row archive reads as a list instead of a solid block. */
+  #exemptionsList,
+  #classExemptionsList,
+  #classReportsList,
+  #archiveListContainer,
+  #auditLogContainer,
+  #securityEventsContainer,
+  #deviceFlagsListContainer,
+  #manualRequestsListContainer {
+    max-height: 260px;
   }
 
-  /* Modals & confirm dialogs */
+  #exemptionsList > *,
+  #classExemptionsList > *,
+  #classReportsList > *,
+  #archiveListContainer > *,
+  #auditLogContainer > *,
+  #assistantsList > * {
+    margin-bottom: 6px;
+  }
+
+  /* --- Modals & confirmations ---------------------------------- */
+  .modal {
+    padding: 14px;
+  }
+
   .modal-card {
-    padding: 24px 20px;
+    padding: 20px 17px;
+    border-radius: 18px;
+    /* A tall form on a short phone used to push its own action buttons
+       off the bottom of the screen with no way to reach them. */
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .modal-card h3 {
+    font-size: 1.15rem;
+    margin-bottom: 14px;
   }
 
   .modal-actions {
     flex-direction: column;
-    gap: 10px;
+    gap: 9px;
+    margin-top: 18px;
   }
 
   .modal-actions .btn {
-    min-height: 46px;
+    min-height: 44px;
   }
 
   #confirm-box {
-    padding: 24px 20px;
+    padding: 20px 17px;
+    border-radius: 18px;
   }
 
-  /* Session banner + PIN display */
-  #activePinDisplay {
-    padding: 12px 12px;
+  #confirm-icon {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
   }
 
-  #pinCodeText {
-    font-size: 1.7rem;
-    letter-spacing: 6px;
+  #confirm-title {
+    font-size: 1.05rem;
   }
 
-  /* QR projector overlay: fit narrow screens, never overflow the viewport */
+  #confirm-message {
+    font-size: 0.84rem;
+    margin-bottom: 18px;
+  }
+
+  #confirm-actions {
+    gap: 9px;
+  }
+
+  #confirm-cancel,
+  #confirm-ok {
+    padding: 10px;
+    font-size: 0.85rem;
+    min-height: 44px;
+  }
+
+  /* Busy overlay: a full-screen card is mostly wasted space on a phone */
+  .busy-card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .busy-spinner {
+    width: 34px;
+    height: 34px;
+    margin-bottom: 12px;
+  }
+
+  .busy-label {
+    font-size: 0.92rem;
+  }
+
+  .busy-hint {
+    font-size: 0.8rem;
+  }
+
+  /* --- Toasts --------------------------------------------------- */
+  .toast {
+    padding: 11px 13px;
+    font-size: 0.85rem;
+  }
+
+  .toast-title,
+  .toast-message {
+    font-size: 0.82rem;
+  }
+
+  /* --- Guide modal ---------------------------------------------- */
+  .guide-section {
+    padding: 10px 9px;
+  }
+
+  .guide-step {
+    gap: 7px;
+  }
+
+  .guide-step-num {
+    width: 19px;
+    height: 19px;
+    font-size: 0.66rem;
+  }
+
+  /* --- QR projector overlay: fit narrow screens, never overflow the
+         viewport. This overlay is shown to the CLASS on a projector, so
+         — like the PIN — its type is deliberately left generous. */
   #qrModeOverlay {
     overflow-y: auto;
+    padding: 14px;
   }
+
   #qrCourseTitle {
     font-size: 1.1rem;
   }
+
   #qrCanvas {
     max-width: min(86vw, 540px);
     max-height: min(70vh, 540px);
     width: auto;
     height: auto;
   }
+
   #qrPinText {
     font-size: 1.2rem;
     letter-spacing: 6px;
@@ -1648,8 +1978,67 @@ input:focus::placeholder {
 
   #closeQrBtn {
     width: auto;
-    padding: 10px 20px;
+    padding: 10px 18px;
     font-size: 0.85rem;
+  }
+
+  /* --- Mission-control drawer ----------------------------------- */
+  .portal-drawer {
+    width: min(86vw, 320px);
+  }
+
+  .drawer-header {
+    padding: 13px 13px 11px;
+  }
+
+  .drawer-title {
+    font-size: 0.92rem;
+  }
+
+  .drawer-nav {
+    padding: 7px 10px 4px;
+    gap: 8px;
+  }
+
+  .drawer-item {
+    padding: 11px 12px;
+    font-size: 0.87rem;
+    border-radius: 10px;
+  }
+
+  .drawer-footnote {
+    font-size: 0.7rem;
+    padding: 9px 12px;
+  }
+
+  /* The tab is a persistent floating control: it shrinks a little but
+     stays wide enough to hit with a thumb. */
+  .drawer-tab {
+    width: 32px;
+    height: 68px;
+  }
+
+  .drawer-tab .tab-glyph {
+    font-size: 1rem;
+  }
+
+  .drawer-tab .tab-label {
+    font-size: 0.5rem;
+  }
+
+  /* --- Semester report table ------------------------------------ */
+  .report-table {
+    font-size: 0.78rem;
+  }
+
+  .report-table th,
+  .report-table td {
+    padding: 7px 8px;
+  }
+
+  .report-table th {
+    font-size: 0.66rem;
+    letter-spacing: 0.6px;
   }
 }
 /* ============================================================
@@ -1750,7 +2139,7 @@ input:focus::placeholder {
 .drawer-item.active {
   border-color: var(--violet);
   background: var(--accent-glow);
-  color: var(--violet);
+  color: var(--violet-ink);
 }
 .drawer-item.hidden {
   display: none;

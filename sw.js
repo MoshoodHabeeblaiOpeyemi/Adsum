@@ -1,7 +1,9 @@
 // Bump this version string on EVERY deploy so the SW refreshes automatically.
 // It doubles as the brand: the cache key is the first thing to change on a
 // rebrand, because a stale cache would keep serving the previous logo.
-const CACHE_NAME = "adsum-static-v50";
+//
+// v51: mobile density pass + palette re-derived from the logo artwork.
+const CACHE_NAME = "adsum-static-v51";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

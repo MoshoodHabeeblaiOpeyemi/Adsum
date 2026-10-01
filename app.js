@@ -1,8 +1,8 @@
 // 🔖 BUILD MARKER — proves which version of app.js the browser is running.
-// If your console does NOT print "build 256052f-drawer", the running JS is stale.
+// If your console does NOT print the build id below, the running JS is stale.
 console.log(
-  "%cAdsum build: premium-design-system (palette refresh, button micro-interactions, success celebration, skeleton shimmer, toast slide-in)",
-  "color:#7C6CF0;font-weight:bold",
+  "%cAdsum build: mobile-density + logo-derived palette (cyan #0F7A87 → mint #5FE0CE → violet #5B3FD4)",
+  "color:#5B3FD4;font-weight:bold",
 );
 
 // --- SUCCESS CELEBRATION (premium check-in moment) ---
@@ -82,7 +82,7 @@ function showToast(message, type = "info", title = "", durationMs) {
       '<i data-lucide="x-circle" style="color: var(--danger); width:18px; height:18px;"></i>',
     warning:
       '<i data-lucide="alert-triangle" style="color: #fd7e14; width:18px; height:18px;"></i>',
-    info: '<i data-lucide="info" style="color: var(--teal); width:18px; height:18px;"></i>',
+    info: '<i data-lucide="info" style="color: var(--teal-ink); width:18px; height:18px;"></i>',
   };
   const titles = {
     success: "Success",
@@ -7045,7 +7045,7 @@ function syncQrDisplayChoiceUI() {
   row.querySelectorAll("button[data-qr-display]").forEach((btn) => {
     const active = btn.dataset.qrDisplay === choice;
     btn.style.borderColor = active ? "var(--teal)" : "var(--border)";
-    btn.style.background = active ? "rgba(45, 224, 201, 0.12)" : "var(--bg)";
+    btn.style.background = active ? "rgba(12, 128, 116, 0.12)" : "var(--bg)";
     btn.innerHTML = btn.innerHTML.replace(/ ✓$/, "");
     if (active) btn.innerHTML += " ✓";
   });
@@ -7096,7 +7096,7 @@ function renderModeCards() {
     btn.type = "button";
     const active = mode === current;
     btn.setAttribute("data-mode", mode);
-    btn.style.cssText = `text-align: left; padding: 10px; border-radius: 10px; cursor: ${locked ? "not-allowed" : "pointer"}; font-size: 0.72rem; border: 1.5px solid ${active ? "var(--teal)" : "var(--border)"}; background: ${active ? "rgba(45, 224, 201, 0.12)" : "var(--bg)"}; color: var(--text); opacity: ${locked ? "0.5" : "1"}; transition: border-color 0.15s ease, opacity 0.15s ease;`;
+    btn.style.cssText = `text-align: left; padding: 10px; border-radius: 10px; cursor: ${locked ? "not-allowed" : "pointer"}; font-size: 0.72rem; border: 1.5px solid ${active ? "var(--teal)" : "var(--border)"}; background: ${active ? "rgba(12, 128, 116, 0.12)" : "var(--bg)"}; color: var(--text); opacity: ${locked ? "0.5" : "1"}; transition: border-color 0.15s ease, opacity 0.15s ease;`;
     btn.innerHTML =
       `<div style="font-weight: 700; margin-bottom: 3px;">${locked ? "🔒 " : ""}${cfg.icon} ${cfg.title}${active ? " ✓" : ""}</div>` +
       `<div style="color: var(--muted);">${cfg.desc}</div>` +

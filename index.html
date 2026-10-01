@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description"
     content="Adsum — verified, server-authoritative attendance for Nigerian universities. Anti-proxy check-in by live QR, PIN and GPS, with course reps and level advisers in one trust chain.">
-  <meta name="theme-color" content="#7C6CF0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#5B3FD4" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0A0B14" media="(prefers-color-scheme: dark)">
   <title>Adsum | Verified Attendance Platform</title>
   <!-- The tab icon and every installable icon is the "A" monogram alone, never
@@ -232,7 +232,7 @@
 
         <p style="text-align: center; margin-top: 15px; font-size: 0.85rem;">
           Already have an account? <a href="#" id="showLogin"
-            style="color: var(--teal); font-weight: 700; text-decoration: none;">Log In</a>
+            style="color: var(--teal-ink); font-weight: 700; text-decoration: none;">Log In</a>
         </p>
       </section>
 
@@ -254,14 +254,14 @@
           </div>
           <div style="text-align: right; margin-bottom: 15px;">
             <a href="#" id="openForgotModal"
-              style="color: var(--teal); font-size: 0.85rem; text-decoration: none;">Forgot password?</a>
+              style="color: var(--teal-ink); font-size: 0.85rem; text-decoration: none;">Forgot password?</a>
           </div>
           <button type="submit" class="btn"><i data-lucide="arrow-right"></i> Log In</button>
         </form>
 
         <p style="text-align: center; margin-top: 15px; font-size: 0.85rem;">
           Don't have an account? <a href="#" id="showSignup"
-            style="color: var(--teal); font-weight: 700; text-decoration: none;">Sign Up</a>
+            style="color: var(--teal-ink); font-weight: 700; text-decoration: none;">Sign Up</a>
         </p>
       </section>
 
@@ -302,7 +302,7 @@
         <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 4px;">
           Role: <strong id="displayRole" style="color: var(--navy);">---</strong>
         </p>
-        <p style="font-size: 0.9rem; font-weight: 600; color: var(--teal); margin-bottom: 10px;" id="displaySchoolInfo">
+        <p style="font-size: 0.9rem; font-weight: 600; color: var(--teal-ink); margin-bottom: 10px;" id="displaySchoolInfo">
           ---
         </p>
         <p style="font-size: 0.85rem; color: var(--muted);">Manage your courses or check in below.</p>
@@ -353,7 +353,7 @@
              sees who is broadcasting the rotating QR, granted by whom and
              when. Written by the backend grant log; hidden when empty. -->
         <div id="hotspotStrip" class="hidden"
-          style="margin-bottom: 15px; padding: 10px 12px; background: rgba(108, 93, 211, 0.1); border: 1px solid rgba(139, 92, 246, 0.5); border-radius: 10px; font-size: 0.8rem; color: var(--text); line-height: 1.6;">
+          style="margin-bottom: 15px; padding: 10px 12px; background: rgba(91, 63, 212, 0.10); border: 1px solid rgba(91, 63, 212, 0.5); border-radius: 10px; font-size: 0.8rem; color: var(--text); line-height: 1.6;">
         </div>
 
         <!-- REP CONTROLS — flat single-view: no box-in-box-in-box. Phase cards
@@ -385,11 +385,11 @@
                 </label>
                 <div class="hall-actions">
                   <button id="setLocationBtn" type="button"
-                    style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
+                    style="background: transparent; border: none; color: var(--teal-ink); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
                     <i data-lucide="crosshairs"></i> Set Current Location
                   </button>
                   <button id="manageHallsBtn" type="button"
-                    style="background: transparent; border: none; color: var(--teal); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
+                    style="background: transparent; border: none; color: var(--teal-ink); font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline; padding: 6px 8px;">
                     <i data-lucide="sliders"></i> Manage Halls
                   </button>
                 </div>
@@ -452,7 +452,7 @@
               style="margin-top: 15px; padding: 15px; background: var(--card-bg); border-radius: 8px; text-align: center; border: 2px dashed var(--teal);">
               <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 5px;">ACTIVE ATTENDANCE PIN:</p>
               <span id="pinCodeText"
-                style="font-size: 2rem; font-weight: bold; color: var(--teal); letter-spacing: 8px;">----</span>
+                style="font-size: 2rem; font-weight: bold; color: var(--teal-ink); letter-spacing: 8px;">----</span>
               <p style="font-size: 0.75rem; color: var(--muted); margin-top: 8px;">New PIN in: <strong
                   id="pinRotationTimer" style="color: var(--navy);">0:10</strong></p>
             </div>
@@ -851,7 +851,7 @@
           <div
             style="background: var(--bg); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border);">
             <span style="font-size: 0.75rem; color: var(--muted);">Attendance Rate</span>
-            <h4 id="statPercentage" style="font-size: 1.2rem; color: var(--teal); margin-top: 4px;">0%</h4>
+            <h4 id="statPercentage" style="font-size: 1.2rem; color: var(--teal-ink); margin-top: 4px;">0%</h4>
           </div>
         </div>
 
@@ -891,7 +891,7 @@
         <i data-lucide="archive"></i> Course Archive & Class History
       </h3>
       <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Total Classes Held This Semester: <strong
-          id="totalClassesCount" style="color: var(--teal);">0</strong></p>
+          id="totalClassesCount" style="color: var(--teal-ink);">0</strong></p>
 
       <div id="archiveListContainer">
         <p style="font-size: 0.9rem; color: var(--muted); text-align: center; padding: 10px;">No archived classes yet.

@@ -37,7 +37,7 @@
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--teal-ink);
   background: var(--teal-glow);
   border: 1.5px solid var(--card-border);
   padding: 7px 13px;
@@ -99,7 +99,7 @@
   gap: 9px;
 }
 
-.adviser-card-h3 svg { width: 18px; height: 18px; color: var(--teal); }
+.adviser-card-h3 svg { width: 18px; height: 18px; color: var(--teal-ink); }
 
 .adviser-card-p {
   color: var(--text-muted);
@@ -143,7 +143,7 @@
   background: var(--bg);
 }
 
-.adviser-msg.ok { border-color: var(--teal); color: var(--teal); }
+.adviser-msg.ok { border-color: var(--teal); color: var(--teal-ink); }
 .adviser-msg.warn { border-color: #d9a441; color: #b8832a; }
 .adviser-msg.err { border-color: var(--danger); color: var(--danger); }
 
@@ -196,7 +196,7 @@
   font-size: 0.75rem;
   font-weight: 600;
 }
-.pw-hint.ok { color: var(--teal); }
+.pw-hint.ok { color: var(--teal-ink); }
 .pw-hint.err { color: var(--danger); }
 .pw-hint svg { width: 13px; height: 13px; flex-shrink: 0; }
 
@@ -220,7 +220,7 @@
   height: 150%;
   background: radial-gradient(
     60% 60% at 30% 0%,
-    rgba(124, 108, 240, 0.28),
+    rgba(91, 63, 212, 0.26),
     transparent 70%
   );
   pointer-events: none;
@@ -245,13 +245,13 @@
   background: linear-gradient(135deg, var(--violet), #4f46e5);
   padding: 7px 14px;
   border-radius: 999px;
-  box-shadow: 0 6px 18px -8px rgba(124, 108, 240, 0.9);
+  box-shadow: 0 6px 18px -8px rgba(91, 63, 212, 0.85);
 }
 .adviser-badge-lg svg { width: 14px; height: 14px; }
 .adviser-scope {
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--teal);
+  color: var(--teal-ink);
   letter-spacing: 0.4px;
 }
 .adviser-hero-title {
@@ -300,7 +300,66 @@
 }
 
 @media (max-width: 560px) {
-  .adviser-hero { padding: 22px 18px 20px; border-radius: 20px; }
-  #adviserVerifyBanner { flex-direction: column; align-items: flex-start; }
+  /* Same density rule as the portal: content shrinks, space between
+     blocks grows. */
+  #adviserDashboard { padding: 16px 2px 0; }
+
+  .adviser-head { margin-bottom: 14px; gap: 10px; }
+
+  .adviser-hero {
+    padding: 17px 15px 16px;
+    border-radius: 18px;
+    margin-bottom: 14px;
+  }
+
+  .adviser-badge-lg {
+    font-size: 0.66rem;
+    padding: 6px 11px;
+  }
+
+  .adviser-scope { font-size: 0.74rem; }
+
+  .adviser-hero-name {
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+
+  .adviser-hero-sub {
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .adviser-stat {
+    padding: 11px 12px;
+    gap: 4px;
+  }
+
+  .adviser-stat-label { font-size: 0.66rem; }
+  .adviser-stat-value { font-size: 1.1rem; }
+
+  .adviser-card {
+    padding: 15px 14px 14px;
+    margin-bottom: 13px;
+    border-radius: 16px;
+  }
+
+  .adviser-card-h3 { font-size: 1rem; margin-bottom: 6px; }
+  .adviser-card-p { font-size: 0.83rem; margin-bottom: 11px; }
+
+  .adviser-select {
+    padding: 10px 12px;
+    font-size: 0.87rem;
+    margin-bottom: 11px;
+  }
+
+  .adviser-row { gap: 8px; }
+  .adviser-row .btn { width: 100%; padding: 10px 14px; }
+
+  .adviser-msg {
+    padding: 10px 12px;
+    font-size: 0.82rem;
+  }
+
+  #adviserVerifyBanner { flex-direction: column; align-items: flex-start; gap: 9px; }
   #adviserVerifyBanner .btn { width: 100%; }
 }

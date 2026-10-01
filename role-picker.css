@@ -6,7 +6,7 @@
 .role-eyebrow {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.72rem; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase;
-  color: var(--teal); background: var(--teal-glow);
+  color: var(--teal-ink); background: var(--teal-glow);
   border: 1px solid var(--card-border);
   padding: 6px 12px; border-radius: 999px; margin-bottom: 12px;
 }
@@ -39,8 +39,13 @@
 .role-card::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
   background: conic-gradient(from 120deg, transparent 55%, var(--teal), var(--violet-2), transparent 90%);
+  /* Prefixed shorthand first, then the standard one — see the matching
+     comment on .card::before in style.css. Each `mask` shorthand resets
+     mask-composite, so the composite must follow its own shorthand. */
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
   opacity: 0; transition: opacity 0.4s ease; pointer-events: none;
 }
 .role-card.active::after { opacity: 1; }
@@ -65,8 +70,8 @@
   box-shadow: 0 14px 28px -10px var(--accent-glow);
 }
 .role-icon svg { width: 27px; height: 27px; color: #fff; }
-.role-rep .role-icon { background: linear-gradient(135deg, #06D6A0, #0EA5A4); }
-.role-adviser .role-icon { background: linear-gradient(135deg, #7C6CF0, #4F46E5); }
+.role-rep .role-icon { background: linear-gradient(135deg, #0C8074, #0F7A87); }
+.role-adviser .role-icon { background: linear-gradient(135deg, #5B3FD4, #4F46E5); }
 .role-card h3 {
   font-family: var(--font-display); font-size: 1.35rem;
   letter-spacing: -0.4px; margin-bottom: 8px; position: relative; z-index: 1;
@@ -75,7 +80,7 @@
 
 .role-points { list-style: none; display: grid; gap: 8px; margin-bottom: 18px; position: relative; z-index: 1; }
 .role-points li { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 600; }
-.role-points svg { width: 15px; height: 15px; color: var(--teal); flex-shrink: 0; }
+.role-points svg { width: 15px; height: 15px; color: var(--teal-ink); flex-shrink: 0; }
 .role-cta { width: 100%; justify-content: center; margin-top: auto; position: relative; z-index: 1; }
 .role-cta svg { width: 16px; height: 16px; }
 .role-free { display: block; text-align: center; width: 100%; font-size: 0.72rem; color: var(--text-muted); margin-top: 10px; position: relative; z-index: 1; }
@@ -95,7 +100,7 @@
 .role-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--border); transition: all 0.3s ease; cursor: pointer; }
 .role-dot.active { width: 26px; background: linear-gradient(90deg, var(--teal), var(--violet)); }
 .role-foot { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
-.role-foot a { color: var(--teal); font-weight: 700; text-decoration: none; }
+.role-foot a { color: var(--teal-ink); font-weight: 700; text-decoration: none; }
 .role-back {
   display: inline-flex; align-items: center; gap: 6px;
   background: transparent; border: none; cursor: pointer;
@@ -117,6 +122,82 @@
   .role-card { flex: 1 1 0; max-width: 300px; }
   .role-arrow { display: none; }
 }
+/* The role deck is the first screen a new user meets, and it was the
+   bulkiest thing on a phone: a 300px-wide card forced to 60vh, with a
+   58px icon tile, 26px padding and 1.35rem headings. The card is now
+   sized to its content instead of to a share of the viewport, so the
+   three role options and their CTAs fit in one glance. */
 @media (max-width: 640px) {
-  .role-card { min-height: 60vh; }
+  #rolePicker { padding: 6px 2px 0; }
+
+  .role-hero { margin-bottom: 12px; }
+
+  .role-eyebrow {
+    font-size: 0.66rem;
+    padding: 5px 10px;
+    margin-bottom: 9px;
+  }
+
+  .role-sub {
+    font-size: 0.85rem;
+  }
+
+  .role-track {
+    gap: 12px;
+    padding: 16px 6px 12px;
+  }
+
+  .role-card {
+    /* min-height is what made this feel like a giant slab — dropped
+       entirely so the card hugs its content. */
+    min-height: 0;
+    flex-basis: min(80vw, 270px);
+    padding: 18px 16px 16px;
+    border-radius: 20px;
+  }
+
+  .role-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+  }
+
+  .role-icon svg { width: 22px; height: 22px; }
+
+  .role-badge {
+    font-size: 0.64rem;
+    padding: 4px 9px;
+    margin-bottom: 10px;
+  }
+
+  .role-card h3 {
+    font-size: 1.12rem;
+    margin-bottom: 6px;
+  }
+
+  .role-desc {
+    font-size: 0.83rem;
+    line-height: 1.5;
+    margin-bottom: 11px;
+  }
+
+  .role-points {
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .role-points li { font-size: 0.8rem; }
+
+  .role-free {
+    font-size: 0.68rem;
+    margin-top: 8px;
+  }
+
+  .role-arrow { width: 34px; height: 34px; }
+  .role-arrow svg { width: 17px; height: 17px; }
+
+  .role-foot { font-size: 0.8rem; }
+  .role-back { font-size: 0.78rem; }
+  .role-context { font-size: 0.78rem; padding: 8px 10px; margin-bottom: 13px; }
 }
