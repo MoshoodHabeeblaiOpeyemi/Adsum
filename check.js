@@ -233,5 +233,181 @@ for (const d of ["api", "utils"]) {
   if (clean) ok(`no BOM or mojibake in ${tracked.length} source files`);
 }
 
+/**
+ * Blank out the CONTENTS of every nested function/arrow body, keeping the
+ * surrounding text and line count intact.
+ *
+ * A reference inside a nested callback runs later (on a click, on a promise),
+ * never during the enclosing call, so it cannot reach a temporal dead zone.
+ * Without this, `el.cancel.addEventListener("click", () => {
+ * adviserPendingCsv = null })` reads as if `adviserPendingCsv` were touched
+ * during init — and the check then condemns a dozen long-standing, working
+ * declarations that have shipped for months.
+ */
+function stripNestedBodies(src) {
+  // `=> {` is written with a space in practice, so the brace must be allowed
+  // after whitespace or the whole strip silently matches nothing.
+  const opener = /(?:=>\s*|function\s*\([^)]*\)\s*)\{/g;
+  // Comments are blanked first. A name mentioned only in a comment is not a
+  // reference — adviserEls() documents the very id it renamed away from, and
+  // reading that as a use condemns a declaration that has always been fine.
+  let out = src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + m.slice(p.length).replace(/[^\n]/g, " "));
+  for (let guard = 0; guard < 400; guard++) {
+    opener.lastIndex = 0;
+    let removed = false;
+    let m;
+    while ((m = opener.exec(out))) {
+      let depth = 0;
+      let end = -1;
+      for (let i = m.index + m[0].length - 1; i < out.length; i++) {
+        if (out[i] === "{") depth++;
+        else if (out[i] === "}") {
+          depth--;
+          if (depth === 0) { end = i; break; }
+        }
+      }
+      if (end < 0) break;
+      const inner = out.slice(m.index, end + 1);
+      const blanked = inner.replace(/[^\n]/g, " "); // preserve line numbers
+      out = out.slice(0, m.index) + blanked + out.slice(end + 1);
+      opener.lastIndex = m.index + m[0].length;
+      removed = true;
+    }
+    if (!removed) break;
+  }
+  return out;
+}
+
+// --- 7. Module-scope DECLARATION ORDER (temporal dead zone) ---------------
+//
+// WHY THIS EXISTS
+// `initAdviserDashboard()` was called at module top level and referenced
+// `removeModal`, a `const` declared ~6000 lines further down. A `const` sits in
+// a TEMPORAL DEAD ZONE until its initialiser runs, so the call threw
+//
+//     ReferenceError: Cannot access 'removeModal' before initialization
+//
+// which escaped to the top of the module and ABORTED EVALUATION of everything
+// after it — including the `onAuthStateChanged()` registration below. Firebase
+// signed the user in, nothing was listening for the result, and login silently
+// did nothing.
+//
+// This is invisible to every other check here: the file parses (it is valid
+// JavaScript), linters see no undefined variable, and the failure is a RUNTIME
+// error on one code path. Only ordering exposes it.
+//
+// HOW IT IS DETECTED
+// `const`/`let` at module scope must be initialised before anything CALLS a
+// function that touches them. So:
+//   1. collect module-scope `const`/`let` declarations and their lines
+//   2. collect module-scope function declarations and their bodies
+//   3. find module-scope call statements (column 0, a bare `name(...)`) and
+//      which function each invokes, following one level of indirection
+//   4. flag any declared name that a called function references, where the
+//      declaration sits BELOW the call
+{
+  const lines = app.split(/\r?\n/);
+
+  // (1) module-scope declarations — column 0, so nested ones are ignored
+  const decls = new Map(); // name -> line number
+  lines.forEach((line, i) => {
+    const m = /^(?:const|let)\s+([A-Za-z0-9_$]+)\s*=/.exec(line);
+    if (m) decls.set(m[1], i + 1);
+  });
+
+  // (2) function declarations + the span of their body
+  const fns = new Map(); // name -> {line, body}
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/.exec(lines[i]);
+    if (!m) continue;
+    let depth = 0, started = false, end = i;
+    for (let j = i; j < lines.length; j++) {
+      for (const ch of lines[j]) {
+        if (ch === "{") { depth++; started = true; }
+        else if (ch === "}") depth--;
+      }
+      if (started && depth === 0) { end = j; break; }
+    }
+    fns.set(m[1], {
+      line: i + 1,
+      body: lines.slice(i, end + 1).join("\n"),
+      // The body with every NESTED function/arrow body removed. A reference
+      // inside `addEventListener("click", () => {...})` is evaluated when the
+      // adviser clicks, long after module evaluation has finished, so it cannot
+      // hit a temporal dead zone. Only references that run DURING the call can.
+      topLevel: stripNestedBodies(lines.slice(i, end + 1).join("\n")),
+    });
+  }
+
+  // (3) module-scope call statements, plus one level of indirection
+  const calls = []; // {line, targets:[fnName]}
+  lines.forEach((line, i) => {
+    const m = /^([A-Za-z0-9_$]+)\s*\(/.exec(line);
+    if (!m) return;
+    const name = m[1];
+    if (decls.has(name)) return;               // `const x = x()` — not a call stmt
+    // Skip the function's own DECLARATION line, but NOT a bare `foo();` call of
+    // it. Matching on the name alone silently dropped every real call site,
+    // which is what made the first version of this check pass a file that was
+    // actively throwing. Only the `function` keyword identifies the former.
+    if (/^(?:async\s+)?function\s+/.test(line)) return;
+    // `targets` is filled in by the indirection pass below.
+    calls.push({ line: i + 1, name, targets: fns.has(name) ? [name] : [] });
+  });
+
+  // one level of indirection: if the called function calls others, include them
+  for (const call of calls) {
+    const reached = new Set();
+    const walk = (fnName) => {
+      if (reached.has(fnName)) return;
+      reached.add(fnName);
+      const fn = fns.get(fnName);
+      if (!fn) return;
+      for (const other of fns.keys()) {
+        // Follow only calls that happen DURING this call. A `foo()` sitting inside
+      // a nested click-handler is stripped by stripNestedBodies, so it is not
+      // followed — which is what stops adviserApi() (invoked on user action)
+      // being treated as reachable from initAdviserDashboard().
+      if (other !== fnName && new RegExp(`\\b${other}\\s*\\(`).test(fn.topLevel)) {
+          walk(other);
+        }
+      }
+    };
+    walk(call.name);
+    call.targets = [...reached];
+  }
+
+  // (4) flag declaration-after-use
+  const violations = [];
+  for (const call of calls) {
+    for (const target of call.targets) {
+      const fn = fns.get(target);
+      if (!fn) continue;
+      for (const [name, declLine] of decls) {
+        if (declLine <= call.line) continue;              // already initialised
+        if (!new RegExp(`\\b${name}\\b`).test(fn.topLevel)) continue;
+        violations.push(
+          `${name} (declared line ${declLine}) is used by ${target}(), ` +
+            `which is called at line ${call.line}`,
+        );
+      }
+    }
+  }
+
+  if (!violations.length) {
+    ok(`module-scope declaration order is safe (${decls.size} const/let, ${calls.length} call sites)`);
+  } else {
+    const uniq = [...new Set(violations)];
+    bad(
+      `module-scope declaration order can throw a temporal-dead-zone ReferenceError`,
+      uniq.slice(0, 6).join("\n        ") +
+        (uniq.length > 6 ? `\n        ...and ${uniq.length - 6} more` : "") +
+        "\n        A module-scope const/let must be declared ABOVE any call that reaches it.",
+    );
+  }
+}
+
 console.log(fails === 0 ? "\nALL PARSED CLEAN" : `\n${fails} PROBLEM(S)`);
 process.exit(fails === 0 ? 0 : 1);

@@ -2804,6 +2804,36 @@ const handleAuthState = async (user) => {
   }
 };
 
+// 🛑 THESE MUST BE DECLARED BEFORE `initAdviserDashboard()` IS CALLED.
+//
+// They are referenced inside that function, which runs HERE (module top level),
+// long before this file's later sections are evaluated. A `const`/`let` sits in
+// a temporal dead zone until its initialiser runs, so declaring them further
+// down — which is where they naturally belong next to the code that uses them —
+// makes this call throw:
+//
+//     ReferenceError: Cannot access 'removeModal' before initialization
+//
+// That exception escapes to the module's top level and ABORTS EVALUATION of
+// everything after this line, including `onAuthStateChanged()` a few hundred
+// lines below. Firebase then signs the user in successfully, nobody is
+// listening for the result, and login silently does nothing — no error shown,
+// no dashboard, no console hint pointing at the cause.
+//
+// Declaration order at module scope is load-bearing. check.js section 7 exists
+// because this is invisible to every parse and lint check.
+const removeModal = {
+  el: document.getElementById("removeStudentsModal"),
+  list: document.getElementById("removeStudentsList"),
+  course: document.getElementById("removeModalCourse"),
+  count: document.getElementById("removeSelectedCount"),
+  confirm: document.getElementById("removeConfirmBtn"),
+  confirmLabel: document.getElementById("removeConfirmLabel"),
+};
+
+/** Matrics ticked in the open modal. */
+let removeSelected = new Set();
+
 // Phase 4: wire the dashboard's controls once the DOM is available. The
 // handlers themselves re-check authorisation on every call, so a panel that
 // is somehow left visible still cannot write anything.
@@ -9068,18 +9098,9 @@ async function loadAdviserRoster() {
 //
 // Every value rendered here is escaped. The matric travels as a checkbox value
 // and is read from the DOM, never from innerHTML.
-
-const removeModal = {
-  el: document.getElementById("removeStudentsModal"),
-  list: document.getElementById("removeStudentsList"),
-  course: document.getElementById("removeModalCourse"),
-  count: document.getElementById("removeSelectedCount"),
-  confirm: document.getElementById("removeConfirmBtn"),
-  confirmLabel: document.getElementById("removeConfirmLabel"),
-};
-
-/** Matrics ticked in the open modal. */
-let removeSelected = new Set();
+//
+// `removeModal` and `removeSelected` are declared near the top of this module,
+// NOT here — see the note by their declaration.
 
 function adviserRemoveMessage(kind, html) {
   const el = adviserEls().removeMsg;
