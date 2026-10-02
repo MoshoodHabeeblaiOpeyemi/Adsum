@@ -20,17 +20,47 @@ call. The name, the "A" monogram and the tagline are one design.
 | `mark-256-cutout.png`, `mark-64-cutout.png` | The monogram on transparency |
 
 **The monogram is the icon, and it is allowed to be loud.** `favicon-32.png`,
-`apple-touch-icon-180.png`, `icon-192.png`, `icon-512.png` and `icon-maskable-512.png` are
-all the "A" monogram, never the full lockup — an app tile has no room for a wordmark, and at
-32px the mark is the only thing that reads.
+`apple-touch-icon-180.png`, `icon-192.png`, `icon-512.png` and
+`icon-maskable-512.png` are all the "A" monogram, never the full lockup — an app
+tile has no room for a wordmark, and at 32px the mark is the only thing that reads.
 
-| File | Plate | "A" fills |
+### Every installable icon is backgroundless
+
+The four installable tiles used to sit on an opaque `#0B0D17` plate. On a phone
+that plate is the *worst* part of the icon: launchers draw their own shape and
+shadow behind it, so a dark square reads as a dark square inside their shape
+rather than as the app. All four are now **true alpha** — the mark floats and the
+platform supplies the background.
+
+They are built from `mark-256-cutout.png` (real alpha), whose ink bounding box
+measures **236×183 px inside a 256×256 canvas** — *not* square, because the
+monogram's swash overshoots the cap height. Each tile scales by WIDTH from that
+measured box and centres the result, rather than stretching a square crop, which
+is what bent the swash the first time.
+
+| File | Mark fills | Plate |
 | --- | --- | --- |
-| `favicon-32.png` | **transparent** | 96% |
-| `apple-touch-icon-180.png` | opaque `#0B0D17` | 88% |
-| `icon-192.png`, `icon-512.png` | opaque `#0B0D17` | 86% |
-| `icon-maskable-512.png` | opaque `#0B0D17` | 60% (safe-zone constrained) |
-| `mark-64-cutout.png`, `mark-256-cutout.png` | transparent | 92% |
+| `favicon-32.png` | 96% | **none** (transparent) |
+| `mark-64-cutout.png`, `mark-256-cutout.png` | 92% | **none** (transparent) |
+| `icon-192.png`, `icon-512.png` | 86% | **none** (transparent) |
+| `apple-touch-icon-180.png` | 88% | **none** (transparent) |
+| `icon-maskable-512.png` | 60% (safe-zone constrained) | **none** (transparent) |
+| `mark-256.png` | 92% | **none** — the centre logo of the projected QR |
+
+> ⚠️ **Two of these are a deliberate trade-off, and they are the two that can
+> look wrong on a real device.** `apple-touch-icon-180.png` is transparent
+> because **iOS composites alpha to black**, so on an iPhone home screen this
+> icon can render as a black square — the exact problem the plate existed to
+> solve. `icon-maskable-512.png` is transparent because a maskable icon is
+> *designed* to be masked into an arbitrary shape and normally needs a full-bleed
+> plate to fill it. Both were made backgroundless on request. If either looks
+> wrong in the wild, the revert is to re-composite it onto `#0B0D17` at the same
+> measured scale — the artwork itself is untouched either way.
+
+`mark-64.png` was deleted: zero references anywhere in the repo. `mark-256.png`
+was **kept** despite sitting next to `mark-256-cutout.png` looking redundant — it
+is loaded by `app.js` as the centre logo of the projected attendance QR
+(`QR_LOGO_SRC`).
 
 The tab icon is the one that must be backgroundless: a browser tab is already sitting on a
 light or dark chrome, and an opaque plate just reads as a dark blob. The installable tiles

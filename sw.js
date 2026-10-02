@@ -2,9 +2,10 @@
 // It doubles as the brand: the cache key is the first thing to change on a
 // rebrand, because a stale cache would keep serving the previous logo.
 //
-// v52: rep loses student-removal (server + Firestore rules); Bulk Import and the
-// rep's Students panel removed; removal moves to the Level Adviser.
-const CACHE_NAME = "adsum-static-v52";
+// v53: semester report no longer leaks past sign-out; native select arrows;
+// GPS mode cards + hall block hidden while the flag is off; backgroundless
+// install icons; adviser remove-student flow rebuilt.
+const CACHE_NAME = "adsum-static-v53";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

@@ -538,23 +538,28 @@ input, select {
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
-/* The chevron is an inline SVG data-URI, so it cannot read var(--teal-ink) —
-   each theme has to carry its own literal hex. They are kept in step with
-   --teal-ink above: #0F7A87 light, #5FE0CE dark. */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  cursor: pointer;
-  padding-right: 42px !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230F7A87'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-position: right 14px center;
-  background-size: 16px;
-  background-repeat: no-repeat;
-}
+/* Selects use the NATIVE dropdown arrow.
+   This used to hide it (`appearance: none`) and hand-draw a chevron as a
+   background-image data-URI. That was three bugs in one costume:
+     1. The data-URI cannot read a CSS variable, so every theme needed its own
+        baked hex and the two drifted apart.
+     2. `background: var(--bg)` on .adviser-select / .custom-dropdown is the
+        `background` SHORTHAND, which resets background-image to `none` — so
+        those selects silently lost the arrow and rendered as broken text
+        inputs with no affordance at all.
+     3. A hand-drawn arrow repeats if anything resets `background-repeat`,
+        producing the row of chevrons that made these look corrupt.
 
-[data-theme="dark"] select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%235FE0CE'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+   The native arrow has none of those failure modes, is always correctly
+   themed via `color-scheme` (set on <html> per theme), and is what assistive
+   tech expects from a <select>. So: no appearance override, no data-URI, and
+   no padding-right hack to make room for a glyph we no longer draw. */
+select {
+  cursor: pointer;
+  font-family: inherit;
+  /* Long option text (course + code + count) must not blow out the box. */
+  min-width: 0;
+  text-overflow: ellipsis;
 }
 
 select option, select optgroup {
@@ -585,14 +590,15 @@ input:focus::placeholder {
   border: 1.5px solid var(--border) !important;
   font-weight: 500;
   letter-spacing: 0.2px;
-  background: var(--card-bg) !important;
+  /* background-color, not the shorthand — see .adviser-select. */
+  background-color: var(--card-bg) !important;
   color: var(--text-primary) !important;
   transition: all 0.3s ease;
 }
 
 .custom-dropdown:hover {
   border-color: var(--teal) !important;
-  background: var(--bg) !important;
+  background-color: var(--bg) !important;
   transform: translateY(-1px);
 }
 
@@ -1415,6 +1421,44 @@ input:focus::placeholder {
   gap: 10px;
 }
 
+/* Attendance mode cards.
+   These used to be built with an inline `cssText` string, which meant the
+   active/hover states could not be restyled per breakpoint and the mobile
+   block had to fight it with !important. Real classes instead: theming,
+   hover and the mobile density pass are now all ordinary cascade. */
+.mode-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background-color 0.16s ease,
+    transform 0.16s ease;
+}
+.mode-card:hover {
+  border-color: var(--teal);
+  transform: translateY(-1px);
+}
+.mode-card.is-active {
+  border-color: var(--teal);
+  background: var(--teal-glow);
+}
+.mode-card-title {
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-bottom: 3px;
+  line-height: 1.35;
+}
+.mode-card-desc {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
 .headcount-row {
   display: flex;
   flex-wrap: wrap;
@@ -1786,13 +1830,18 @@ input:focus::placeholder {
     gap: 8px;
   }
 
-  #modeCardsGrid button[data-mode] {
-    padding: 10px 11px !important;
-    font-size: 0.78rem !important;
+  /* The mode cards are now real classes, so the mobile pass is ordinary
+     cascade — no !important needed. */
+  .mode-card {
+    padding: 10px 11px;
   }
 
-  #modeCardsGrid button[data-mode] div {
-    margin-bottom: 3px !important;
+  .mode-card-title {
+    font-size: 0.78rem;
+  }
+
+  .mode-card-desc {
+    font-size: 0.73rem;
   }
 
   #modeHint {
@@ -1979,6 +2028,20 @@ input:focus::placeholder {
   }
 
   /* --- Mission-control drawer ----------------------------------- */
+  /* 🔴 THE FLOATING MENU TAB OVERLAPS CONTENT ON A PHONE.
+     .drawer-tab is `position: fixed; right: 0`, 32px wide, and it sits above
+     everything. On the rep portal that put it straight on top of the right
+     edge of the attendance-mode cards and the QR-display buttons — i.e. on top
+     of things you tap. A floating control may overlap decoration; it may not
+     overlap controls.
+
+     The portal gets a right inset equal to the tab's width so every control
+     clears it. Only the portal: the tab is staff-only and only renders there,
+     so the dashboard and the auth screens keep their full width. */
+  #portalSection {
+    padding-right: 38px;
+  }
+
   .portal-drawer {
     width: min(86vw, 320px);
   }

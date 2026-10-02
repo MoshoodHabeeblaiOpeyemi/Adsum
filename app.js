@@ -2014,6 +2014,12 @@ function showAuthView(view, role) {
   if (rolePicker) rolePicker.classList.toggle("hidden", view !== "picker");
   signupCard.classList.toggle("hidden", view !== "signup");
   loginCard.classList.toggle("hidden", view !== "login");
+  // 🛑 #semesterReport is a SIBLING of <main>, not a child of the auth stack, so
+  // toggling the three cards above does nothing to it. Without this line a rep
+  // who signed out kept a full table of student percentages rendered under the
+  // role picker — staff-only data, sitting on the screen of anyone who walks up
+  // to a signed-out device.
+  if (typeof syncSemesterReportPanel === "function") syncSemesterReportPanel();
   if (view === "signup") {
     if (role && ROLE_LABEL[role])
       pendingRole = role; // draft only — safe to change
@@ -2776,6 +2782,14 @@ const handleAuthState = async (user) => {
 
     stopCourseListener();
     checkAuth();
+    // 🛑 THE SEMESTER REPORT MUST BE TORN DOWN ON SIGN-OUT.
+    // It is a top-level <section>, a SIBLING of <main>, so hiding portalSection
+    // and every management panel above does not touch it. `activeCourse` is
+    // already null here, so syncSemesterReportPanel() correctly evaluates to
+    // "not in a portal" and hides it. Before this call the panel survived
+    // logout and rendered a full table of student percentages underneath the
+    // role picker on a signed-out device.
+    syncSemesterReportPanel();
     // Phase 4: the roster dashboard is adviser-only, so it goes on sign-out.
     syncAdviserDashboard();
     syncAdviserVerificationUI();
@@ -6690,11 +6704,16 @@ const ATTENDANCE_MODES = {
   },
 };
 
-// Shown on every disabled GPS card so the reason is never a mystery.
+// 🔒 WHY GPS IS OFF, kept as prose rather than a string constant.
+// It used to be interpolated into a toast on every tap of a locked mode card.
+// Those cards are no longer rendered while the flag is off, so the constant had
+// no caller left. The reason is preserved here because `modeHint` still has to
+// explain to a rep why no hall is needed — the explanation is part of the
+// design, not an error string.
 const GPS_DISABLED_REASON =
-  "🔒 Disabled for now. Browser location needs HTTPS and user permission; " +
-  "indoors, phones may rely on Wi-Fi/cell estimates too coarse to distinguish nearby halls. " +
-  "A native app may expose better device controls, but still needs real-device accuracy testing.";
+  "Browser location needs HTTPS and user permission; indoors, phones may rely " +
+  "on Wi-Fi/cell estimates too coarse to distinguish nearby halls. A native app " +
+  "may expose better device controls, but still needs real-device accuracy testing.";
 
 // 📺 QR DISPLAY CHOICE — projector vs hotspot students. Visible only when
 // the QR + Device Lock mode is selected; choice persists per course.
@@ -6762,29 +6781,33 @@ function renderModeCards() {
   const current = getSelectedAttendanceMode();
   grid.innerHTML = "";
   Object.entries(ATTENDANCE_MODES).forEach(([mode, cfg]) => {
-    // 🔒 GPS modes are SHOWN, not hidden. A rep should be able to see
-    // they exist and why they are unavailable, rather than meeting a
-    // feature that simply is not there.
-    const locked = cfg.prototype && !GPS_PROTOTYPE_ENABLED;
+    // 🛑 PROTOTYPE MODES ARE NOT RENDERED WHEN THE FLAG IS OFF.
+    //
+    // These used to be drawn greyed-out with a "Needs the mobile app" line.
+    // That was a defensible call when GPS was mid-build, but on a phone it is
+    // the single biggest source of clutter on the rep's most important screen:
+    // two permanently-dead cards occupied as much vertical space as the two
+    // that actually work, on the decision a rep makes seconds before a class.
+    // The server rejects these modes with 403 while the flag is off, so they
+    // were never reachable — the cards were pure noise.
+    //
+    // A feature flag's job is to remove the surface, not to display a locked
+    // version of it. `modeHint` still states plainly that verification is QR or
+    // PIN plus device lock, so nothing is hidden from the rep without an
+    // explanation. Flip GPS_PROTOTYPE_ENABLED and the cards return.
+    if (cfg.prototype && !GPS_PROTOTYPE_ENABLED) return;
+
+    const locked = false;
     const btn = document.createElement("button");
     btn.type = "button";
     const active = mode === current;
     btn.setAttribute("data-mode", mode);
-    btn.style.cssText = `text-align: left; padding: 10px; border-radius: 10px; cursor: ${locked ? "not-allowed" : "pointer"}; font-size: 0.72rem; border: 1.5px solid ${active ? "var(--teal)" : "var(--border)"}; background: ${active ? "rgba(12, 128, 116, 0.12)" : "var(--bg)"}; color: var(--text); opacity: ${locked ? "0.5" : "1"}; transition: border-color 0.15s ease, opacity 0.15s ease;`;
+    btn.className = "mode-card" + (active ? " is-active" : "");
     btn.innerHTML =
-      `<div style="font-weight: 700; margin-bottom: 3px;">${locked ? "🔒 " : ""}${cfg.icon} ${cfg.title}${active ? " ✓" : ""}</div>` +
-      `<div style="color: var(--muted);">${cfg.desc}</div>` +
-      (locked
-        ? `<div style="color: var(--muted); margin-top: 5px; font-size: 0.68rem; font-style: italic;">Needs the mobile app</div>`
-        : "");
+      `<div class="mode-card-title">${cfg.icon} ${escapeHTML(cfg.title)}${active ? " ✓" : ""}</div>` +
+      `<div class="mode-card-desc">${escapeHTML(cfg.desc)}</div>`;
     if (locked) btn.setAttribute("aria-disabled", "true");
     btn.addEventListener("click", () => {
-      if (locked) {
-        // Explain rather than silently ignore: a button that does nothing
-        // looks broken, whereas one that says why is honest.
-        toast.info(GPS_DISABLED_REASON, "Not available on web");
-        return;
-      }
       localStorage.setItem(`adsum_mode_${activeCourse.id}`, mode);
       renderModeCards();
       syncModeUI();
@@ -6800,6 +6823,17 @@ function syncModeUI() {
   const usesLocation = mode === "full_combo" || mode === "live_gps";
   syncQrDisplayChoiceUI();
 
+  // 🛑 The WHOLE hall block goes when nothing in the list can use it.
+  // It used to stay on screen with the dropdown greyed to 0.5 opacity and a
+  // "Lecture Location / Hall" label the rep could not act on — a labelled,
+  // bordered box that does nothing, directly above the real controls. Dimming a
+  // dead control still spends the rep's attention; removing it does not.
+  // `GPS_PROTOTYPE_ENABLED` gates it, so switching the feature on restores it.
+  const hallBlock = document.getElementById("hallSetupBlock");
+  if (hallBlock) {
+    hallBlock.classList.toggle("hidden", !usesLocation);
+  }
+
   if (selectEl) {
     selectEl.disabled = !usesLocation;
     selectEl.style.opacity = usesLocation ? "1" : "0.5";
@@ -6810,7 +6844,7 @@ function syncModeUI() {
       // a broken promise. Say plainly that location is simply not in play.
       hint.innerHTML = GPS_PROTOTYPE_ENABLED
         ? `📍 <em>Location is not used in this mode — the hall dropdown is disabled. Switch to a GPS mode to use a saved hall.</em>`
-        : `📍 <em>Location is not used in any mode available here. Verification is QR or PIN plus device lock, so no lecture hall is needed.</em>`;
+        : `📍 <em>No hall needed. Students verify with the rotating QR or PIN plus device lock, so there is nothing to set up before class.</em>`;
     } else if (mode === "live_gps") {
       hint.innerHTML = `📍 Your current position will be captured the moment you generate the PIN.`;
     } else {
@@ -9034,6 +9068,14 @@ async function loadAdviserRoster() {
 function adviserRemoveMessage(kind, html) {
   const el = adviserEls().removeMsg;
   if (!el) return;
+  // An empty message CLEARS the box rather than leaving a coloured bar with
+  // nothing in it — which is what a bare `adviserRemoveMessage("info", "")`
+  // would otherwise do.
+  if (!html) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
   el.className = "adviser-msg " + kind;
   el.innerHTML = html;
   el.classList.remove("hidden");
@@ -9046,26 +9088,49 @@ async function loadAdviserScopedCourses() {
     const data = await adviserApi("listScopedCourses", {});
     const courses = Array.isArray(data.courses) ? data.courses : [];
     el.courseSelect.innerHTML = "";
+
     if (!courses.length) {
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "No courses in your scope yet";
+      opt.textContent = "No courses in your level yet";
       el.courseSelect.appendChild(opt);
       el.courseSelect.disabled = true;
+      el.classList?.classList.add("hidden");
+      adviserRemoveMessage(
+        "warn",
+        "There are no courses in your level yet. A course appears here once a " +
+          "course rep creates one.",
+      );
       return;
     }
+
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = "Choose a course…";
+    placeholder.textContent = `Choose a course (${courses.length})…`;
     el.courseSelect.appendChild(placeholder);
     courses.forEach((c) => {
       const opt = document.createElement("option");
       opt.value = c.id;
       const count = Number(c.enrolledCount) || 0;
-      opt.textContent = `${c.name}${c.code ? " (" + c.code + ")" : ""} — ${count} enrolled`;
+      opt.textContent = `${c.name}${c.code ? " · " + c.code : ""} — ${count} enrolled`;
       el.courseSelect.appendChild(opt);
     });
     el.courseSelect.disabled = false;
+
+    // 🎯 A LEVEL ADVISER USUALLY RUNS ONE COURSE. With exactly one, sitting on a
+    // placeholder that does nothing reads as a broken control, so the single
+    // course is selected and its roster is loaded immediately. The dropdown stays
+    // for the level adviser who genuinely has more than one.
+    if (courses.length === 1) {
+      el.courseSelect.value = courses[0].id;
+      await loadAdviserCourseStudents(courses[0].id);
+    } else {
+      if (el.classList) {
+        el.classList.classList.add("hidden");
+        el.classList.innerHTML = "";
+      }
+      adviserRemoveMessage("info", "Pick a course to see who is on its roster.");
+    }
   } catch (err) {
     el.courseSelect.innerHTML = "";
     const opt = document.createElement("option");
@@ -9092,7 +9157,7 @@ async function loadAdviserCourseStudents(courseId) {
 
     if (!students.length) {
       el.classList.innerHTML =
-        '<div class="adviser-preview-head">No students on this roster yet.</div>';
+        '<div class="adviser-preview-head">Nobody is on this roster yet.</div>';
       el.classList.remove("hidden");
       return;
     }
@@ -9104,18 +9169,18 @@ async function loadAdviserCourseStudents(courseId) {
       .map((s) => {
         const isRep = repUid && s.uid === repUid;
         const action = isRep
-          ? '<span style="font-size: 0.72rem; color: var(--teal-ink); font-weight: 700;">Course rep</span>'
-          : `<button type="button" class="adviser-remove-student-btn" data-remove-matric="${escapeHTML(s.matric)}" data-remove-name="${escapeHTML(s.name)}" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; cursor: pointer;">Remove</button>`;
-        return `<tr><td>${escapeHTML(s.matric)}</td><td>${escapeHTML(s.name)}</td><td style="text-align: right;">${action}</td></tr>`;
+          ? '<span class="adviser-rep-tag">Course rep</span>'
+          : `<button type="button" class="adviser-remove-student-btn" data-remove-matric="${escapeHTML(s.matric)}" data-remove-name="${escapeHTML(s.name)}">Remove</button>`;
+        return `<tr><td class="adviser-student-matric">${escapeHTML(s.matric)}</td><td>${escapeHTML(s.name)}</td><td class="adviser-row-action">${action}</td></tr>`;
       })
       .join("");
 
+    const courseName = (data.course && data.course.name) || "this class";
     el.classList.innerHTML =
-      `<div class="adviser-preview-head">${escapeHTML(
-        (data.course && data.course.name) || "Class",
-      )} — ${students.length} enrolled</div>` +
-      `<div class="adviser-preview-scroll"><table><thead><tr><th>Matric</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      `<div class="adviser-preview-head">${escapeHTML(courseName)} — ${students.length} enrolled</div>` +
+      `<div class="adviser-preview-scroll"><table class="adviser-student-table"><thead><tr><th>Matric</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
     el.classList.remove("hidden");
+    adviserRemoveMessage("info", "");
   } catch (err) {
     el.classList.add("hidden");
     el.classList.innerHTML = "";

@@ -123,7 +123,10 @@
   padding: 11px 13px;
   border-radius: 12px;
   border: 1.5px solid var(--card-border);
-  background: var(--bg);
+  /* `background-color`, NOT the `background` shorthand — the shorthand resets
+     background-image, which is how this select ended up with no dropdown
+     affordance at all and read as a broken text input. */
+  background-color: var(--bg);
   color: var(--text-primary);
   font-size: 0.9rem;
   font-family: inherit;
@@ -146,8 +149,64 @@
 .adviser-msg.ok { border-color: var(--teal); color: var(--teal-ink); }
 .adviser-msg.warn { border-color: #d9a441; color: #b8832a; }
 .adviser-msg.err { border-color: var(--danger); color: var(--danger); }
+.adviser-msg.info { border-color: var(--card-border); color: var(--text-muted); }
 
 .adviser-msg ul { margin: 8px 0 0; padding-left: 18px; }
+
+/* --- remove-a-student roster table --- */
+.adviser-student-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.adviser-student-table th,
+.adviser-student-table td {
+  text-align: left;
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--card-border);
+  vertical-align: middle;
+}
+.adviser-student-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.adviser-student-table tbody tr:last-child td { border-bottom: none; }
+/* The matric is the identifier; the name is the person. Give the name the
+   room and keep the number from wrapping into two ragged lines. */
+.adviser-student-matric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.adviser-row-action { text-align: right; white-space: nowrap; }
+
+.adviser-remove-student-btn {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  min-height: 32px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.adviser-remove-student-btn:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.adviser-rep-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--teal-ink);
+  background: var(--teal-glow);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
 
 /* --- import preview --- */
 .adviser-preview {
