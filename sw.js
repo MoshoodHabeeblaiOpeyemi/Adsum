@@ -2,10 +2,9 @@
 // It doubles as the brand: the cache key is the first thing to change on a
 // rebrand, because a stale cache would keep serving the previous logo.
 //
-// v53: semester report no longer leaks past sign-out; native select arrows;
-// GPS mode cards + hall block hidden while the flag is off; backgroundless
-// install icons; adviser remove-student flow rebuilt.
-const CACHE_NAME = "adsum-static-v53";
+// v54: adviser remove-students rebuilt as a course-picker that opens a
+// multi-select modal (checkboxes) instead of a one-at-a-time inline list.
+const CACHE_NAME = "adsum-static-v54";
 const STATIC_ASSETS = [
   "/",
   "/index.html",

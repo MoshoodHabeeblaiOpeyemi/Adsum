@@ -8818,7 +8818,6 @@ function adviserEls() {
     log: document.getElementById("repLog"),
     endSession: document.getElementById("endAcademicSessionBtn"),
     courseSelect: document.getElementById("adviserCourseSelect"),
-    classList: document.getElementById("adviserClassList"),
     removeMsg: document.getElementById("adviserRemoveMsg"),
   };
 }
@@ -9056,21 +9055,37 @@ async function loadAdviserRoster() {
   }
 }
 
-// ── REMOVE A STUDENT FROM A COURSE (adviser-only) ────────────────────────────
+// ── REMOVE STUDENTS FROM A COURSE (adviser-only) ────────────────────────────
 //
-// This replaces the rep's removed "Manage Enrolled Students" panel. The rep
-// can no longer take anyone off a roster at all — that permission is gone
-// from api/course.js — so this screen is the single remaining route.
+// This replaces the rep's removed "Manage Enrolled Students" panel. The rep can
+// no longer take anyone off a roster at all — that permission is gone from
+// api/course.js — so this is the single remaining route.
 //
-// Every value rendered here is escaped. The matric travels as a data
-// attribute and is re-read from it on click, never from innerHTML.
+// THE CARD IS ONLY A LAUNCHER. Tapping the course picker opens a modal that
+// lists the class with checkboxes, because the real task is almost always
+// "these three joined from the wrong level". One confirmation for one decision
+// beats three stacked dialogs.
+//
+// Every value rendered here is escaped. The matric travels as a checkbox value
+// and is read from the DOM, never from innerHTML.
+
+const removeModal = {
+  el: document.getElementById("removeStudentsModal"),
+  list: document.getElementById("removeStudentsList"),
+  course: document.getElementById("removeModalCourse"),
+  count: document.getElementById("removeSelectedCount"),
+  confirm: document.getElementById("removeConfirmBtn"),
+  confirmLabel: document.getElementById("removeConfirmLabel"),
+};
+
+/** Matrics ticked in the open modal. */
+let removeSelected = new Set();
 
 function adviserRemoveMessage(kind, html) {
   const el = adviserEls().removeMsg;
   if (!el) return;
   // An empty message CLEARS the box rather than leaving a coloured bar with
-  // nothing in it — which is what a bare `adviserRemoveMessage("info", "")`
-  // would otherwise do.
+  // nothing in it.
   if (!html) {
     el.classList.add("hidden");
     el.innerHTML = "";
@@ -9079,6 +9094,81 @@ function adviserRemoveMessage(kind, html) {
   el.className = "adviser-msg " + kind;
   el.innerHTML = html;
   el.classList.remove("hidden");
+}
+
+/** Keep the footer honest: how many are ticked, and whether we can act. */
+function syncRemoveSelection() {
+  const n = removeSelected.size;
+  if (removeModal.count) {
+    removeModal.count.textContent =
+      n === 0 ? "No one selected" : `${n} student${n === 1 ? "" : "s"} selected`;
+  }
+  if (removeModal.confirm) removeModal.confirm.disabled = n === 0;
+  if (removeModal.confirmLabel) {
+    removeModal.confirmLabel.textContent =
+      n === 0 ? "Remove selected" : `Remove ${n} student${n === 1 ? "" : "s"}`;
+  }
+}
+
+/** Render the class into the modal. The rep appears but cannot be ticked. */
+function renderRemoveStudentList(students, repUid, courseName) {
+  if (removeModal.course) {
+    removeModal.course.textContent = courseName || "this class";
+  }
+  if (!removeModal.list) return;
+  removeSelected = new Set();
+
+  if (!students.length) {
+    removeModal.list.innerHTML =
+      '<p class="remove-list-empty">Nobody is on this roster yet.</p>';
+    syncRemoveSelection();
+    return;
+  }
+
+  removeModal.list.innerHTML = students
+    .map((s) => {
+      const isRep = repUid && s.uid === repUid;
+      // The rep cannot be removed through this path (the server refuses with
+      // TARGET_IS_REP), so a tick box here would be a control that lies. The
+      // row is still shown, because the adviser needs to see who the rep is.
+      const tag = isRep ? '<span class="adviser-rep-tag">Course rep</span>' : "";
+      const input = isRep
+        ? '<input type="checkbox" disabled aria-label="The course rep cannot be removed here">'
+        : `<input type="checkbox" value="${escapeHTML(s.matric)}">`;
+      return (
+        `<label class="remove-row${isRep ? " is-rep" : ""}">${input}` +
+        `<span class="remove-row-body"><span class="remove-row-name">${escapeHTML(s.name)}</span>` +
+        `<br><span class="remove-row-matric">${escapeHTML(s.matric)}</span></span>${tag}</label>`
+      );
+    })
+    .join("");
+  syncRemoveSelection();
+}
+
+/** Load the roster for a course into the modal. */
+async function openRemoveStudentsModal(courseId) {
+  if (!removeModal.el) return;
+  if (removeModal.list) {
+    removeModal.list.innerHTML =
+      '<p class="remove-list-empty">Loading the class list…</p>';
+  }
+  removeSelected = new Set();
+  syncRemoveSelection();
+  removeModal.el.classList.add("show");
+  refreshIcons();
+  try {
+    const data = await adviserApi("listCourseStudents", { courseId });
+    renderRemoveStudentList(
+      Array.isArray(data.students) ? data.students : [],
+      data.repUid || null,
+      data.course && data.course.name,
+    );
+  } catch (err) {
+    if (removeModal.confirm) removeModal.confirm.disabled = true;
+    if (removeModal.count) removeModal.count.textContent = "Could not load the class";
+    adviserRemoveMessage("err", escapeHTML(err.message));
+    removeModal.el.classList.remove("show");
+  }
 }
 
 async function loadAdviserScopedCourses() {
@@ -9095,7 +9185,8 @@ async function loadAdviserScopedCourses() {
       opt.textContent = "No courses in your level yet";
       el.courseSelect.appendChild(opt);
       el.courseSelect.disabled = true;
-      el.classList?.classList.add("hidden");
+      const pickBtn = document.getElementById("adviserCoursePickBtn");
+      if (pickBtn) pickBtn.disabled = true;
       adviserRemoveMessage(
         "warn",
         "There are no courses in your level yet. A course appears here once a " +
@@ -9116,21 +9207,14 @@ async function loadAdviserScopedCourses() {
       el.courseSelect.appendChild(opt);
     });
     el.courseSelect.disabled = false;
+    const pickBtn = document.getElementById("adviserCoursePickBtn");
+    if (pickBtn) pickBtn.disabled = false;
 
-    // 🎯 A LEVEL ADVISER USUALLY RUNS ONE COURSE. With exactly one, sitting on a
-    // placeholder that does nothing reads as a broken control, so the single
-    // course is selected and its roster is loaded immediately. The dropdown stays
-    // for the level adviser who genuinely has more than one.
-    if (courses.length === 1) {
-      el.courseSelect.value = courses[0].id;
-      await loadAdviserCourseStudents(courses[0].id);
-    } else {
-      if (el.classList) {
-        el.classList.classList.add("hidden");
-        el.classList.innerHTML = "";
-      }
-      adviserRemoveMessage("info", "Pick a course to see who is on its roster.");
-    }
+    // A LEVEL ADVISER USUALLY RUNS ONE COURSE. Sitting on a placeholder that
+    // does nothing reads as a broken control, so a lone course is preselected
+    // and the picker simply says "open this one". The roster is NOT loaded here
+    // any more — it belongs in the modal, which the adviser opens deliberately.
+    el.courseSelect.value = courses.length === 1 ? courses[0].id : "";
   } catch (err) {
     el.courseSelect.innerHTML = "";
     const opt = document.createElement("option");
@@ -9138,102 +9222,95 @@ async function loadAdviserScopedCourses() {
     opt.textContent = "Could not load your courses";
     el.courseSelect.appendChild(opt);
     el.courseSelect.disabled = true;
+    const pickBtn = document.getElementById("adviserCoursePickBtn");
+    if (pickBtn) pickBtn.disabled = true;
     adviserRemoveMessage("err", escapeHTML(err.message));
   }
 }
 
-async function loadAdviserCourseStudents(courseId) {
-  const el = adviserEls();
-  if (!el.classList) return;
-  if (!courseId) {
-    el.classList.classList.add("hidden");
-    el.classList.innerHTML = "";
-    return;
-  }
-  try {
-    const data = await adviserApi("listCourseStudents", { courseId });
-    const students = Array.isArray(data.students) ? data.students : [];
-    const repUid = data.repUid || null;
+/**
+ * Remove every ticked student, one request each.
+ *
+ * Sequentially rather than with Promise.all, on purpose: each call is its own
+ * transaction writing to the same course doc's `enrolled[]` array, and a burst
+ * of parallel writes against one array is how you get a contended write and a
+ * partial failure. Failures are collected and REPORTED — a silent partial
+ * removal would leave the adviser believing the roster is clean when it is not.
+ */
+async function removeSelectedStudents() {
+  const select = adviserEls().courseSelect;
+  const courseId = select && select.value;
+  if (!courseId || removeSelected.size === 0) return;
+  const targets = Array.from(removeSelected);
+  const many = targets.length > 1;
 
-    if (!students.length) {
-      el.classList.innerHTML =
-        '<div class="adviser-preview-head">Nobody is on this roster yet.</div>';
-      el.classList.remove("hidden");
-      return;
-    }
-
-    // The rep's own row is shown but carries no button: the server refuses to
-    // remove the rep, so offering the control would be a dead button. The row
-    // still appears because the adviser needs to see who the rep is.
-    const rows = students
-      .map((s) => {
-        const isRep = repUid && s.uid === repUid;
-        const action = isRep
-          ? '<span class="adviser-rep-tag">Course rep</span>'
-          : `<button type="button" class="adviser-remove-student-btn" data-remove-matric="${escapeHTML(s.matric)}" data-remove-name="${escapeHTML(s.name)}">Remove</button>`;
-        return `<tr><td class="adviser-student-matric">${escapeHTML(s.matric)}</td><td>${escapeHTML(s.name)}</td><td class="adviser-row-action">${action}</td></tr>`;
-      })
-      .join("");
-
-    const courseName = (data.course && data.course.name) || "this class";
-    el.classList.innerHTML =
-      `<div class="adviser-preview-head">${escapeHTML(courseName)} — ${students.length} enrolled</div>` +
-      `<div class="adviser-preview-scroll"><table class="adviser-student-table"><thead><tr><th>Matric</th><th>Name</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    el.classList.remove("hidden");
-    adviserRemoveMessage("info", "");
-  } catch (err) {
-    el.classList.add("hidden");
-    el.classList.innerHTML = "";
-    adviserRemoveMessage("err", escapeHTML(err.message));
-  }
-}
-
-async function removeAdviserCourseStudent(matric, name) {
-  const el = adviserEls();
-  if (!matric || !el.courseSelect) return;
-  const courseId = el.courseSelect.value;
-  if (!courseId) return;
-
-  // Same "transparency before the tap" rule the rep's version followed: this
-  // is a decision about a real person, and the three facts that decide it are
-  // shown BEFORE the button is pressed, not after.
   const ok = await showConfirm({
-    title: "Remove Student From Class",
-    message: `Remove ${name} (${matric}) from this class?`,
-    okText: "Remove from roster",
-    cancelText: "Cancel",
-    icon: "door-open",
+    title: many ? `Remove ${targets.length} students?` : "Remove this student?",
+    message: many
+      ? `${targets.length} students will be taken off the roster.`
+      : `${targets[0]} will be taken off the roster.`,
+    okText: many ? `Remove ${targets.length}` : "Remove",
+    cancelText: "Keep them",
+    icon: "user-x",
     danger: true,
     details: [
-      { label: "Student", value: `${name} (${matric})` },
+      {
+        label: "Course",
+        value:
+          (select.selectedOptions && select.selectedOptions[0]
+            ? select.selectedOptions[0].textContent
+            : "") || "",
+      },
+      { label: many ? "Students" : "Student", value: targets.join(", ") },
       {
         label: "Their attendance history",
         value: "Kept — removal never erases past classes",
       },
-      { label: "Audit log", value: "A permanent record is written" },
-      { label: "They can rejoin", value: "Yes, immediately, with the course code" },
+      { label: "Audit log", value: "A permanent record is written for each" },
+      {
+        label: "They can rejoin",
+        value: "Yes, immediately, with the course code",
+      },
     ],
   });
   if (!ok) return;
 
-  try {
-    const res = await adviserApi("removeCourseStudent", {
-      courseId,
-      targetMatric: matric,
-    });
+  const failed = [];
+  let done = 0;
+  for (const matric of targets) {
+    try {
+      await adviserApi("removeCourseStudent", { courseId, targetMatric: matric });
+      done += 1;
+    } catch (err) {
+      // Keep going: one student being the live rep, or a session starting
+      // mid-loop, must not strand the rest of the batch unprocessed.
+      failed.push(`${matric}: ${err.message}`);
+    }
+  }
+
+  if (removeModal.el) removeModal.el.classList.remove("show");
+
+  if (!failed.length) {
     adviserRemoveMessage(
       "ok",
-      escapeHTML(res.message || "Student removed.") +
-        " Their history was kept and the removal is recorded in the audit log.",
+      `Removed ${done} student${done === 1 ? "" : "s"}. Their attendance history was kept and every removal is in the audit log.`,
     );
-    toast.success(res.message || "Student removed.", "Removed");
-    await loadAdviserCourseStudents(courseId);
-  } catch (err) {
-    // 🛑 Surface WHY. The server distinguishes "outside your scope", "that is
-    // the rep" and "session is live" — collapsing them into "try again" is what
-    // sent the old rep flow into an unresolvable retry loop.
-    adviserRemoveMessage("err", escapeHTML(err.message || "Unable to remove."));
+    toast.success(
+      `${done} student${done === 1 ? "" : "s"} removed.`,
+      "Roster Updated",
+    );
+  } else {
+    // Partial success is reported AS partial. Never claim a clean roster.
+    adviserRemoveMessage(
+      failed.length === targets.length ? "err" : "warn",
+      `Removed ${done} of ${targets.length}. These could not be removed:<br>` +
+        failed.map((f) => escapeHTML(f)).join("<br>"),
+    );
   }
+  removeSelected = new Set();
+  syncRemoveSelection();
+  // The enrolled count on the picker is stale now — refresh it.
+  loadAdviserScopedCourses();
 }
 
 async function handleRosterFileChosen(file) {
@@ -9599,23 +9676,43 @@ function initAdviserDashboard() {
   if (el.endSession)
     el.endSession.addEventListener("click", endAdviserAcademicSession);
 
-  // ── Remove-a-student wiring ──
-  if (el.courseSelect) {
-    el.courseSelect.addEventListener("change", () => {
-      loadAdviserCourseStudents(el.courseSelect.value);
+  // ── Remove-students modal wiring ──
+  // The card's course picker launches the modal. The <select> underneath is
+  // pointer-events:none so the OS dropdown never opens on top of it.
+  const pickBtn = document.getElementById("adviserCoursePickBtn");
+  if (pickBtn) {
+    pickBtn.addEventListener("click", () => {
+      const sel = adviserEls().courseSelect;
+      if (!sel || !sel.value) {
+        // More than one course and none chosen: say so instead of opening an
+        // empty modal.
+        adviserRemoveMessage("info", "Choose a course first, then tap it again.");
+        return;
+      }
+      openRemoveStudentsModal(sel.value);
     });
   }
-  if (el.classList) {
-    // Delegation, wired once here — NOT after every innerHTML rebuild, which
-    // is how the old rep panel once fired N confirm dialogs for one tap.
-    el.classList.addEventListener("click", (e) => {
-      const btn = e.target.closest(".adviser-remove-student-btn");
-      if (!btn) return;
-      e.preventDefault();
-      removeAdviserCourseStudent(
-        btn.dataset.removeMatric,
-        btn.dataset.removeName,
-      );
+  // Changing course by keyboard (the select is still focusable) also re-targets.
+  if (el.courseSelect) {
+    el.courseSelect.addEventListener("change", () => {
+      removeSelected = new Set();
+      syncRemoveSelection();
+    });
+  }
+  if (removeModal.list) {
+    // Delegation: the rows are re-rendered on every open, so this is wired once
+    // here rather than after each render (the old rep panel's N-listeners bug).
+    removeModal.list.addEventListener("change", (e) => {
+      const box = e.target.closest('input[type="checkbox"]');
+      if (!box || box.disabled) return;
+      if (box.checked) removeSelected.add(box.value);
+      else removeSelected.delete(box.value);
+      syncRemoveSelection();
+    });
+  }
+  if (removeModal.confirm) {
+    removeModal.confirm.addEventListener("click", () => {
+      removeSelectedStudents();
     });
   }
 }

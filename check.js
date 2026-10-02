@@ -21,6 +21,8 @@
 //   - checks index.html for duplicate ids, because getElementById resolves to
 //     the FIRST match in document order and a collided id silently strands one
 //     element forever, with no error anywhere
+//   - rejects MOJIBAKE, which is the failure a plain "does it parse" check
+//     waves through. See section 6 for why that one nearly shipped.
 //
 // Run: npm run check
 
@@ -175,6 +177,60 @@ for (const d of ["api", "utils"]) {
     );
   }
   if (!missing.length) ok(`all ${refs.size} getElementById targets exist`);
+}
+
+// --- 6. MOJIBAKE + BOM: the corruption that parses perfectly --------------
+//
+// WHY THIS IS ITS OWN CHECK
+// style.css was once left with its UTF-8 read as Latin-1 and rewritten in
+// place: every arrow, em-dash, ellipsis and box-drawing character became two
+// or three VISIBLE characters instead (the arrow rendered as U+00E2 followed
+// by two more). The file looked fine to a parser and was wrecked to a reader.
+//
+// That failure is invisible to every other check in this file, which is
+// exactly the problem:
+//   - it PARSES. Mojibake is valid UTF-8, so U+FFFD is never produced and a
+//     "count the replacement characters" test reports zero, every time.
+//   - the CSS is still valid; only human-readable text in comments is wrecked.
+//   - git shows a large diff, so it reads like a deliberate rewrite.
+//
+// A mangled file still ends up holding real, valid Unicode, so the only
+// reliable signal is the tell-tale LEADING CHARACTER: U+00E2 on its own is the
+// signature of UTF-8 bytes decoded once as cp1252. Legitimate copy does not
+// begin a word with it. (This comment therefore cannot QUOTE the broken text
+// literally — doing so would trip the very check that documents it.)
+//
+// Asserted as a hard failure, not a warning: shipping it puts visible garbage
+// into the source everyone else opens.
+{
+  const tracked = [
+    "style.css", "adviser.css", "role-picker.css", "app.js", "index.html",
+    "sw.js", "check.js", "rules-test.js", "firebase-messaging-sw.js",
+    "manifest.json", "README.md", "brand/README.md",
+    "docs/SECURITY_MODEL.md", "docs/ROADMAP.md", "docs/ARCHITECTURE.md",
+    "firestore.rules",
+  ];
+  const MOJIBAKE_LEAD = "\u00e2";
+  let clean = true;
+  for (const f of tracked) {
+    if (!fs.existsSync(f)) continue;
+    const text = fs.readFileSync(f).toString("utf8");
+    if (text.charCodeAt(0) === 0xfeff) {
+      bad(`${f} starts with a UTF-8 BOM`, "strip it before committing");
+      clean = false;
+    }
+    const idx = text.indexOf(MOJIBAKE_LEAD);
+    if (idx !== -1) {
+      const line = text.slice(0, idx).split("\n").length;
+      bad(
+        `${f} contains mojibake`,
+        `first at line ${line}: ${JSON.stringify(text.slice(idx - 20, idx + 20))} — ` +
+          "decoded as Latin-1 and rewritten",
+      );
+      clean = false;
+    }
+  }
+  if (clean) ok(`no BOM or mojibake in ${tracked.length} source files`);
 }
 
 console.log(fails === 0 ? "\nALL PARSED CLEAN" : `\n${fails} PROBLEM(S)`);

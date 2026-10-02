@@ -1121,16 +1121,28 @@
       </div>
 
       <div class="adviser-card">
-        <h3 class="adviser-card-h3"><i data-lucide="user-x"></i> Remove a Student From a Class</h3>
+        <h3 class="adviser-card-h3"><i data-lucide="user-x"></i> Remove Students From a Class</h3>
         <p class="adviser-card-p">This is the only way to take someone off a course roster — the course
           rep cannot do it. Use it when a student joined a course code but should not be in the class.
-          Their attendance history is kept, the removal is written to a permanent audit log, and they
+          Their attendance history is kept, every removal is written to a permanent audit log, and they
           can rejoin with the course code at any time.
         </p>
-        <select id="adviserCourseSelect" class="adviser-select" disabled>
-          <option value="">Loading your courses…</option>
-        </select>
-        <div id="adviserClassList" class="adviser-preview hidden"></div>
+
+        <!-- 🎯 THE CARD IS JUST A LAUNCHER.
+             The <select> below holds the currently-targeted course and is still a
+             real <select> (so it is announced and focusable), but it is covered by
+             a transparent button: tapping it opens the student-picker modal instead
+             of the native dropdown. Letting the OS dropdown open would put a second,
+             competing list of courses on screen for a control whose only job is to
+             pick WHICH course the modal is about. -->
+        <div class="course-picker">
+          <select id="adviserCourseSelect" class="adviser-select" disabled>
+            <option value="">Loading your courses…</option>
+          </select>
+          <button type="button" id="adviserCoursePickBtn" class="course-picker-hit"
+            aria-haspopup="dialog" aria-controls="removeStudentsModal" disabled>
+          </button>
+        </div>
         <div class="adviser-msg hidden" id="adviserRemoveMsg"></div>
       </div>
 
@@ -1188,6 +1200,34 @@
     </section>
 
   </main>
+
+  <!-- MODAL: REMOVE STUDENTS (adviser) ----------------------------------
+       Multi-select by checkbox, because the real task is almost always "these
+       three joined from the wrong level" — making the adviser remove them one
+       dialog at a time would be three confirmations for one decision. -->
+  <div id="removeStudentsModal" class="modal">
+    <div class="modal-card remove-modal-card">
+      <h3><i data-lucide="user-x"></i> Remove Students From <span id="removeModalCourse">this class</span></h3>
+      <p class="remove-modal-note">
+        Tick everyone you want off the roster, then remove them in one go. Their attendance
+        history is kept and each removal is recorded in the audit log.
+      </p>
+
+      <div id="removeStudentsList" class="remove-student-list">
+        <p class="remove-list-empty">Loading the class list…</p>
+      </div>
+
+      <div class="remove-modal-foot">
+        <span id="removeSelectedCount" class="remove-count">No one selected</span>
+        <div class="modal-actions remove-modal-actions">
+          <button type="button" class="btn btn-outline close-modal" id="removeModalCancel">Close</button>
+          <button type="button" class="btn btn-danger-solid" id="removeConfirmBtn" disabled>
+            <i data-lucide="user-x"></i> <span id="removeConfirmLabel">Remove selected</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: FORGOT PASSWORD -->
   <div id="forgotModal" class="modal">

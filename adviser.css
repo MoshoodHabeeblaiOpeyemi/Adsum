@@ -153,48 +153,137 @@
 
 .adviser-msg ul { margin: 8px 0 0; padding-left: 18px; }
 
-/* --- remove-a-student roster table --- */
-.adviser-student-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-.adviser-student-table th,
-.adviser-student-table td {
-  text-align: left;
-  padding: 8px 8px;
-  border-bottom: 1px solid var(--card-border);
-  vertical-align: middle;
+/* --- course picker (launches the remove-students modal) --- */
+/* The <select> renders the target course; a transparent button sits on top and
+   intercepts the tap. `pointer-events: none` on the select is what stops the
+   native dropdown from opening underneath, while the button keeps the control
+   keyboard-operable and screen-reader-legible via aria-haspopup. */
+.course-picker {
+  position: relative;
+  margin-bottom: 14px;
 }
-.adviser-student-table th {
-  color: var(--text-muted);
-  font-weight: 700;
-  font-size: 0.7rem;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-}
-.adviser-student-table tbody tr:last-child td { border-bottom: none; }
-/* The matric is the identifier; the name is the person. Give the name the
-   room and keep the number from wrapping into two ragged lines. */
-.adviser-student-matric {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-}
-.adviser-row-action { text-align: right; white-space: nowrap; }
-
-.adviser-remove-student-btn {
-  background: transparent;
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 5px 10px;
-  min-height: 32px;
+.course-picker .adviser-select {
+  margin-bottom: 0;
+  pointer-events: none;
   cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease;
 }
-.adviser-remove-student-btn:hover {
+.course-picker-hit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: transparent;
+  padding: 0;
+}
+.course-picker-hit:disabled {
+  cursor: not-allowed;
+}
+
+/* --- remove-students modal --- */
+.remove-modal-card {
+  /* A class list is the content here, so the card is allowed to be taller than
+     the stock modal and must scroll rather than push its buttons off-screen. */
+  max-width: 480px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+.remove-modal-note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.remove-student-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  border: 1.5px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 6px;
+}
+.remove-list-empty {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 18px 10px;
+  margin: 0;
+}
+.remove-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  min-height: 44px; /* tap target */
+  transition: background-color 0.15s ease;
+}
+.remove-row:hover { background: var(--teal-glow); }
+.remove-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+  cursor: pointer;
+  margin: 0;
+}
+.remove-row-body { flex: 1; min-width: 0; }
+.remove-row-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.remove-row-matric {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.remove-row.is-rep {
+  cursor: default;
+  opacity: 0.65;
+}
+.remove-row.is-rep:hover { background: transparent; }
+.remove-row.is-rep input[type="checkbox"] {
+  accent-color: var(--border);
+  cursor: not-allowed;
+}
+
+.remove-modal-foot {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.remove-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.remove-modal-actions {
+  margin-top: 0;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+.remove-modal-actions .btn { width: auto; }
+
+/* The destructive confirm. Distinct from the generic .btn (which is violet) so
+   the weight of the click matches the weight of the action. */
+.btn-danger-solid {
   background: var(--danger);
-  color: #fff;
+  box-shadow: 0 10px 24px -8px rgba(220, 38, 38, 0.6);
+}
+.btn-danger-solid:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.4);
 }
 
 .adviser-rep-tag {
@@ -206,6 +295,7 @@
   background: var(--teal-glow);
   border-radius: 999px;
   padding: 3px 8px;
+  white-space: nowrap;
 }
 
 /* --- import preview --- */
