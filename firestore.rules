@@ -262,6 +262,7 @@ service cloud.firestore {
 
       allow update: if isCourseStaff(courseId)
         && request.resource.data.repUid == resource.data.repUid
+        && request.resource.data.get('archived', false) == resource.data.get('archived', false)
         && request.resource.data.code == resource.data.code
         && request.resource.data.institution == resource.data.institution
         && request.resource.data.department == resource.data.department

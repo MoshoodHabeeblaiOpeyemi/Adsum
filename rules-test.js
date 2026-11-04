@@ -195,6 +195,15 @@ async function main() {
   );
 
   check(
+    "G1. client cannot change course archive state",
+    await req("PATCH", "/courses/courseA", {
+      uid: "rep1",
+      body: { fields: courseDoc("rep1", "24/56SV002", { archived: B(true) }) },
+    }),
+    403,
+  );
+
+  check(
     "H. non-staff cannot update the course",
     await req("PATCH", "/courses/courseA", {
       uid: "student1",

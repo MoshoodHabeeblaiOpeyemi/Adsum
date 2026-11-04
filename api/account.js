@@ -153,6 +153,7 @@ async function handleDeleteAccount(req, res, decoded) {
           Object.assign(courseUpdates, {
             repUid: null,
             rep: "Former course rep",
+            assistants: [],
             activeSession: null,
             archived: true,
             archivedAt: FieldValue.serverTimestamp(),
@@ -175,8 +176,24 @@ async function handleDeleteAccount(req, res, decoded) {
         return isCurrentRep;
       });
 
-      if (archived) coursesArchived++;
-      else coursesLeft++;
+      if (archived) {
+        const remainingStaff = await courseRef
+          .collection("members")
+          .where("role", "in", ["assistant", "session_assistant", "rep"])
+          .get();
+        for (
+          let offset = 0;
+          offset < remainingStaff.docs.length;
+          offset += 450
+        ) {
+          const batch = db.batch();
+          remainingStaff.docs.slice(offset, offset + 450).forEach((member) => {
+            batch.update(member.ref, { role: "student" });
+          });
+          await batch.commit();
+        }
+        coursesArchived++;
+      } else coursesLeft++;
     }
 
     if (matric) {

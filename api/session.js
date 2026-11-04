@@ -82,6 +82,10 @@ async function handleRotatePin(req, res, decoded) {
       return res.status(404).json({ error: "Course not found." });
 
     const courseData = courseSnap.data();
+    if (courseData.archived === true)
+      return res
+        .status(410)
+        .json({ error: "This course is archived.", code: "COURSE_ARCHIVED" });
     const memberSnap = await courseRef
       .collection("members")
       .doc(decoded.uid)
@@ -180,6 +184,10 @@ async function handleStartSession(req, res, decoded) {
     const courseSnap = await courseRef.get();
     if (!courseSnap.exists)
       return res.status(404).json({ error: "Course not found." });
+    if (courseSnap.data().archived === true)
+      return res
+        .status(410)
+        .json({ error: "This course is archived.", code: "COURSE_ARCHIVED" });
 
     const memberSnap = await courseRef
       .collection("members")
@@ -343,6 +351,10 @@ async function handleClose(req, res, decoded) {
       return res.status(404).json({ error: "Course not found." });
 
     const courseData = courseSnap.data();
+    if (courseData.archived === true)
+      return res
+        .status(410)
+        .json({ error: "This course is archived.", code: "COURSE_ARCHIVED" });
     const memberSnap = await courseRef
       .collection("members")
       .doc(decoded.uid)
