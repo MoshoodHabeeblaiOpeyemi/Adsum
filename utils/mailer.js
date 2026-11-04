@@ -14,6 +14,7 @@
 async function sendVerificationCode({
   to,
   code,
+  name,
   institutionId,
   level,
   department,
@@ -30,6 +31,12 @@ async function sendVerificationCode({
 
   const scope = [institutionId, department, level].filter(Boolean).join(" — ");
   const isAdviser = accountType === "Level Adviser";
+  const greetingName =
+    String(name || "there")
+      .replace(/[\r\n\t]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120) || "there";
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -43,7 +50,8 @@ async function sendVerificationCode({
         to: [to],
         subject: "Your Adsum email verification code",
         text:
-          `Your Adsum verification code is ${code}\n\n` +
+          `Hi ${greetingName},\n\n` +
+          `Your Adsum verification code is ${code}.\n\n` +
           (isAdviser ? `Level: ${scope || "your department"}\n` : "") +
           `It expires in 10 minutes. Enter it in the app to verify your\n` +
           `${isAdviser ? "Level Adviser" : "Adsum"} account.\n\n` +

@@ -505,6 +505,7 @@ async function handleCreateProfile(req, res, decoded) {
         const mail = await sendVerificationCode({
           to: p.email,
           code,
+          name: p.name,
           institutionId: p.institution,
           level: p.level,
           department: p.department,

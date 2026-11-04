@@ -27,8 +27,20 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { sendVerificationCode } = require("../utils/mailer");
 
 try {
-  if (getApps().length === 0) initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") }) });
-} catch (e) { if (!/already exists/.test(e.message)) console.error("Init error:", e); }
+  if (getApps().length === 0)
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(
+          /\\n/g,
+          "\n",
+        ),
+      }),
+    });
+} catch (e) {
+  if (!/already exists/.test(e.message)) console.error("Init error:", e);
+}
 
 const db = getFirestore();
 
@@ -41,8 +53,10 @@ function ageMs(value, now = Date.now()) {
   if (value == null) return null;
   let ms = null;
   if (typeof value === "number") ms = value;
-  else if (typeof value === "object" && typeof value.toMillis === "function") ms = value.toMillis();
-  else if (typeof value === "object" && typeof value.seconds === "number") ms = value.seconds * 1000;
+  else if (typeof value === "object" && typeof value.toMillis === "function")
+    ms = value.toMillis();
+  else if (typeof value === "object" && typeof value.seconds === "number")
+    ms = value.seconds * 1000;
   else {
     const d = new Date(value);
     ms = Number.isNaN(d.getTime()) ? null : d.getTime();
@@ -51,7 +65,6 @@ function ageMs(value, now = Date.now()) {
   return now - ms;
 }
 
-
 /**
  * Warn (first pass) or delete (second pass) for ONE unverified adviser.
  * Failures are collected, never thrown, so one bad document cannot abort the
@@ -59,7 +72,13 @@ function ageMs(value, now = Date.now()) {
  */
 async function purgeOne(profile, now) {
   const uid = profile.uid;
-  const out = { uid, email: profile.email || null, warned: false, deleted: false, error: null };
+  const out = {
+    uid,
+    email: profile.email || null,
+    warned: false,
+    deleted: false,
+    error: null,
+  };
   try {
     if (profile.verificationWarnedAt !== true) {
       const age = ageMs(profile.createdAt, now);
@@ -71,23 +90,37 @@ async function purgeOne(profile, now) {
         await sendVerificationCode({
           to: profile.email,
           code: "------",
+          name: profile.name,
           institutionId: profile.institution,
           level: profile.level,
           department: profile.department,
+          accountType: "Level Adviser",
         });
-        await db.collection("users").doc(uid).set(
-          { verificationWarnedAt: true, verificationWarnedAtTs: FieldValue.serverTimestamp() },
-          { merge: true },
-        );
+        await db
+          .collection("users")
+          .doc(uid)
+          .set(
+            {
+              verificationWarnedAt: true,
+              verificationWarnedAtTs: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
         out.warned = true;
-        console.log(`pruneAdvisers: warned ${uid} (${out.email}) at ${Math.round(age / HOUR)}h`);
+        console.log(
+          `pruneAdvisers: warned ${uid} (${out.email}) at ${Math.round(age / HOUR)}h`,
+        );
       }
       return out;
     }
 
     // Full deletion. The transient code and profile go first; Auth last, so if
     // it fails the user is still reachable and a retry can finish the job.
-    await db.collection("adviserVerifications").doc(uid).delete().catch(() => {});
+    await db
+      .collection("adviserVerifications")
+      .doc(uid)
+      .delete()
+      .catch(() => {});
     await db.collection("users").doc(uid).delete();
     out.deleted = true;
     try {
@@ -97,7 +130,9 @@ async function purgeOne(profile, now) {
       out.authDeleted = false;
       console.error("pruneAdvisers: Auth user not deleted", uid, e.message);
     }
-    console.log(`pruneAdvisers: deleted ${uid} (${out.email}) aged ${Math.round(ageMs(profile.createdAt, now) / HOUR)}h`);
+    console.log(
+      `pruneAdvisers: deleted ${uid} (${out.email}) aged ${Math.round(ageMs(profile.createdAt, now) / HOUR)}h`,
+    );
   } catch (e) {
     out.error = e.message;
     console.error("pruneAdvisers: failed for", uid, e.message);

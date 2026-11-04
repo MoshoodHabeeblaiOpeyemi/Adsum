@@ -87,12 +87,10 @@ async function handleSendCode(req, res, decoded) {
         .status(403)
         .json({ error: "This account cannot request email verification." });
     if (!domain || cleanEmail !== tokenEmail)
-      return res
-        .status(403)
-        .json({
-          error:
-            "The email on this account does not match your signed-in address.",
-        });
+      return res.status(403).json({
+        error:
+          "The email on this account does not match your signed-in address.",
+      });
     if (
       decoded.email_verified === true &&
       profile.verificationStatus === VERIFICATION.VERIFIED
@@ -122,11 +120,9 @@ async function handleSendCode(req, res, decoded) {
         );
       const slotSnap = await db.collection("adviserSlots").doc(slotId).get();
       if (slotSnap.exists && slotSnap.data().adviserUid !== decoded.uid) {
-        return res
-          .status(409)
-          .json({
-            error: `A Level Adviser already exists for ${profile.institution} • ${profile.department} • ${profile.level}.`,
-          });
+        return res.status(409).json({
+          error: `A Level Adviser already exists for ${profile.institution} • ${profile.department} • ${profile.level}.`,
+        });
       }
     }
 
@@ -140,12 +136,10 @@ async function handleSendCode(req, res, decoded) {
         (data.lastSentAt + RESEND_COOLDOWN_MS - Date.now()) / 1000,
       );
       if (retryAfterSeconds > 0) {
-        return res
-          .status(429)
-          .json({
-            error: "Please wait before requesting another code.",
-            retryAfterSeconds,
-          });
+        return res.status(429).json({
+          error: "Please wait before requesting another code.",
+          retryAfterSeconds,
+        });
       }
     }
 
@@ -163,6 +157,7 @@ async function handleSendCode(req, res, decoded) {
     const mail = await sendVerificationCode({
       to: cleanEmail,
       code,
+      name: profile.name,
       institutionId: norm(profile.institution),
       level: adviser ? profile.level : null,
       department: adviser ? profile.department : null,
@@ -206,12 +201,10 @@ async function handleVerifyCode(req, res, decoded) {
       !profileEmail ||
       tokenEmail !== profileEmail
     ) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "The email on this account does not match your signed-in address.",
-        });
+      return res.status(403).json({
+        error:
+          "The email on this account does not match your signed-in address.",
+      });
     }
 
     const verRef = db
@@ -331,19 +324,14 @@ async function handleVerifyCode(req, res, decoded) {
     });
   } catch (error) {
     if (error.message === "ADVISER_SLOT_TAKEN") {
-      return res
-        .status(409)
-        .json({
-          error:
-            "A Level Adviser already exists for this department and level.",
-        });
+      return res.status(409).json({
+        error: "A Level Adviser already exists for this department and level.",
+      });
     }
     if (error.message === "VERIFICATION_CODE_CHANGED") {
-      return res
-        .status(409)
-        .json({
-          error: "That code was already used or expired. Request a new code.",
-        });
+      return res.status(409).json({
+        error: "That code was already used or expired. Request a new code.",
+      });
     }
     console.error("verification verifyCode error:", error);
     return res.status(500).json({ error: "Unable to verify code." });
