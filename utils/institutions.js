@@ -31,7 +31,10 @@ try {
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(
+          /\\n/g,
+          "\n",
+        ),
       }),
     });
   }
@@ -40,14 +43,17 @@ try {
 }
 
 const db = getFirestore();
-const norm = (v) => String(v || "").trim().toUpperCase();
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase();
 
 const REGISTRY_SCAN_LIMIT = 300;
 
 /** Pull a usable domain list out of either supported document shape. */
 function domainsOf(data) {
   if (!data) return [];
-  const list = data.emailDomains || data.domains || [];
+  const list = data.emailDomains || data.emaildomains || data.domains || [];
   if (!Array.isArray(list)) return [];
   return list.map((d) => String(d).trim().toLowerCase()).filter(Boolean);
 }
@@ -64,7 +70,9 @@ const keyMatches = (data, wanted) =>
  *   problem the caller should surface, not silently treat as "not official".
  */
 async function isInstitutionDomain(institutionId, domain) {
-  const wantedDomain = String(domain || "").trim().toLowerCase();
+  const wantedDomain = String(domain || "")
+    .trim()
+    .toLowerCase();
   const wantedId = norm(institutionId);
   if (!wantedDomain || !wantedId) return { ok: false, configured: false };
 
@@ -81,10 +89,20 @@ async function isInstitutionDomain(institutionId, domain) {
   // 2. The client may hold a display name or a different code — match on
   //    code / name / alias instead. The registry is small and admin-written,
   //    so a bounded scan is cheaper than another round trip to the client.
-  const snap = await db.collection("institutions").limit(REGISTRY_SCAN_LIMIT).get();
+  const snap = await db
+    .collection("institutions")
+    .limit(REGISTRY_SCAN_LIMIT)
+    .get();
   for (const doc of snap.docs) {
-    if (keyMatches(doc.data(), wantedId) && domainsOf(doc.data()).includes(wantedDomain)) {
-      return { ok: true, configured: true, matchedBy: `institutions/${doc.id}` };
+    if (
+      keyMatches(doc.data(), wantedId) &&
+      domainsOf(doc.data()).includes(wantedDomain)
+    ) {
+      return {
+        ok: true,
+        configured: true,
+        matchedBy: `institutions/${doc.id}`,
+      };
     }
   }
 
