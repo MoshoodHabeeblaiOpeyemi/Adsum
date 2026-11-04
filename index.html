@@ -414,29 +414,6 @@
               <div id="modeCardsGrid" class="mode-cards-grid"></div>
               <div id="modeHint" style="font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4;">
               </div>
-              <!-- 📺 QR DISPLAY CHOICE — appears when QR + Device Lock is selected:
-                 where does the big rolling code live? Projector or trusted
-                 physically-present students acting as live "hotspots". -->
-              <div id="qrDisplayChoiceRow" class="hidden"
-                style="margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--bg); border: 1.5px dashed var(--teal);">
-                <p style="font-size: 0.75rem; font-weight: 700; color: var(--navy); margin: 0 0 8px;">
-                  Where will the rotating QR be shown?
-                </p>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" data-qr-display="projector"
-                    style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
-                    <div style="font-weight: 700;">📺 Projector</div>
-                    <div style="color: var(--muted); margin-top: 2px;">Halls with a projector/cast — fullscreen
-                      portrait, biggest QR</div>
-                  </button>
-                  <button type="button" data-qr-display="hotspots"
-                    style="flex: 1; min-width: 130px; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 0.75rem; border: 1.5px solid var(--border); background: var(--bg); color: var(--text);">
-                    <div style="font-weight: 700;">👥 Hotspot Students</div>
-                    <div style="color: var(--muted); margin-top: 2px;">No projector — pick trusted students in the hall
-                      to show the QR</div>
-                  </button>
-                </div>
-              </div>
             </div>
 
             <button id="generatePinBtn" class="btn">
@@ -1206,6 +1183,28 @@
     </section>
 
   </main>
+
+  <!-- QR DISPLAY CHOICE -------------------------------------------- -->
+  <div id="qrDisplayChoiceRow" class="modal" role="dialog" aria-modal="true"
+    aria-labelledby="qrDisplayChoiceTitle">
+    <div class="modal-card qr-display-modal">
+      <h3 id="qrDisplayChoiceTitle">Where will the rotating QR be shown?</h3>
+      <p class="qr-display-help">Choose the display for this course. You can change it before a future class.</p>
+      <div class="qr-display-options">
+        <button type="button" class="qr-display-option" data-qr-display="projector" aria-pressed="false">
+          <strong>Projector</strong>
+          <span>Show one large QR on a projector or cast display.</span>
+        </button>
+        <button type="button" class="qr-display-option" data-qr-display="hotspots" aria-pressed="false">
+          <strong>Hotspot students</strong>
+          <span>Let checked-in students show the rotating QR around the hall.</span>
+        </button>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline close-modal">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: REMOVE STUDENTS (adviser) ----------------------------------
        Multi-select by checkbox, because the real task is almost always "these

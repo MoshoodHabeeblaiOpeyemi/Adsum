@@ -6763,14 +6763,12 @@ function syncQrDisplayChoiceUI() {
     activeCourse.activeSession &&
     !activeCourse.activeSession.expired &&
     getAccurateNow() < activeCourse.activeSession.expiresAt;
-  row.classList.toggle("hidden", mode !== "qr_mode" || isLive);
+  if (mode !== "qr_mode" || isLive) row.classList.remove("show");
   const choice = getQrDisplayChoice();
   row.querySelectorAll("button[data-qr-display]").forEach((btn) => {
     const active = btn.dataset.qrDisplay === choice;
-    btn.style.borderColor = active ? "var(--teal)" : "var(--border)";
-    btn.style.background = active ? "rgba(12, 128, 116, 0.12)" : "var(--bg)";
-    btn.innerHTML = btn.innerHTML.replace(/ ✓$/, "");
-    if (active) btn.innerHTML += " ✓";
+    btn.classList.toggle("is-selected", active);
+    btn.setAttribute("aria-pressed", String(active));
   });
 }
 
@@ -6785,6 +6783,7 @@ function initQrDisplayChoice() {
       btn.dataset.qrDisplay,
     );
     syncQrDisplayChoiceUI();
+    row.classList.remove("show");
   });
 }
 initQrDisplayChoice();
@@ -6841,6 +6840,15 @@ function renderModeCards() {
       localStorage.setItem(`adsum_mode_${activeCourse.id}`, mode);
       renderModeCards();
       syncModeUI();
+      if (mode === "qr_mode") {
+        const choiceModal = document.getElementById("qrDisplayChoiceRow");
+        const session = activeCourse.activeSession;
+        const isLive =
+          session &&
+          !session.expired &&
+          getAccurateNow() < session.expiresAt;
+        if (choiceModal && !isLive) choiceModal.classList.add("show");
+      }
     });
     grid.appendChild(btn);
   });
