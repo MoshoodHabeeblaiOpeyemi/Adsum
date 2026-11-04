@@ -173,10 +173,7 @@ window.addEventListener("popstate", (event) => {
     ".modal.show, #confirm-overlay.show",
   );
   if (openModal) {
-    if (
-      openModal.id === "confirm-overlay" &&
-      window.__adsumCancelConfirm
-    ) {
+    if (openModal.id === "confirm-overlay" && window.__adsumCancelConfirm) {
       window.__adsumCancelConfirm();
       pushNavTrap(currentNavView);
       return;
@@ -1131,10 +1128,7 @@ function getFailureState(courseId) {
 
 function setFailureState(courseId, state) {
   try {
-    localStorage.setItem(
-      `adsum_failures_${courseId}`,
-      JSON.stringify(state),
-    );
+    localStorage.setItem(`adsum_failures_${courseId}`, JSON.stringify(state));
   } catch (e) {
     /* storage unavailable — the override simply stays locked */
   }
@@ -2428,18 +2422,17 @@ if (signupForm) {
       // attempt it returns `undefined` and the outer value stays `null`, so
       // every `signup && ...` branch below correctly falls through to the
       // plain success toast rather than reading a stale object.
-      signup =
-        await withBusyOnce(
-          "Creating your account…",
-          "signup",
-          async () => {
-            const userCredential = await createUserWithEmailAndPassword(
-              auth,
-              email,
-              password,
-            );
+      signup = await withBusyOnce(
+        "Creating your account…",
+        "signup",
+        async () => {
+          const userCredential = await createUserWithEmailAndPassword(
+            auth,
+            email,
+            password,
+          );
 
-            // 🔒 PHASE 5: the profile is written by the SERVER, not here.
+          // 🔒 PHASE 5: the profile is written by the SERVER, not here.
           //
           // This used to claim `departmentReps/{rep_INST_DEPT_LEVEL}` on the
           // client and then setDoc the profile, which meant the rep badge was
@@ -2950,64 +2943,71 @@ document
           danger: true,
         })
       ) {
-      try {
-        // 🔒 The most destructive action in the app. A second run would
-        // re-query an already-deleted account, and the 2s reload below is
-        // racing anything that follows it.
-        await withBusyOnce("Deleting your account…", "deleteAccount", async () => {
-          const idToken = await auth.currentUser.getIdToken();
+        try {
+          // 🔒 The most destructive action in the app. A second run would
+          // re-query an already-deleted account, and the 2s reload below is
+          // racing anything that follows it.
+          await withBusyOnce(
+            "Deleting your account…",
+            "deleteAccount",
+            async () => {
+              const idToken = await auth.currentUser.getIdToken();
 
-          const response = await fetch("/api/account?action=deleteAccount", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
+              const response = await fetch(
+                "/api/account?action=deleteAccount",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${idToken}`,
+                  },
+                },
+              );
+
+              if (!response.ok) {
+                const result = await response.json().catch(() => ({}));
+                // Say what actually happened. "Check your connection" was
+                // actively misleading: a missing Firestore index or a server
+                // fault is not the user's network, and telling them so sent them
+                // debugging the wrong thing entirely.
+                const hint =
+                  result.code === "INDEX_NOT_DEPLOYED"
+                    ? "This is a server-side issue, not your connection. Please try again shortly."
+                    : response.status >= 500
+                      ? "Something went wrong on our side, not your connection. Please try again."
+                      : result.error || "Server error during deletion.";
+                throw new Error(hint);
+              }
+
+              localStorage.removeItem("adsum_device_uuid");
+              localStorage.removeItem("adsum_theme");
+              // Clear every pre-rebrand key too, in case this device never
+              // triggered a read-through migration before the account was
+              // deleted. Both older generations must go, or a leftover UUID would
+              // be re-adopted as if it were the live one.
+              localStorage.removeItem("veripresenx_device_uuid");
+              localStorage.removeItem("veripresenx_theme");
+              localStorage.removeItem("attendify_device_uuid");
+              localStorage.removeItem("attendify_theme");
+              // 🧭 Deleting the account untracks the device, so a genuinely new
+              // person using this machine is asked their role again. Keeping the
+              // flag would send them straight to a Sign in they cannot pass.
+              try {
+                localStorage.removeItem(ACCOUNT_EXISTS_KEY);
+              } catch (_) {}
+
+              toast.info(
+                "Your account has been deleted. Goodbye! 👋",
+                "Account Deleted",
+              );
+
+              // Redirect to auth screen after a short delay
+              setTimeout(() => {
+                window.location.reload();
+              }, 2000);
             },
-          });
-
-          if (!response.ok) {
-            const result = await response.json().catch(() => ({}));
-            // Say what actually happened. "Check your connection" was
-            // actively misleading: a missing Firestore index or a server
-            // fault is not the user's network, and telling them so sent them
-            // debugging the wrong thing entirely.
-            const hint =
-              result.code === "INDEX_NOT_DEPLOYED"
-                ? "This is a server-side issue, not your connection. Please try again shortly."
-                : response.status >= 500
-                  ? "Something went wrong on our side, not your connection. Please try again."
-                  : result.error || "Server error during deletion.";
-            throw new Error(hint);
-          }
-
-          localStorage.removeItem("adsum_device_uuid");
-          localStorage.removeItem("adsum_theme");
-          // Clear every pre-rebrand key too, in case this device never
-          // triggered a read-through migration before the account was
-          // deleted. Both older generations must go, or a leftover UUID would
-          // be re-adopted as if it were the live one.
-          localStorage.removeItem("veripresenx_device_uuid");
-          localStorage.removeItem("veripresenx_theme");
-          localStorage.removeItem("attendify_device_uuid");
-          localStorage.removeItem("attendify_theme");
-          // 🧭 Deleting the account untracks the device, so a genuinely new
-          // person using this machine is asked their role again. Keeping the
-          // flag would send them straight to a Sign in they cannot pass.
-          try {
-            localStorage.removeItem(ACCOUNT_EXISTS_KEY);
-          } catch (_) {}
-
-          toast.info(
-            "Your account has been deleted. Goodbye! 👋",
-            "Account Deleted",
           );
-
-          // Redirect to auth screen after a short delay
-          setTimeout(() => {
-            window.location.reload();
-          }, 2000);
-        });
-      } catch (error) {
+        } catch (error) {
           console.error("Delete account error:", error);
           toast.error(
             error.message ||
@@ -5580,8 +5580,7 @@ window.__adsumCloseDrawer = () => {
 };
 
 // Whenever the portal is closed, reset to the default view and hide the tab.
-const _drwReturnToDashboard =
-  window.__adsumReturnToDashboard || function () {};
+const _drwReturnToDashboard = window.__adsumReturnToDashboard || function () {};
 window.__adsumReturnToDashboard = function () {
   closePortalDrawer();
   syncDrawerTabVisibility();
@@ -5884,7 +5883,9 @@ if (joinCourseForm) {
           } else {
             // Course wasn't in local array yet — fetch the full course doc
             // and add it
-            const courseDocSnap = await getDoc(doc(db, "courses", result.courseId));
+            const courseDocSnap = await getDoc(
+              doc(db, "courses", result.courseId),
+            );
             if (courseDocSnap.exists()) {
               courses.push({
                 id: courseDocSnap.id,
@@ -6750,8 +6751,7 @@ const GPS_DISABLED_REASON =
 function getQrDisplayChoice() {
   if (!activeCourse) return "projector";
   return (
-    localStorage.getItem(`adsum_qrdisplay_${activeCourse.id}`) ||
-    "projector"
+    localStorage.getItem(`adsum_qrdisplay_${activeCourse.id}`) || "projector"
   );
 }
 
@@ -7918,24 +7918,28 @@ async function closeSessionRequest(courseId, physicalHeadcount = null) {
   // 🔒 Closing archives the attendance record. Two concurrent closes would
   // archive the same session twice and the second would find nothing to
   // write. Locked by course so closing one class never blocks another.
-  return withBusyOnce("Closing the class…", "closeSession:" + courseId, async () => {
-    const idToken = await auth.currentUser.getIdToken();
-    const response = await fetch("/api/session?action=close", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ courseId, physicalHeadcount }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(result.error || "Unable to close the session.");
-      error.code = result.code;
-      throw error;
-    }
-    return result;
-  });
+  return withBusyOnce(
+    "Closing the class…",
+    "closeSession:" + courseId,
+    async () => {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch("/api/session?action=close", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ courseId, physicalHeadcount }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(result.error || "Unable to close the session.");
+        error.code = result.code;
+        throw error;
+      }
+      return result;
+    },
+  );
 }
 
 const closeClassBtn = document.getElementById("closeClassBtn");
@@ -8891,14 +8895,17 @@ async function adviserApi(action, body) {
   // only genuine writes are gated.
   const run = async () => {
     const idToken = await auth.currentUser.getIdToken();
-    const res = await fetch(`/api/roster?action=${encodeURIComponent(action)}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+    const res = await fetch(
+      `/api/roster?action=${encodeURIComponent(action)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify(body || {}),
       },
-      body: JSON.stringify(body || {}),
-    });
+    );
     let data = {};
     try {
       data = await res.json();
@@ -9122,7 +9129,9 @@ function syncRemoveSelection() {
   const n = removeSelected.size;
   if (removeModal.count) {
     removeModal.count.textContent =
-      n === 0 ? "No one selected" : `${n} student${n === 1 ? "" : "s"} selected`;
+      n === 0
+        ? "No one selected"
+        : `${n} student${n === 1 ? "" : "s"} selected`;
   }
   if (removeModal.confirm) removeModal.confirm.disabled = n === 0;
   if (removeModal.confirmLabel) {
@@ -9152,7 +9161,9 @@ function renderRemoveStudentList(students, repUid, courseName) {
       // The rep cannot be removed through this path (the server refuses with
       // TARGET_IS_REP), so a tick box here would be a control that lies. The
       // row is still shown, because the adviser needs to see who the rep is.
-      const tag = isRep ? '<span class="adviser-rep-tag">Course rep</span>' : "";
+      const tag = isRep
+        ? '<span class="adviser-rep-tag">Course rep</span>'
+        : "";
       const input = isRep
         ? '<input type="checkbox" disabled aria-label="The course rep cannot be removed here">'
         : `<input type="checkbox" value="${escapeHTML(s.matric)}">`;
@@ -9186,7 +9197,8 @@ async function openRemoveStudentsModal(courseId) {
     );
   } catch (err) {
     if (removeModal.confirm) removeModal.confirm.disabled = true;
-    if (removeModal.count) removeModal.count.textContent = "Could not load the class";
+    if (removeModal.count)
+      removeModal.count.textContent = "Could not load the class";
     adviserRemoveMessage("err", escapeHTML(err.message));
     removeModal.el.classList.remove("show");
   }
@@ -9300,7 +9312,10 @@ async function removeSelectedStudents() {
   let done = 0;
   for (const matric of targets) {
     try {
-      await adviserApi("removeCourseStudent", { courseId, targetMatric: matric });
+      await adviserApi("removeCourseStudent", {
+        courseId,
+        targetMatric: matric,
+      });
       done += 1;
     } catch (err) {
       // Keep going: one student being the live rep, or a session starting
@@ -9707,7 +9722,10 @@ function initAdviserDashboard() {
       if (!sel || !sel.value) {
         // More than one course and none chosen: say so instead of opening an
         // empty modal.
-        adviserRemoveMessage("info", "Choose a course first, then tap it again.");
+        adviserRemoveMessage(
+          "info",
+          "Choose a course first, then tap it again.",
+        );
         return;
       }
       openRemoveStudentsModal(sel.value);
@@ -9938,8 +9956,17 @@ function reportFileBase() {
 }
 
 function initSemesterReport() {
+  const toggle = document.getElementById("semesterReportToggle");
+  const content = document.getElementById("semesterReportContent");
   const csvBtn = document.getElementById("reportCsvBtn");
   const pdfBtn = document.getElementById("reportPdfBtn");
+  if (toggle && content) {
+    toggle.addEventListener("click", () => {
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", String(!expanded));
+      content.hidden = expanded;
+    });
+  }
   if (csvBtn) {
     csvBtn.addEventListener("click", () => {
       if (!lastSemesterReport || !lastSemesterReport.sessions) {
@@ -10014,8 +10041,25 @@ function syncSemesterReportPanel() {
       )),
   );
   const show = inPortal && isStaff;
+  if (show && panel.dataset.courseId !== activeCourse.id) {
+    panel.dataset.courseId = activeCourse.id;
+    const toggle = document.getElementById("semesterReportToggle");
+    const content = document.getElementById("semesterReportContent");
+    if (toggle && content) {
+      toggle.setAttribute("aria-expanded", "false");
+      content.hidden = true;
+    }
+  }
   panel.classList.toggle("hidden", !show);
   if (show) renderSemesterReport();
+  else {
+    const toggle = document.getElementById("semesterReportToggle");
+    const content = document.getElementById("semesterReportContent");
+    if (toggle && content) {
+      toggle.setAttribute("aria-expanded", "false");
+      content.hidden = true;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

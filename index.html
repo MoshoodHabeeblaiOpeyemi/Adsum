@@ -56,8 +56,7 @@
       <button id="openSettingsBtn" class="theme-btn hidden" title="Account Settings" style="padding: 8px 12px;">
         <i data-lucide="settings"></i>
       </button>
-      <button id="openGuideBtn" class="theme-btn" title="How Adsum Works"
-        style="padding: 8px 12px; font-weight: 600;">
+      <button id="openGuideBtn" class="theme-btn" title="How Adsum Works" style="padding: 8px 12px; font-weight: 600;">
         <i data-lucide="book-open"></i> Guide
       </button>
       <button id="themeToggle" class="theme-btn" aria-label="Toggle theme">
@@ -302,7 +301,8 @@
         <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 4px;">
           Role: <strong id="displayRole" style="color: var(--navy);">---</strong>
         </p>
-        <p style="font-size: 0.9rem; font-weight: 600; color: var(--teal-ink); margin-bottom: 10px;" id="displaySchoolInfo">
+        <p style="font-size: 0.9rem; font-weight: 600; color: var(--teal-ink); margin-bottom: 10px;"
+          id="displaySchoolInfo">
           ---
         </p>
         <p style="font-size: 0.85rem; color: var(--muted);">Manage your courses or check in below.</p>
@@ -375,8 +375,7 @@
             <p style="font-size: 0.9rem; margin-bottom: 15px;">Generate a secure PIN for today's lecture attendance.</p>
 
             <!-- LECTURE LOCATION SELECTOR -->
-            <div
-              id="hallSetupBlock"
+            <div id="hallSetupBlock"
               style="margin-bottom: 18px; padding: 14px; background: var(--card-bg); border-radius: 12px; border: 1.5px solid var(--border);">
               <div class="hall-actions-row">
                 <label for="repHallSelect"
@@ -933,49 +932,56 @@
        held so far and each student's percentage. CSV for a spreadsheet,
        "Save as PDF" for the print-ready version. -->
     <section id="semesterReport" class="container hidden">
-      <div class="adviser-head">
-        <div>
-          <h2 class="adviser-h2">Semester Attendance Report</h2>
-          <p class="adviser-sub" id="reportSub">Every class held so far, with each student's percentage.</p>
+      <button type="button" id="semesterReportToggle" class="report-toggle" aria-expanded="false"
+        aria-controls="semesterReportContent">
+        <span class="report-toggle-title"><i data-lucide="chart-no-axes-column-increasing"></i> Semester Attendance
+          Report</span>
+        <i data-lucide="chevron-down" class="report-toggle-icon" aria-hidden="true"></i>
+      </button>
+      <div id="semesterReportContent" class="report-content" hidden>
+        <div class="adviser-head">
+          <div>
+            <p class="adviser-sub" id="reportSub">Every class held so far, with each student's percentage.</p>
+          </div>
+          <div class="adviser-row">
+            <button type="button" class="btn btn-outline" id="reportCsvBtn">
+              <i data-lucide="table"></i> Download CSV</button>
+            <button type="button" class="btn" id="reportPdfBtn">
+              <i data-lucide="file-text"></i> Save as PDF</button>
+          </div>
         </div>
-        <div class="adviser-row">
-          <button type="button" class="btn btn-outline" id="reportCsvBtn">
-            <i data-lucide="table"></i> Download CSV</button>
-          <button type="button" class="btn" id="reportPdfBtn">
-            <i data-lucide="file-text"></i> Save as PDF</button>
-        </div>
-      </div>
 
-      <div class="adviser-stats">
-        <div class="adviser-stat">
-          <span class="adviser-stat-label">Classes held</span>
-          <strong class="adviser-stat-value" id="reportSessions">0</strong>
+        <div class="adviser-stats">
+          <div class="adviser-stat">
+            <span class="adviser-stat-label">Classes held</span>
+            <strong class="adviser-stat-value" id="reportSessions">0</strong>
+          </div>
+          <div class="adviser-stat">
+            <span class="adviser-stat-label">Students</span>
+            <strong class="adviser-stat-value" id="reportStudents">0</strong>
+          </div>
+          <div class="adviser-stat">
+            <span class="adviser-stat-label">Average attendance</span>
+            <strong class="adviser-stat-value" id="reportAverage">0%</strong>
+          </div>
         </div>
-        <div class="adviser-stat">
-          <span class="adviser-stat-label">Students</span>
-          <strong class="adviser-stat-value" id="reportStudents">0</strong>
-        </div>
-        <div class="adviser-stat">
-          <span class="adviser-stat-label">Average attendance</span>
-          <strong class="adviser-stat-value" id="reportAverage">0%</strong>
-        </div>
-      </div>
 
-      <div class="adviser-card">
-        <div class="adviser-preview-scroll">
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th class="num">Matric</th>
-                <th class="num">Attended</th>
-                <th class="num">%</th>
-              </tr>
-            </thead>
-            <tbody id="reportBody"></tbody>
-          </table>
+        <div class="adviser-card">
+          <div class="adviser-preview-scroll">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th class="num">Matric</th>
+                  <th class="num">Attended</th>
+                  <th class="num">%</th>
+                </tr>
+              </thead>
+              <tbody id="reportBody"></tbody>
+            </table>
+          </div>
+          <p class="adviser-foot" id="reportNote"></p>
         </div>
-        <p class="adviser-foot" id="reportNote"></p>
       </div>
     </section>
     <!-- CODE SENT ACKNOWLEDGEMENT ------------------------------------------
@@ -1139,8 +1145,8 @@
           <select id="adviserCourseSelect" class="adviser-select" disabled>
             <option value="">Loading your courses…</option>
           </select>
-          <button type="button" id="adviserCoursePickBtn" class="course-picker-hit"
-            aria-haspopup="dialog" aria-controls="removeStudentsModal" disabled>
+          <button type="button" id="adviserCoursePickBtn" class="course-picker-hit" aria-haspopup="dialog"
+            aria-controls="removeStudentsModal" disabled>
           </button>
         </div>
         <div class="adviser-msg hidden" id="adviserRemoveMsg"></div>
@@ -1577,14 +1583,14 @@
        message and a "did you mean...?" prompt are never hidden by
        the thing that reported them.
        ============================================================ -->
-  <div id="busyOverlay" class="hidden" role="status" aria-live="assertive"
-    aria-busy="true" aria-labelledby="busyLabel">
+  <div id="busyOverlay" class="hidden" role="status" aria-live="assertive" aria-busy="true" aria-labelledby="busyLabel">
     <div class="busy-card">
       <div class="busy-spinner" aria-hidden="true"></div>
       <p id="busyLabel" class="busy-label">Working…</p>
       <!-- Shown only after SLOW_AFTER_MS; explains WHY it is taking so
            long and what the user can do about it. -->
-      <p id="busyHint" class="busy-hint hidden">This is taking longer than usual. Check your connection — you have not lost anything.</p>
+      <p id="busyHint" class="busy-hint hidden">This is taking longer than usual. Check your connection — you have not
+        lost anything.</p>
       <!-- Escape hatch. A blocker you cannot leave is a worse bug than
            the double-tap we are preventing. -->
       <button type="button" id="busyCancel" class="busy-cancel hidden">Stop waiting</button>
