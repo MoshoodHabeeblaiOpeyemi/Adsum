@@ -1490,49 +1490,61 @@
   <div id="settingsModal" class="modal">
     <div class="modal-card">
       <h3><i data-lucide="settings"></i> Account Settings</h3>
-      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Update your name below. Matric number is
-        permanently linked for security.</p>
+      <div id="settingsProfileSection">
+        <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 15px;">Update your name below. Matric number
+          is
+          permanently linked for security.</p>
 
-      <form id="settingsForm">
-        <div class="field">
-          <label for="settingsName">Full Name</label>
-          <input type="text" id="settingsName" required placeholder="John Doe">
-        </div>
-        <div class="field">
-          <label for="settingsMatric">Matric Number</label>
-          <input type="text" id="settingsMatric" required placeholder="e.g., UCH/2022/4092" readonly
-            aria-describedby="matricHelp">
-          <small id="matricHelp"
-            style="color: var(--muted); font-size: 0.75rem; display: block; margin-top: 4px;">Matric numbers cannot be
-            changed after registration.</small>
-        </div>
-        <div class="input-group">
-          <label for="settingsLevel">Academic Level</label>
-          <select id="settingsLevel" required class="input-field">
-            <option value="">Select your level...</option>
-            <option value="100 LEVEL">100 Level</option>
-            <option value="200 LEVEL">200 Level</option>
-            <option value="300 LEVEL">300 Level</option>
-            <option value="400 LEVEL">400 Level</option>
-            <option value="500 LEVEL">500 Level</option>
-            <option value="600 LEVEL">600 Level</option>
-            <option value="ND 1">ND 1</option>
-            <option value="ND 2">ND 2</option>
-            <option value="HND 1">HND 1</option>
-            <option value="HND 2">HND 2</option>
-          </select>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline close-modal">Cancel</button>
-          <button type="submit" class="btn"><i data-lucide="save"></i> Save Changes</button>
-        </div>
-        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); text-align: center;">
-          <button id="enablePushBtn" type="button"
-            style="background: transparent; border: none; color: #fd7e14; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: underline; margin-left: 16px;">
-            <i data-lucide="bell-ring"></i> Enable Emergency Push Alerts
-          </button>
-        </div>
-      </form>
+        <form id="settingsForm">
+          <div class="field">
+            <label for="settingsName">Full Name</label>
+            <input type="text" id="settingsName" required placeholder="John Doe">
+          </div>
+          <div class="field">
+            <label for="settingsMatric">Matric Number</label>
+            <input type="text" id="settingsMatric" required placeholder="e.g., UCH/2022/4092" readonly
+              aria-describedby="matricHelp">
+            <small id="matricHelp"
+              style="color: var(--muted); font-size: 0.75rem; display: block; margin-top: 4px;">Matric numbers cannot be
+              changed after registration.</small>
+          </div>
+          <div class="input-group">
+            <label for="settingsLevel">Academic Level</label>
+            <select id="settingsLevel" required class="input-field">
+              <option value="">Select your level...</option>
+              <option value="100 LEVEL">100 Level</option>
+              <option value="200 LEVEL">200 Level</option>
+              <option value="300 LEVEL">300 Level</option>
+              <option value="400 LEVEL">400 Level</option>
+              <option value="500 LEVEL">500 Level</option>
+              <option value="600 LEVEL">600 Level</option>
+              <option value="ND 1">ND 1</option>
+              <option value="ND 2">ND 2</option>
+              <option value="HND 1">HND 1</option>
+              <option value="HND 2">HND 2</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-outline close-modal">Cancel</button>
+            <button type="submit" class="btn"><i data-lucide="save"></i> Save Changes</button>
+          </div>
+          <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); text-align: center;">
+            <button id="enablePushBtn" type="button"
+              style="background: transparent; border: none; color: #fd7e14; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: underline; margin-left: 16px;">
+              <i data-lucide="bell-ring"></i> Enable Emergency Push Alerts
+            </button>
+          </div>
+        </form>
+      </div>
+      <div class="input-group settings-font-field">
+        <label for="fontPreferenceSelect">App font</label>
+        <select id="fontPreferenceSelect" class="input-field">
+          <option value="kalam">Kalam · Handwritten</option>
+          <option value="nunito">Nunito · Rounded</option>
+          <option value="lora">Lora · Serif</option>
+          <option value="manrope">Manrope · Modern</option>
+        </select>
+      </div>
     </div>
   </div>
 

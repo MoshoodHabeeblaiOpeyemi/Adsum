@@ -1526,6 +1526,43 @@ function stopCourseListener() {
 // --- THEME TOGGLE LOGIC ---
 const themeToggleBtn = document.getElementById("themeToggle");
 const htmlElement = document.documentElement;
+const fontPreferenceSelect = document.getElementById("fontPreferenceSelect");
+const FONT_FAMILIES = {
+  kalam: "'Kalam', cursive",
+  nunito: "'Nunito', sans-serif",
+  lora: "'Lora', serif",
+  manrope: "'Manrope', sans-serif",
+};
+
+function applyFontPreference(fontId, persist = false) {
+  const selectedFont = Object.prototype.hasOwnProperty.call(
+    FONT_FAMILIES,
+    fontId,
+  )
+    ? fontId
+    : "kalam";
+  const family = FONT_FAMILIES[selectedFont];
+  htmlElement.style.setProperty("--font-body", family);
+  htmlElement.style.setProperty("--font-display", family);
+  if (fontPreferenceSelect) fontPreferenceSelect.value = selectedFont;
+  if (persist) {
+    try {
+      localStorage.setItem("adsum_font", selectedFont);
+    } catch (_) {}
+  }
+}
+
+let savedFont = "kalam";
+try {
+  savedFont = localStorage.getItem("adsum_font") || savedFont;
+} catch (_) {}
+applyFontPreference(savedFont);
+if (fontPreferenceSelect) {
+  fontPreferenceSelect.addEventListener("change", () => {
+    applyFontPreference(fontPreferenceSelect.value, true);
+  });
+}
+
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", () => {
     const currentTheme = htmlElement.getAttribute("data-theme");
@@ -2071,21 +2108,7 @@ function checkAuth() {
     authContainer.classList.add("hidden");
     dashboardSection.classList.remove("hidden");
     logoutBtn.classList.remove("hidden");
-    // 🔒 ADVISERS GET NO PROFILE SETTINGS. They are identified by
-    // institution / department / level, not by a matric, so the settings form
-    // would show an empty readonly matric field and invite the question of
-    // what it is for. It is also pinned immutable server-side, so the gear
-    // would lead to a form nobody can change.
-    //
-    // A PENDING adviser is the same: roster tools are locked, and so is this.
-    // Their only action is entering the code, reached from the banner.
-    const isAdviserAccount = Boolean(
-      currentUser &&
-      (currentUser.role === "adviser" || currentUser.role === "level_anchor"),
-    );
-    if (openSettingsBtn) {
-      openSettingsBtn.classList.toggle("hidden", isAdviserAccount);
-    }
+    if (openSettingsBtn) openSettingsBtn.classList.remove("hidden");
 
     displayName.textContent = currentUser.name;
 
@@ -3087,14 +3110,24 @@ const settingsForm = document.getElementById("settingsForm");
 if (openSettingsBtn && settingsModal) {
   openSettingsBtn.addEventListener("click", () => {
     if (!currentUser) return;
+    const settingsProfileSection = document.getElementById(
+      "settingsProfileSection",
+    );
     const settingsNameInput = document.getElementById("settingsName");
     const settingsMatricInput = document.getElementById("settingsMatric");
     const settingsLevelInput = document.getElementById("settingsLevel"); // NEW
+    const isAdviserAccount =
+      currentUser.role === "adviser" || currentUser.role === "level_anchor";
 
+    if (settingsProfileSection)
+      settingsProfileSection.classList.toggle("hidden", isAdviserAccount);
     if (settingsNameInput) settingsNameInput.value = currentUser.name || "";
     if (settingsMatricInput)
       settingsMatricInput.value = currentUser.matric || "";
     if (settingsLevelInput) settingsLevelInput.value = currentUser.level || ""; // NEW
+    applyFontPreference(
+      (fontPreferenceSelect && fontPreferenceSelect.value) || "kalam",
+    );
 
     settingsModal.classList.add("show");
   });
@@ -6779,6 +6812,7 @@ function initQrDisplayChoice() {
       `adsum_qrdisplay_${activeCourse.id}`,
       btn.dataset.qrDisplay,
     );
+    renderModeCards();
     syncQrDisplayChoiceUI();
     row.classList.remove("show");
   });
@@ -6827,10 +6861,16 @@ function renderModeCards() {
     const btn = document.createElement("button");
     btn.type = "button";
     const active = mode === current;
+    const qrChoice = getQrDisplayChoice();
+    const choiceLabel = qrChoice === "hotspots" ? "Hotspots" : "Projector";
+    const choiceTag =
+      mode === "qr_mode"
+        ? `<span class="mode-choice-tag">${choiceLabel}</span>`
+        : "";
     btn.setAttribute("data-mode", mode);
     btn.className = "mode-card" + (active ? " is-active" : "");
     btn.innerHTML =
-      `<div class="mode-card-title">${cfg.icon} ${escapeHTML(cfg.title)}${active ? " ✓" : ""}</div>` +
+      `<div class="mode-card-title">${cfg.icon} ${escapeHTML(cfg.title)}${active ? " ✓" : ""}${choiceTag}</div>` +
       `<div class="mode-card-desc">${escapeHTML(cfg.desc)}</div>`;
     if (locked) btn.setAttribute("aria-disabled", "true");
     btn.addEventListener("click", () => {
