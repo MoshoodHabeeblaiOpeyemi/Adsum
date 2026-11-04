@@ -27,6 +27,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  reload,
   onAuthStateChanged,
   sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
@@ -2523,16 +2524,9 @@ if (signupForm) {
       // not shown again on the next visit.
       noteAccountCreated();
 
-      // --- ADVISER VERIFICATION: 6-DIGIT CODE ONLY -------------------------
-      // The code was already minted and emailed by api/onboarding.js during
-      // signup. This branch only tells the user about it.
-      //
-      // It does NOT promote the account: `role` stays "adviser" and
-      // `verificationStatus` stays "pending_email" until they enter the code
-      // and api/verification.js claims the adviserSlots row and writes
-      // role: "level_anchor". So we must NOT say their access has unlocked.
-      // NIN stays a disabled placeholder (index.html) until after the pilot.
-      if (isAdviserSignup) {
+      // Email verification is required for every account. Adviser domain
+      // eligibility is checked by onboarding; students may use personal email.
+      if (signup && signup.verification && signup.verification.required) {
         // 📧 ONE email, not two.
         //
         // This used to call Firebase's sendEmailVerification() as well as the
@@ -2554,10 +2548,8 @@ if (signupForm) {
         // field where "Resend code" is one click away.
         const serverMsg =
           signup && signup.verification && signup.verification.message;
-        const wasDelivered =
-          !signup ||
-          !signup.verification ||
-          signup.verification.delivery === "email";
+        const wasDelivered = signup.verification.delivery === "email";
+        adviserVerifyModalShownThisSession = true;
 
         if (wasDelivered) {
           openCodeSentModal(email);
@@ -2724,29 +2716,34 @@ const handleAuthState = async (user) => {
     if (userDoc.exists()) {
       currentUser = userDoc.data();
       startUserProfileListener(user.uid);
+      checkAuth();
+      syncAdviserSurfaces();
+      syncAdviserVerificationUI();
+      if (needsAccountEmailVerification(currentUser, user)) {
+        stopCourseListener();
+        stopPortalListeners();
+        syncAdviserDashboard();
+        if (!adviserVerifyModalShownThisSession) {
+          adviserVerifyModalShownThisSession = true;
+          setTimeout(openAdviserVerifyModal, 400);
+        }
+        return;
+      }
+
       startCourseListener();
       startNotificationsListener();
-      checkAuth();
       // G1: seed the server-minted device cookie (fire-and-forget) so
       // check-ins carry an unforgeable identity anchor.
       seedServerDevice();
       // Phase 4: reveal the roster dashboard only for a VERIFIED adviser.
       syncAdviserDashboard();
-      // Phase 3 UX: a pending adviser has no other way in, so surface the
-      // code field on arrival \u2014 once per session, not on every auth event,
-      // which would trap them in a modal they cannot dismiss.
-      // 🔒 syncAdviserSurfaces() decides which of the THREE dashboards is
-      // visible (locked / adviser / student) and disables the course actions
-      // for a locked adviser, so it must run on EVERY auth state, not just at
-      // signup - otherwise a refresh would leave the wrong screen up.
+      // A verified account sees the ordinary student or adviser surface.
       syncAdviserSurfaces();
-      const stillPending = syncAdviserVerificationUI();
-      if (stillPending && !adviserVerifyModalShownThisSession) {
-        adviserVerifyModalShownThisSession = true;
-        // Returning to the app mid-flow: they have already read the warning,
-        // so go straight to the code field rather than making them dismiss
-        // the same notice twice.
-        setTimeout(openAdviserVerifyModal, 400);
+      if (
+        !needsAccountEmailVerification(currentUser, user) &&
+        adviserVerifyModalShownThisSession
+      ) {
+        adviserVerifyModalShownThisSession = false;
       }
     } else {
       console.warn("Ghost user blocked: No Firestore profile found.");
@@ -6844,9 +6841,7 @@ function renderModeCards() {
         const choiceModal = document.getElementById("qrDisplayChoiceRow");
         const session = activeCourse.activeSession;
         const isLive =
-          session &&
-          !session.expired &&
-          getAccurateNow() < session.expiresAt;
+          session && !session.expired && getAccurateNow() < session.expiresAt;
         if (choiceModal && !isLive) choiceModal.classList.add("show");
       }
     });
@@ -9785,7 +9780,8 @@ function initAdviserDashboard() {
 /** Which dashboard should this account see? */
 function adviserSurface() {
   if (!currentUser) return "none";
-  if (isPendingAdviser(currentUser)) return "locked";
+  if (needsAccountEmailVerification(currentUser, auth.currentUser))
+    return "locked";
   if (isVerifiedAdviser(currentUser)) return "adviser";
   return "student";
 }
@@ -9801,10 +9797,16 @@ function syncAdviserSurfaces() {
   const dash = document.getElementById("dashboardSection");
   const adv = document.getElementById("adviserDashboard");
   const banner = document.getElementById("adviserVerifyBanner");
+  const emailGate = document.getElementById("emailVerificationSection");
+  const emailAddress = document.getElementById("emailVerificationAddress");
 
   if (dash) dash.classList.toggle("hidden", surface !== "student");
   if (adv) adv.classList.toggle("hidden", surface !== "adviser");
   if (banner) banner.classList.toggle("hidden", surface !== "locked");
+  if (emailGate) emailGate.classList.toggle("hidden", surface !== "locked");
+  if (emailAddress)
+    emailAddress.textContent =
+      (currentUser && currentUser.email) || "your email";
 
   // A locked adviser gets no course actions at all. The buttons stay visible
   // but disabled, so the screen does not look broken — they are told why.
@@ -9838,7 +9840,10 @@ function syncAdviserSurfaces() {
 function syncAdviserDashboard() {
   const el = adviserEls();
   if (!el.section) return;
-  const show = Boolean(currentUser) && isVerifiedAdviser(currentUser);
+  const show =
+    Boolean(currentUser) &&
+    isVerifiedAdviser(currentUser) &&
+    !needsAccountEmailVerification(currentUser, auth.currentUser);
   el.section.classList.toggle("hidden", !show);
   if (!show) return;
   renderAdviserIdentity();
@@ -10095,6 +10100,19 @@ function needsAdviserVerification(profile) {
   );
 }
 
+function needsAccountEmailVerification(profile, authUser = auth.currentUser) {
+  if (!profile) return false;
+  if (needsAdviserVerification(profile)) return true;
+  const isStudentAccount = profile.role === "student" || profile.role === "rep";
+  const isVerifiedAdviserAccount = profile.role === "level_anchor";
+  if (!isStudentAccount && !isVerifiedAdviserAccount) return false;
+  return (
+    profile.verificationStatus === "pending_email" ||
+    !authUser ||
+    authUser.emailVerified !== true
+  );
+}
+
 // 🔒 The SAME test the server uses to build the locked screen. Both halves are
 // required, so a profile holding one without the other is NOT treated as
 // pending — a half-state fails closed to the normal dashboard rather than
@@ -10123,7 +10141,7 @@ function openCodeSentModal(email) {
   const emailEl = document.getElementById("codeSentEmail");
   if (emailEl)
     emailEl.textContent =
-      email || (currentUser && currentUser.email) || "your school email";
+      email || (currentUser && currentUser.email) || "your email";
   modal.classList.add("show");
   setTimeout(() => {
     const btn = document.getElementById("codeSentAckBtn");
@@ -10145,8 +10163,7 @@ function openAdviserVerifyModal() {
   // the first must be gone before the second appears.
   closeCodeSentModal();
   if (emailEl) {
-    emailEl.textContent =
-      (currentUser && currentUser.email) || "your school email";
+    emailEl.textContent = (currentUser && currentUser.email) || "your email";
   }
   if (input) input.value = "";
   setAdviserVerifyMsg("");
@@ -10306,24 +10323,17 @@ async function submitAdviserCode() {
       }
       return;
     }
-    // 🔒 Re-read the profile rather than trusting the response: the role
-    // promotion is server-side, and currentUser drives every gate in the app
-    // including the adviser dashboard.
-    const snap = await getDoc(doc(db, "users", auth.currentUser.uid));
-    if (snap.exists()) currentUser = snap.data();
+    await reload(auth.currentUser);
+    await auth.currentUser.getIdToken(true);
+    await handleAuthState(auth.currentUser);
     closeAdviserVerifyModal();
-    // Hides the banner AND reveals the dashboard, both from currentUser.
-    // syncAdviserSurfaces() runs too because verification is the exact moment
-    // the adviser crosses from "locked" to "adviser" — without it the student
-    // dashboard would stay hidden and the screen would be momentarily empty.
-    syncAdviserVerificationUI();
-    syncAdviserSurfaces();
-    syncAdviserDashboard();
     stopResendCooldown();
     setAdviserVerifyMsg("");
     toast.success(
-      "Your account is verified. You can now import your level roster and choose a rep.",
-      "Verified \u2705",
+      data.adviser
+        ? "Your account is verified. You can now import your level roster and choose a rep."
+        : "Your email is verified. Welcome to Adsum.",
+      "Email verified",
     );
   } catch (err) {
     console.error("Adviser verify error:", err);
@@ -10392,6 +10402,7 @@ function initAdviserVerificationUI() {
   const form = document.getElementById("adviserVerifyForm");
   const later = document.getElementById("adviserVerifyLaterBtn");
   const bannerBtn = document.getElementById("adviserBannerVerifyBtn");
+  const emailGateBtn = document.getElementById("openEmailVerifyBtn");
   const resend = document.getElementById("adviserResendBtn");
   const input = document.getElementById("adviserCodeInput");
   if (form) {
@@ -10403,6 +10414,8 @@ function initAdviserVerificationUI() {
   if (resend) resend.addEventListener("click", resendAdviserCode);
   if (later) later.addEventListener("click", closeAdviserVerifyModal);
   if (bannerBtn) bannerBtn.addEventListener("click", openAdviserVerifyModal);
+  if (emailGateBtn)
+    emailGateBtn.addEventListener("click", openAdviserVerifyModal);
   // 🆕 Acknowledging the "code sent" notice is what reveals the code field.
   const ack = document.getElementById("codeSentAckBtn");
   if (ack) {

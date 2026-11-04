@@ -2,6 +2,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const requireVerifiedEmail = require("../utils/requireVerifiedEmail");
 const { toMillis, generatePin, isValidCoord } = require("../utils/geo");
 
 try {
@@ -545,6 +546,7 @@ module.exports = async (req, res) => {
     if (!header.startsWith("Bearer "))
       return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
+    if (!requireVerifiedEmail(decoded, res)) return;
     switch (action) {
       case "close":
         return handleClose(req, res, decoded);

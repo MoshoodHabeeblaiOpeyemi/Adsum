@@ -1,4 +1,4 @@
-// Adsum — adviser verification mail (Resend over plain HTTPS, no SDK).
+// Adsum — account verification mail (Resend over plain HTTPS, no SDK).
 //
 // Shared by api/verification.js (resend / retry a code) and api/onboarding.js
 // (send the very first code at signup). Keeping one implementation means the
@@ -11,7 +11,14 @@
  * @returns {Promise<{delivered: boolean, reason?: string}>}
  *   delivered:false + reason "NOT_CONFIGURED" when the env keys are absent.
  */
-async function sendVerificationCode({ to, code, institutionId, level, department }) {
+async function sendVerificationCode({
+  to,
+  code,
+  institutionId,
+  level,
+  department,
+  accountType,
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.VERIFICATION_FROM_EMAIL;
   if (!apiKey || !from) {
@@ -22,20 +29,24 @@ async function sendVerificationCode({ to, code, institutionId, level, department
   }
 
   const scope = [institutionId, department, level].filter(Boolean).join(" — ");
+  const isAdviser = accountType === "Level Adviser";
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         from,
         to: [to],
-        subject: "Your Adsum adviser verification code",
+        subject: "Your Adsum email verification code",
         text:
           `Your Adsum verification code is ${code}\n\n` +
-          `Level: ${scope || "your department"}\n` +
-          `It expires in 10 minutes. Enter it in the app to activate your\n` +
-          `Level Adviser account.\n\n` +
+          (isAdviser ? `Level: ${scope || "your department"}\n` : "") +
+          `It expires in 10 minutes. Enter it in the app to verify your\n` +
+          `${isAdviser ? "Level Adviser" : "Adsum"} account.\n\n` +
           `If you did not request this, ignore this email — nothing happens\n` +
           `until the code is entered.`,
       }),

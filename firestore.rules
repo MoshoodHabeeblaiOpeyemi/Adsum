@@ -7,6 +7,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function emailVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function isOwner(userId) {
       return signedIn() && request.auth.uid == userId;
     }
@@ -37,7 +41,8 @@ service cloud.firestore {
     // key in a rules expression raises an ERROR (which denies) rather than
     // returning null.
     function isVerifiedAdviser() {
-      return userExists()
+      return emailVerified()
+        && userExists()
         && get(
           /databases/$(database)/documents/users/$(request.auth.uid)
         ).data.get('role', null) == 'level_anchor'
@@ -47,7 +52,7 @@ service cloud.firestore {
     }
 
     function isCourseRep(courseId) {
-      return signedIn()
+      return emailVerified()
         && exists(
           /databases/$(database)/documents/courses/$(courseId)
         )
@@ -57,14 +62,15 @@ service cloud.firestore {
     }
 
     function isCourseMember(courseId) {
-      return signedIn()
+      return emailVerified()
         && exists(
           /databases/$(database)/documents/courses/$(courseId)/members/$(request.auth.uid)
         );
     }
 
     function isAdviserGrantedRep() {
-      return hasUserProfile()
+      return emailVerified()
+        && hasUserProfile()
         && get(
           /databases/$(database)/documents/users/$(request.auth.uid)
         ).data.get('role', null) == 'rep'
@@ -113,6 +119,7 @@ service cloud.firestore {
       // purpose: they are values only api/verification.js may write, and it
       // runs on the Admin SDK, which bypasses these rules entirely.
       allow create: if isOwner(userId)
+        && emailVerified()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.isRep is bool
         // Only the three roles a signup may legitimately request.
@@ -152,6 +159,7 @@ service cloud.firestore {
       // `institution` and `department` define who this account IS inside the
       // trust chain and can never be rewritten from the client.
       allow update: if isOwner(userId)
+        && emailVerified()
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.matric == resource.data.matric
         && request.resource.data.isRep == resource.data.isRep
@@ -196,13 +204,13 @@ service cloud.firestore {
 
       // 📲 FCM push tokens (device registrations for emergency alerts).
       match /fcmTokens/{tokenId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if emailVerified() && isOwner(userId);
       }
 
       // 🚩 Emergency push-style alerts (e.g. "flagged absent — see your Rep").
       // Written only by the trusted backend; the student can only read them.
       match /notifications/{notificationId} {
-        allow read: if isOwner(userId);
+        allow read: if emailVerified() && isOwner(userId);
         allow write: if false;
       }
     }
@@ -220,12 +228,12 @@ service cloud.firestore {
     // Reads stay open to signed-in users: the rep directory is how a student
     // finds who to ask.
     match /departmentReps/{repId} {
-      allow read: if signedIn();
+      allow read: if emailVerified();
       allow write: if false;
     }
 
     match /courses/{courseId} {
-      allow read: if signedIn();
+      allow read: if emailVerified();
 
       allow create: if isAdviserGrantedRep()
         && validCourseFields()
@@ -265,7 +273,7 @@ service cloud.firestore {
         // get (single doc): own doc or course staff
         // list (collection query / onSnapshot): any course member — needed for
         //   the live member listener that keeps enrolled counts in sync
-        allow get: if signedIn() && (
+        allow get: if emailVerified() && (
           request.auth.uid == memberUid || isCourseStaff(courseId)
         );
         allow list: if isCourseMember(courseId) || isCourseStaff(courseId);
@@ -334,7 +342,7 @@ service cloud.firestore {
         // Self-removal is kept because it is not a privilege: it is a student
         // deleting their OWN membership, and `api/course.js?action=leave` does
         // the same thing transactionally with the enrolled[] array cleaned up.
-        allow delete: if signedIn() && request.auth.uid == memberUid;
+        allow delete: if emailVerified() && request.auth.uid == memberUid;
       }
 
       match /session/live {
@@ -401,7 +409,7 @@ service cloud.firestore {
       // (uid-keyed) — that is the emergency "see your Rep" alert. Flags are
       // permanent and can never be flipped or erased by anyone.
       match /absentFlags/{flagUid} {
-        allow get: if isCourseStaff(courseId) || isOwner(flagUid);
+        allow get: if isCourseStaff(courseId) || (emailVerified() && isOwner(flagUid));
         allow list: if isCourseStaff(courseId);
         allow create, update, delete: if false;
       }
@@ -428,7 +436,7 @@ service cloud.firestore {
       // api/approval.js and update attendance atomically.
       match /manualRequests/{requestUid} {
         allow get: if signedIn() && (
-          request.auth.uid == requestUid || isCourseStaff(courseId)
+          (emailVerified() && request.auth.uid == requestUid) || isCourseStaff(courseId)
         );
         allow list: if isCourseStaff(courseId);
 
@@ -437,6 +445,7 @@ service cloud.firestore {
         allow update: if (
             // Student may refine their own reason while still pending...
             isOwner(requestUid)
+            && emailVerified()
             && resource.data.status == 'pending'
             && request.resource.data.status == 'pending'
             && request.resource.data.uid == resource.data.uid

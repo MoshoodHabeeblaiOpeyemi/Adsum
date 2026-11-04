@@ -32,6 +32,7 @@ const {
   Timestamp,
 } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const requireVerifiedEmail = require("../utils/requireVerifiedEmail");
 const { isVerifiedAdviser, ROLE } = require("../utils/roles");
 const { parseRosterCsv } = require("../utils/csv");
 
@@ -742,7 +743,8 @@ async function handleRemoveCourseStudent(req, res, decoded) {
       liveSnap.data().expiresAt > Date.now()
     )
       return res.status(409).json({
-        error: "Cannot remove during a live session. Wait for the class to close.",
+        error:
+          "Cannot remove during a live session. Wait for the class to close.",
         code: "SESSION_LIVE",
       });
 
@@ -975,6 +977,7 @@ module.exports = async (req, res) => {
     if (!header.startsWith("Bearer "))
       return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
+    if (!requireVerifiedEmail(decoded, res)) return;
     const action = req.query.action;
     switch (action) {
       case "importRoster":

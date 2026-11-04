@@ -200,6 +200,20 @@ While that is empty the client sends no token, so flipping the env var first loc
 every user. Register the app in the console, set the site key, confirm verified traffic,
 and only then set the env var.
 
+## 6a. Email verification is required for every account
+
+Every new profile starts with `verificationStatus: "pending_email"`. A 6-digit code is
+sent to the Firebase Auth email address and is stored server-side for 10 minutes, with a
+five-attempt limit and a 60-second resend cooldown. Only `api/verification.js` may mark
+the Firebase Auth user `emailVerified`; the client then refreshes its ID token before
+protected data loads.
+
+Students may verify personal email addresses. Advisers must additionally use a domain
+listed in their institution document's `emailDomains` array; domains are not hardcoded in
+the client. Protected API routes and Firestore rules require the `email_verified` claim.
+The owner may still read their own profile and use verification/account-deletion routes
+while locked, so the flow can complete and an abandoned account can be closed.
+
 ---
 
 ## 7. Hotspot grants require proof of presence

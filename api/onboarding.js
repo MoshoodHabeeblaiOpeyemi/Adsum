@@ -454,9 +454,7 @@ async function handleCreateProfile(req, res, decoded) {
           // when the adviser re-imports or the rep approves them.
           rosterStatus,
           rosterReason,
-          verificationStatus: p.isAdviser
-            ? VERIFICATION.PENDING_EMAIL
-            : VERIFICATION.NOT_REQUIRED,
+          verificationStatus: VERIFICATION.PENDING_EMAIL,
           // Written as explicit nulls (not omitted) so the keys always EXIST:
           // firestore.rules pins them with `get('verifiedAt', null) == ...`, and
           // touching a missing key in a rules expression is an ERROR that would
@@ -468,12 +466,10 @@ async function handleCreateProfile(req, res, decoded) {
       });
     } catch (txErr) {
       if (txErr.message === "PROFILE_EXISTS") {
-        return res
-          .status(409)
-          .json({
-            error: "This account already has a profile.",
-            code: "PROFILE_EXISTS",
-          });
+        return res.status(409).json({
+          error: "This account already has a profile.",
+          code: "PROFILE_EXISTS",
+        });
       }
       if (txErr.message === "REP_SLOT_TAKEN") {
         return res.status(409).json({
@@ -484,14 +480,17 @@ async function handleCreateProfile(req, res, decoded) {
       throw txErr;
     }
 
-    // ---- Adviser: mint and mail the FIRST verification code ----------------
+    // ---- Mint and mail the FIRST verification code ------------------------
     // Done AFTER the profile commits. A mail failure must not roll back a
     // completed signup — the user can always get a code later via
     // api/verification.js?action=sendCode, and utils/mailer.js never throws.
     let verification = null;
-    if (p.isAdviser) {
+    {
       const code = codeFor();
-      const verRef = db.collection("adviserVerifications").doc(decoded.uid);
+      const verCollection = p.isAdviser
+        ? "adviserVerifications"
+        : "emailVerifications";
+      const verRef = db.collection(verCollection).doc(decoded.uid);
       try {
         await verRef.set({
           uid: decoded.uid,
@@ -509,6 +508,7 @@ async function handleCreateProfile(req, res, decoded) {
           institutionId: p.institution,
           level: p.level,
           department: p.department,
+          accountType: p.isAdviser ? "Level Adviser" : "student",
         });
         // 🔒 The code is NEVER echoed back. It exists only in this document and
         // in the inbox.
@@ -516,8 +516,8 @@ async function handleCreateProfile(req, res, decoded) {
           required: true,
           delivery: mail.delivered ? "email" : "not_configured",
           message: mail.delivered
-            ? "A 6-digit code is on its way to your school email. If you don't see it within a minute, check your Spam folder and mark it as 'Not Spam'."
-            : 'Account created. Email delivery is not configured on this deployment yet — use "Resend verification" once an administrator sets it up.',
+            ? "A 6-digit code is on its way to your email. If you don't see it within a minute, check your Spam folder."
+            : 'Account created. Email delivery is not configured on this deployment yet — use "Resend code" once an administrator sets it up.',
           expiresInSeconds: CODE_TTL_MS / 1000,
         };
       } catch (verErr) {
@@ -533,7 +533,7 @@ async function handleCreateProfile(req, res, decoded) {
           required: true,
           delivery: "failed",
           message:
-            'Account created, but we could not send the code. Use "Resend verification" to try again.',
+            'Account created, but we could not send the code. Use "Resend code" to try again.',
         };
       }
     }

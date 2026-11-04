@@ -329,6 +329,39 @@
   margin-top: 18px;
 }
 
+.email-verification-card {
+  max-width: 440px;
+  margin: clamp(24px, 8vh, 72px) auto;
+  text-align: center;
+}
+
+.email-verification-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  background: var(--teal-glow);
+  color: var(--teal-ink);
+}
+
+.email-verification-icon svg { width: 25px; height: 25px; }
+
+.email-verification-card h2 {
+  font-family: var(--font-display);
+  margin-bottom: 8px;
+}
+
+.email-verification-card p {
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 18px;
+  overflow-wrap: anywhere;
+}
+
+.email-verification-card .btn { width: 100%; }
+
 .report-toggle {
   width: 100%;
   min-height: 48px;

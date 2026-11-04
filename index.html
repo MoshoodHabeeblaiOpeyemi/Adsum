@@ -266,6 +266,18 @@
 
     </div>
 
+    <section id="emailVerificationSection" class="container hidden" aria-labelledby="emailVerificationTitle">
+      <div class="card email-verification-card">
+        <div class="email-verification-icon" aria-hidden="true"><i data-lucide="mail-check"></i></div>
+        <h2 id="emailVerificationTitle">Verify your email</h2>
+        <p>We sent a 6-digit code to <strong id="emailVerificationAddress">your email</strong>. Verify it to unlock
+          Adsum.</p>
+        <button type="button" class="btn" id="openEmailVerifyBtn">
+          <i data-lucide="shield-check"></i> Enter or resend code
+        </button>
+      </div>
+    </section>
+
     <!-- MAIN DASHBOARD -->
     <section id="dashboardSection" class="hidden">
       <!-- PERSISTENT BANNER — shown on the dashboard while an adviser is still
@@ -979,8 +991,7 @@
         </h3>
         <p style="font-size:0.88rem; color:var(--text-muted); margin:0 0 10px; line-height:1.55; text-align:center;">
           We sent a 6-digit code to
-          <strong id="codeSentEmail" style="color:var(--text-primary); word-break:break-all;">your school
-            email</strong>.
+          <strong id="codeSentEmail" style="color:var(--text-primary); word-break:break-all;">your email</strong>.
         </p>
 
         <div style="margin:14px 0; padding:12px 14px; border-radius:12px;
@@ -989,7 +1000,7 @@
             Can't see it? Check your spam folder.
           </strong>
           <span style="font-size:0.79rem; color:var(--text-muted); line-height:1.55;">
-            Adsum sends from a new email address, so the code often lands in
+            Verification codes may land in
             <strong>Spam</strong> or <strong>Promotions</strong>. Open that folder,
             find the email from us, and mark it <strong>"Not Spam"</strong> —
             otherwise every future code goes there too.
@@ -1015,12 +1026,12 @@
     <div id="adviserVerifyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="adviserVerifyTitle">
       <div class="modal-card" style="max-width: 420px;">
         <h3 id="adviserVerifyTitle" style="font-family:var(--font-display); font-size:1.15rem; margin:0 0 8px;">
-          Verify your school email
+          Verify your email
         </h3>
         <p style="font-size:0.85rem; color:var(--text-muted); margin:0 0 6px; line-height:1.5;">
           We sent a 6-digit code to
           <strong id="adviserVerifyEmail" style="color:var(--text-primary); word-break:break-all;">your email</strong>.
-          Enter it below to unlock your adviser tools.
+          Enter it below to unlock your Adsum account.
         </p>
         <p style="font-size:0.75rem; color:var(--text-muted); margin:0 0 14px; line-height:1.5;">
           💡 Can't see it? It may be in your Spam or Promotions folder — check there
@@ -1056,7 +1067,7 @@
             Do this later
           </button>
           <span style="font-size:0.72rem; color:var(--text-muted); text-align:right;">
-            Adviser tools stay locked until you verify.
+            Adsum stays locked until you verify.
           </span>
         </div>
       </div>
@@ -1185,8 +1196,7 @@
   </main>
 
   <!-- QR DISPLAY CHOICE -------------------------------------------- -->
-  <div id="qrDisplayChoiceRow" class="modal" role="dialog" aria-modal="true"
-    aria-labelledby="qrDisplayChoiceTitle">
+  <div id="qrDisplayChoiceRow" class="modal" role="dialog" aria-modal="true" aria-labelledby="qrDisplayChoiceTitle">
     <div class="modal-card qr-display-modal">
       <h3 id="qrDisplayChoiceTitle">Where will the rotating QR be shown?</h3>
       <p class="qr-display-help">Choose the display for this course. You can change it before a future class.</p>

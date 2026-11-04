@@ -2,6 +2,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const requireVerifiedEmail = require("../utils/requireVerifiedEmail");
 
 try {
   if (getApps().length === 0) {
@@ -9,12 +10,16 @@ try {
       credential: cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(/\n/g, "\n"),
+        privateKey: String(process.env.FIREBASE_PRIVATE_KEY || "").replace(
+          /\n/g,
+          "\n",
+        ),
       }),
     });
   }
 } catch (error) {
-  if (!/already exists/.test(error.message)) console.error("Firebase Admin Init Error:", error);
+  if (!/already exists/.test(error.message))
+    console.error("Firebase Admin Init Error:", error);
 }
 
 const db = getFirestore();
@@ -22,7 +27,10 @@ const db = getFirestore();
 // COURSE ACTIONS - enroll, leave, delete.
 // (`remove` was here until the rep lost that power; see the note above
 // handleDelete for where it went and why.)
-const norm = (v) => String(v || "").trim().toUpperCase();
+const norm = (v) =>
+  String(v || "")
+    .trim()
+    .toUpperCase();
 
 // Firestore document IDs cannot contain "/", but matric numbers often do
 // (e.g. 24/56SV002) — that crashed enroll with "Expected documentPath".
@@ -54,23 +62,37 @@ async function handleEnroll(req, res, decoded) {
         .where("code", "==", norm(courseCode))
         .limit(1)
         .get();
-      if (codeQuery.empty) return res.status(404).json({ error: "Course not found." });
+      if (codeQuery.empty)
+        return res.status(404).json({ error: "Course not found." });
       courseRef = codeQuery.docs[0].ref;
     } else {
-      return res.status(400).json({ error: "courseId or courseCode is required." });
+      return res
+        .status(400)
+        .json({ error: "courseId or courseCode is required." });
     }
 
     const courseSnap = await courseRef.get();
-    if (!courseSnap.exists) return res.status(404).json({ error: "Course not found." });
+    if (!courseSnap.exists)
+      return res.status(404).json({ error: "Course not found." });
     const courseData = courseSnap.data();
     const userSnap = await db.collection("users").doc(decoded.uid).get();
-    if (!userSnap.exists) return res.status(404).json({ error: "User profile not found." });
+    if (!userSnap.exists)
+      return res.status(404).json({ error: "User profile not found." });
     const userData = userSnap.data();
     const matric = norm(userData.matric);
-    if (!matric) return res.status(400).json({ error: "You need a matric number to enroll." });
-    if (courseData.institution && norm(courseData.institution) !== norm(userData.institution))
+    if (!matric)
+      return res
+        .status(400)
+        .json({ error: "You need a matric number to enroll." });
+    if (
+      courseData.institution &&
+      norm(courseData.institution) !== norm(userData.institution)
+    )
       return res.status(403).json({ error: "Institution mismatch." });
-    if (courseData.department && norm(courseData.department) !== norm(userData.department))
+    if (
+      courseData.department &&
+      norm(courseData.department) !== norm(userData.department)
+    )
       return res.status(403).json({ error: "Department mismatch." });
     if (courseData.level && norm(courseData.level) !== norm(userData.level))
       return res.status(403).json({ error: "Level mismatch." });
@@ -78,9 +100,16 @@ async function handleEnroll(req, res, decoded) {
     const regInst = norm(userData.institution) || "UNKNOWN";
     const registryKey = registryDocId(regInst, matric);
     const registryRef = db.collection("matricRegistry").doc(registryKey);
-    if (String(process.env.REQUIRE_EMAIL_VERIFIED || "").toLowerCase() === "true") {
+    if (
+      String(process.env.REQUIRE_EMAIL_VERIFIED || "").toLowerCase() === "true"
+    ) {
       if (!decoded.email_verified)
-        return res.status(403).json({ error: "Verify your email before enrolling.", emailNotVerified: true });
+        return res
+          .status(403)
+          .json({
+            error: "Verify your email before enrolling.",
+            emailNotVerified: true,
+          });
     }
     try {
       await db.runTransaction(async (tx) => {
@@ -90,48 +119,80 @@ async function handleEnroll(req, res, decoded) {
         const memberSnap = await tx.get(memberRef);
         if (regSnap.exists && regSnap.data().uid !== decoded.uid)
           throw new Error("MATRIC_CLAIMED_BY_ANOTHER");
-        tx.set(registryRef, { uid: decoded.uid, matric, institution: regInst,
-          department: norm(userData.department) || null, level: norm(userData.level) || null,
-          claimedAt: FieldValue.serverTimestamp() }, { merge: true });
+        tx.set(
+          registryRef,
+          {
+            uid: decoded.uid,
+            matric,
+            institution: regInst,
+            department: norm(userData.department) || null,
+            level: norm(userData.level) || null,
+            claimedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
         if (memberSnap.exists) return;
-        tx.set(memberRef, { uid: decoded.uid, matric,
+        tx.set(memberRef, {
+          uid: decoded.uid,
+          matric,
           name: String(userData.name || "").trim() || matric,
-          role: "student", joinedAt: FieldValue.serverTimestamp() });
+          role: "student",
+          joinedAt: FieldValue.serverTimestamp(),
+        });
         tx.update(courseRef, { enrolled: FieldValue.arrayUnion(matric) });
       });
     } catch (txErr) {
       if (txErr.message === "MATRIC_CLAIMED_BY_ANOTHER")
-        return res.status(409).json({ error: "Matric " + matric + " already claimed.", matricClaimed: true });
+        return res
+          .status(409)
+          .json({
+            error: "Matric " + matric + " already claimed.",
+            matricClaimed: true,
+          });
       throw txErr;
     }
-    return res.status(200).json({ success: true, message: "Enrolled.", courseId: courseRef.id });
+    return res
+      .status(200)
+      .json({ success: true, message: "Enrolled.", courseId: courseRef.id });
   } catch (error) {
     console.error("Enroll error:", error);
-    return res.status(500).json({ error: "Unable to join the course. Please try again." });
+    return res
+      .status(500)
+      .json({ error: "Unable to join the course. Please try again." });
   }
 }
 
 async function handleLeave(req, res, decoded) {
   try {
     const { courseId } = req.body || {};
-    if (!courseId) return res.status(400).json({ error: "Course ID is required." });
+    if (!courseId)
+      return res.status(400).json({ error: "Course ID is required." });
     const courseRef = db.collection("courses").doc(courseId);
     const courseSnap = await courseRef.get();
-    if (!courseSnap.exists) return res.status(404).json({ error: "Course not found." });
+    if (!courseSnap.exists)
+      return res.status(404).json({ error: "Course not found." });
     if (courseSnap.data().repUid === decoded.uid)
-      return res.status(403).json({ error: "Rep cannot leave. Transfer or delete instead." });
+      return res
+        .status(403)
+        .json({ error: "Rep cannot leave. Transfer or delete instead." });
     const memberRef = courseRef.collection("members").doc(decoded.uid);
     const memberSnap = await memberRef.get();
-    if (!memberSnap.exists) return res.status(404).json({ error: "Not enrolled." });
+    if (!memberSnap.exists)
+      return res.status(404).json({ error: "Not enrolled." });
     const matric = norm(memberSnap.data().matric);
     await db.runTransaction(async (tx) => {
       tx.delete(memberRef);
-      tx.update(courseRef, { enrolled: FieldValue.arrayRemove(matric), assistants: FieldValue.arrayRemove(matric) });
+      tx.update(courseRef, {
+        enrolled: FieldValue.arrayRemove(matric),
+        assistants: FieldValue.arrayRemove(matric),
+      });
     });
     return res.status(200).json({ success: true, message: "Left the course." });
   } catch (error) {
     console.error("Leave error:", error);
-    return res.status(500).json({ error: "Unable to leave the course. Please try again." });
+    return res
+      .status(500)
+      .json({ error: "Unable to leave the course. Please try again." });
   }
 }
 
@@ -167,11 +228,28 @@ async function handleDelete(req, res, decoded) {
 
     const courseRef = db.collection("courses").doc(courseId);
     const courseSnap = await courseRef.get();
-    if (!courseSnap.exists) return res.status(404).json({ error: "Course not found." });
+    if (!courseSnap.exists)
+      return res.status(404).json({ error: "Course not found." });
     if (courseSnap.data().repUid !== decoded.uid)
-      return res.status(403).json({ error: "Only the course rep can delete this course." });
+      return res
+        .status(403)
+        .json({ error: "Only the course rep can delete this course." });
 
-    const subcollections = ["members", "session", "attendance", "checkins", "deviceFlags", "absentFlags", "manualRequests", "hotspotLog", "removalLog", "exemptions", "exemptionReasons", "securityEvents", "notifications"];
+    const subcollections = [
+      "members",
+      "session",
+      "attendance",
+      "checkins",
+      "deviceFlags",
+      "absentFlags",
+      "manualRequests",
+      "hotspotLog",
+      "removalLog",
+      "exemptions",
+      "exemptionReasons",
+      "securityEvents",
+      "notifications",
+    ];
 
     for (const sub of subcollections) {
       try {
@@ -183,7 +261,9 @@ async function handleDelete(req, res, decoded) {
           snap = await courseRef.collection(sub).limit(500).get();
         }
       } catch (err) {
-        console.warn("Could not delete subcollection " + sub + ": " + err.message);
+        console.warn(
+          "Could not delete subcollection " + sub + ": " + err.message,
+        );
       }
     }
 
@@ -191,24 +271,32 @@ async function handleDelete(req, res, decoded) {
     return res.status(200).json({ success: true, message: "Course deleted." });
   } catch (error) {
     console.error("Delete course error:", error);
-    return res.status(500).json({ error: "Unable to delete the course. Please try again." });
+    return res
+      .status(500)
+      .json({ error: "Unable to delete the course. Please try again." });
   }
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Method not allowed" });
 
   try {
     await verifyAppCheck(req);
     const header = req.headers.authorization || "";
-    if (!header.startsWith("Bearer ")) return res.status(401).json({ error: "Unauthorized" });
+    if (!header.startsWith("Bearer "))
+      return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
+    if (!requireVerifiedEmail(decoded, res)) return;
     const action = req.query.action;
 
     switch (action) {
-      case "enroll": return handleEnroll(req, res, decoded);
-      case "leave": return handleLeave(req, res, decoded);
-      case "delete": return handleDelete(req, res, decoded);
+      case "enroll":
+        return handleEnroll(req, res, decoded);
+      case "leave":
+        return handleLeave(req, res, decoded);
+      case "delete":
+        return handleDelete(req, res, decoded);
       default:
         return res.status(400).json({
           error:

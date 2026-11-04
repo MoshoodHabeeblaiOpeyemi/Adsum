@@ -2,6 +2,7 @@ const { getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const verifyAppCheck = require("../utils/appCheck");
+const requireVerifiedEmail = require("../utils/requireVerifiedEmail");
 const { WINDOW_MS } = require("../utils/throttle");
 
 try {
@@ -432,6 +433,7 @@ module.exports = async (req, res) => {
     if (!header.startsWith("Bearer "))
       return res.status(401).json({ error: "Unauthorized" });
     const decoded = await getAuth().verifyIdToken(header.slice(7));
+    if (!requireVerifiedEmail(decoded, res)) return;
     const action = req.query.action;
     switch (action) {
       case "requestManual":
@@ -441,12 +443,10 @@ module.exports = async (req, res) => {
       case "grantHotspot":
         return handleGrantHotspot(req, res, decoded);
       default:
-        return res
-          .status(400)
-          .json({
-            error:
-              "Invalid action. Use: requestManual, approveManual, grantHotspot",
-          });
+        return res.status(400).json({
+          error:
+            "Invalid action. Use: requestManual, approveManual, grantHotspot",
+        });
     }
   } catch (error) {
     console.error("Approval API error:", error);
