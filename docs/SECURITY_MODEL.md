@@ -136,6 +136,23 @@ Enforced in `firestore.rules`, not in the client:
 Removal is also logged: `api/roster.js` (`removeCourseStudent`) writes `removalLog` so a
 student cannot be quietly deleted from a roster.
 
+### Account deletion preserves academic history
+
+`api/account.js?action=deleteAccount` removes the profile, Firebase Auth account, current
+course membership, display name/email from active roster rows, matric claim, device record,
+push tokens, and pending verification/manual-request artifacts. Historical attendance,
+matric identifiers, resolved flags, and rep-change/audit records remain for reference.
+Names for the deleted matric are cleared from imported roster entries and rep-change
+history; rep-change actor references become `deleted_account`. Course-level audit records
+retain their non-display actor IDs for internal traceability, but no profile or email can
+be resolved from the deleted Firebase UID.
+
+If the deleted account owns a course, the course is archived: its live PIN/session is
+deleted, the rep identity and current enrollment are cleared, and historical subcollections
+are retained. If the account is an adviser, the level roster remains but its current
+`adviserUid` and adviser slot are released for a replacement. This retention policy must
+be approved by the university before real student data is collected.
+
 ### 4a. Reps cannot remove students
 
 A course rep used to be able to remove any student from their roster via

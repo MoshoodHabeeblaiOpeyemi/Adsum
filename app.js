@@ -2933,7 +2933,7 @@ document
         await showConfirm({
           title: "Delete Account",
           message:
-            "This will permanently delete your account, remove you from all courses, and release your matric number. This cannot be undone.",
+            "This deletes your sign-in and removes your name and email from current course rosters. Attendance and audit history stay for university reference under your matric; courses without a rep are archived. This cannot be undone.",
           okText: "Yes, Delete",
           cancelText: "Keep Account",
           icon: "🗑️",
@@ -2994,7 +2994,7 @@ document
               } catch (_) {}
 
               toast.info(
-                "Your account has been deleted. Goodbye! 👋",
+                "Your account was deleted. Current rosters are cleared; historical attendance remains under your matric.",
                 "Account Deleted",
               );
 
@@ -3278,6 +3278,7 @@ function renderCourses() {
     card.innerHTML = `
       ${actionIcon}
       <h3 style="color: var(--navy); margin-bottom: 5px;">${escapeHTML(course.name || "Unnamed Course")}</h3>
+      ${course.archived ? '<span class="course-archived-badge">Archived · history retained</span>' : ""}
       <p style="font-size: 0.85rem; margin-bottom: 5px;">Code: <strong>${escapeHTML(course.code)}</strong> | Rep: ${escapeHTML(course.rep || "—")}</p>
       <p style="font-size: 0.75rem; color: var(--muted); margin-bottom: 15px;">
         <i data-lucide="building" style="width:12px; height:12px;"></i> ${escapeHTML(course.institution || "GEN")} • 

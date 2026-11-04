@@ -60,11 +60,19 @@ async function handleEnroll(req, res, decoded) {
       const codeQuery = await db
         .collection("courses")
         .where("code", "==", norm(courseCode))
-        .limit(1)
+        .limit(25)
         .get();
-      if (codeQuery.empty)
+      const activeCourse = codeQuery.docs.find(
+        (doc) => doc.data().archived !== true,
+      );
+      if (!activeCourse && codeQuery.empty)
         return res.status(404).json({ error: "Course not found." });
-      courseRef = codeQuery.docs[0].ref;
+      if (!activeCourse)
+        return res.status(410).json({
+          error: "This course is archived and no longer accepts new students.",
+          code: "COURSE_ARCHIVED",
+        });
+      courseRef = activeCourse.ref;
     } else {
       return res
         .status(400)
@@ -75,6 +83,11 @@ async function handleEnroll(req, res, decoded) {
     if (!courseSnap.exists)
       return res.status(404).json({ error: "Course not found." });
     const courseData = courseSnap.data();
+    if (courseData.archived === true)
+      return res.status(410).json({
+        error: "This course is archived and no longer accepts new students.",
+        code: "COURSE_ARCHIVED",
+      });
     const userSnap = await db.collection("users").doc(decoded.uid).get();
     if (!userSnap.exists)
       return res.status(404).json({ error: "User profile not found." });
@@ -104,12 +117,10 @@ async function handleEnroll(req, res, decoded) {
       String(process.env.REQUIRE_EMAIL_VERIFIED || "").toLowerCase() === "true"
     ) {
       if (!decoded.email_verified)
-        return res
-          .status(403)
-          .json({
-            error: "Verify your email before enrolling.",
-            emailNotVerified: true,
-          });
+        return res.status(403).json({
+          error: "Verify your email before enrolling.",
+          emailNotVerified: true,
+        });
     }
     try {
       await db.runTransaction(async (tx) => {
@@ -143,12 +154,10 @@ async function handleEnroll(req, res, decoded) {
       });
     } catch (txErr) {
       if (txErr.message === "MATRIC_CLAIMED_BY_ANOTHER")
-        return res
-          .status(409)
-          .json({
-            error: "Matric " + matric + " already claimed.",
-            matricClaimed: true,
-          });
+        return res.status(409).json({
+          error: "Matric " + matric + " already claimed.",
+          matricClaimed: true,
+        });
       throw txErr;
     }
     return res

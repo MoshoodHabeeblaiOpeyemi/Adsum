@@ -835,6 +835,20 @@ input:focus::placeholder {
   padding: 30px;
 }
 
+.course-archived-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0 0 8px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 /* --- LIVE SESSION BANNER PULSE --- */
 #sessionBanner {
   animation: pulseGlow 2.2s infinite;
