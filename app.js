@@ -6299,8 +6299,7 @@ async function granthotspots() {
   } finally {
     if (grantBtn) {
       grantBtn.disabled = false;
-      grantBtn.innerHTML =
-        '<i data-lucide="broadcast"></i> Grant Hotspot Power';
+      grantBtn.innerHTML = '<i data-lucide="radio"></i> Grant Hotspot Power';
       refreshIcons();
     }
   }
