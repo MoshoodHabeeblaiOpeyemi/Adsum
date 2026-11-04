@@ -139,7 +139,7 @@
   }
 
   .role-sub {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
   .role-track {
@@ -177,7 +177,7 @@
   }
 
   .role-desc {
-    font-size: 0.83rem;
+    font-size: 0.88rem;
     line-height: 1.5;
     margin-bottom: 11px;
   }
@@ -187,10 +187,10 @@
     margin-bottom: 14px;
   }
 
-  .role-points li { font-size: 0.8rem; }
+  .role-points li { font-size: 0.84rem; }
 
   .role-free {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     margin-top: 8px;
   }
 

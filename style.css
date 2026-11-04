@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&display=swap');
 
 /* --- DESIGN TOKENS ---
    THE PALETTE IS SAMPLED FROM THE LOGO, NOT GUESSED.
@@ -48,8 +48,8 @@
   --shadow: 0 20px 45px -18px rgba(31, 22, 90, 0.22);
   --glass-blur: blur(18px);
 
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Kalam', cursive;
+  --font-body: 'Kalam', cursive;
 
   /* Motion tokens — centralized so the whole app eases the same way */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -1625,7 +1625,7 @@ input:focus::placeholder {
   }
 
   .network-chip {
-    font-size: 0.64rem;
+    font-size: 0.72rem;
     padding: 3px 8px;
   }
 
@@ -1647,7 +1647,7 @@ input:focus::placeholder {
   }
 
   .card p {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     margin-bottom: 16px;
   }
 
@@ -1656,12 +1656,12 @@ input:focus::placeholder {
   }
 
   .dashboard-header h2 {
-    font-size: 1.3rem;
-    letter-spacing: -0.4px;
+    font-size: 1.35rem;
+    letter-spacing: 0;
   }
 
   .section-title {
-    font-size: 0.98rem;
+    font-size: 1.05rem;
     margin-bottom: 12px;
   }
 
@@ -1694,14 +1694,21 @@ input:focus::placeholder {
   }
 
   label {
-    font-size: 0.8rem;
+    font-size: 0.86rem;
     margin-bottom: 6px;
   }
 
   input,
   select {
     padding: 11px 13px;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
   }
 
   .field {
@@ -1837,15 +1844,15 @@ input:focus::placeholder {
   }
 
   .mode-card-title {
-    font-size: 0.78rem;
+    font-size: 0.86rem;
   }
 
   .mode-card-desc {
-    font-size: 0.73rem;
+    font-size: 0.8rem;
   }
 
   #modeHint {
-    font-size: 0.72rem !important;
+    font-size: 0.8rem !important;
     margin-top: 6px !important;
   }
 
@@ -2087,7 +2094,7 @@ input:focus::placeholder {
 
   /* --- Semester report table ------------------------------------ */
   .report-table {
-    font-size: 0.78rem;
+    font-size: 0.84rem;
   }
 
   .report-table th,
@@ -2096,8 +2103,8 @@ input:focus::placeholder {
   }
 
   .report-table th {
-    font-size: 0.66rem;
-    letter-spacing: 0.6px;
+    font-size: 0.72rem;
+    letter-spacing: 0;
   }
 }
 /* ============================================================
