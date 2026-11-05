@@ -147,7 +147,7 @@
 }
 
 .adviser-msg.ok { border-color: var(--teal); color: var(--teal-ink); }
-.adviser-msg.warn { border-color: #d9a441; color: #b8832a; }
+.adviser-msg.warn { border-color: var(--accent); color: var(--accent-ink); }
 .adviser-msg.err { border-color: var(--danger); color: var(--danger); }
 .adviser-msg.info { border-color: var(--card-border); color: var(--text-muted); }
 
@@ -443,7 +443,7 @@
   height: 150%;
   background: radial-gradient(
     60% 60% at 30% 0%,
-    rgba(91, 63, 212, 0.26),
+    rgba(47, 111, 159, 0.2),
     transparent 70%
   );
   pointer-events: none;
@@ -465,10 +465,10 @@
   letter-spacing: 1.2px;
   text-transform: uppercase;
   color: #fff;
-  background: linear-gradient(135deg, var(--violet), #4f46e5);
+  background: linear-gradient(135deg, var(--violet), var(--teal));
   padding: 7px 14px;
   border-radius: 999px;
-  box-shadow: 0 6px 18px -8px rgba(91, 63, 212, 0.85);
+  box-shadow: 0 6px 18px -8px rgba(47, 111, 159, 0.5);
 }
 .adviser-badge-lg svg { width: 14px; height: 14px; }
 .adviser-scope {
@@ -503,10 +503,10 @@
    offers only that. The course buttons below are disabled in JS as well —
    hidden alone would not stop the modals behind them. */
 #adviserVerifyBanner {
-  background: linear-gradient(180deg, rgba(217, 164, 65, 0.12), var(--card-bg) 70%);
+  background: linear-gradient(180deg, var(--accent-glow), var(--card-bg) 70%);
 }
 #adviserVerifyBanner .btn {
-  background: linear-gradient(135deg, #d9a441, #b8832a);
+  background: var(--accent);
   border-color: transparent;
   color: #10131c;
   font-weight: 700;

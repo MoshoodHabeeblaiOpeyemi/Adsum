@@ -53,9 +53,9 @@
   position: absolute; inset: -30% -40% auto -40%; height: 70%;
   filter: blur(46px); opacity: 0.5; pointer-events: none;
 }
-.role-adviser .role-glow { background: linear-gradient(180deg, rgba(124,108,240,.4), transparent 70%); }
-.role-rep .role-glow { background: linear-gradient(180deg, rgba(6,214,160,.35), transparent 70%); }
-.role-student .role-glow { background: linear-gradient(180deg, rgba(159,139,255,.35), transparent 70%); }
+.role-adviser .role-glow { background: linear-gradient(180deg, rgba(47,111,159,.22), transparent 70%); }
+.role-rep .role-glow { background: linear-gradient(180deg, rgba(8,127,120,.28), transparent 70%); }
+.role-student .role-glow { background: linear-gradient(180deg, rgba(142,170,214,.26), transparent 70%); }
 .role-badge {
   position: relative; z-index: 1;
   font-size: 0.68rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
@@ -70,8 +70,8 @@
   box-shadow: 0 14px 28px -10px var(--accent-glow);
 }
 .role-icon svg { width: 27px; height: 27px; color: #fff; }
-.role-rep .role-icon { background: linear-gradient(135deg, #0C8074, #0F7A87); }
-.role-adviser .role-icon { background: linear-gradient(135deg, #5B3FD4, #4F46E5); }
+.role-rep .role-icon { background: linear-gradient(135deg, var(--teal), var(--primary)); }
+.role-adviser .role-icon { background: linear-gradient(135deg, var(--secondary), var(--teal)); }
 .role-card h3 {
   font-family: var(--font-display); font-size: 1.35rem;
   letter-spacing: -0.4px; margin-bottom: 8px; position: relative; z-index: 1;

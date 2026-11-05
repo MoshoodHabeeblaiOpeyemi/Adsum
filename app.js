@@ -1,8 +1,8 @@
 // 🔖 BUILD MARKER — proves which version of app.js the browser is running.
 // If your console does NOT print the build id below, the running JS is stale.
 console.log(
-  "%cAdsum build: mobile-density + logo-derived palette (cyan #0F7A87 → mint #5FE0CE → violet #5B3FD4)",
-  "color:#5B3FD4;font-weight:bold",
+  "%cAdsum build: Nunito default + teal, blue, and amber palette",
+  "color:#087F78;font-weight:bold",
 );
 
 // --- SUCCESS CELEBRATION (premium check-in moment) ---
@@ -82,7 +82,7 @@ function showToast(message, type = "info", title = "", durationMs) {
     error:
       '<i data-lucide="x-circle" style="color: var(--danger); width:18px; height:18px;"></i>',
     warning:
-      '<i data-lucide="alert-triangle" style="color: #fd7e14; width:18px; height:18px;"></i>',
+      '<i data-lucide="alert-triangle" style="color: var(--accent-ink); width:18px; height:18px;"></i>',
     info: '<i data-lucide="info" style="color: var(--teal-ink); width:18px; height:18px;"></i>',
   };
   const titles = {
@@ -262,7 +262,7 @@ function updateNetworkChips() {
       color = "var(--danger)";
     } else if (type === "3g" || (down !== null && down < 1.5)) {
       label = "📶 Weak";
-      color = "#fd7e14";
+      color = "var(--accent-ink)";
     } else {
       label = "📶 Good";
       color = "var(--success)";
@@ -1235,8 +1235,8 @@ async function submitManualRequest() {
     );
     if (statusEl) {
       statusEl.classList.remove("hidden");
-      statusEl.style.background = "rgba(253, 126, 20, 0.1)";
-      statusEl.style.color = "#fd7e14";
+      statusEl.style.background = "var(--accent-glow)";
+      statusEl.style.color = "var(--accent-ink)";
       statusEl.textContent =
         "⏳ Request sent — waiting for your Rep to verify you.";
     }
@@ -1530,9 +1530,9 @@ const fontPreferenceSelect = document.getElementById("fontPreferenceSelect");
 const FONT_FAMILIES = {
   kalam: "'Kalam', cursive",
   nunito: "'Nunito', sans-serif",
+  poppins: "'Poppins', sans-serif",
   lora: "'Lora', serif",
-  manrope: "'Manrope', sans-serif",
-};
+} ;
 
 function applyFontPreference(fontId, persist = false) {
   const selectedFont = Object.prototype.hasOwnProperty.call(
@@ -1540,7 +1540,7 @@ function applyFontPreference(fontId, persist = false) {
     fontId,
   )
     ? fontId
-    : "kalam";
+    : "nunito";
   const family = FONT_FAMILIES[selectedFont];
   htmlElement.style.setProperty("--font-body", family);
   htmlElement.style.setProperty("--font-display", family);
@@ -1552,9 +1552,13 @@ function applyFontPreference(fontId, persist = false) {
   }
 }
 
-let savedFont = "kalam";
+let savedFont = "nunito";
 try {
   savedFont = localStorage.getItem("adsum_font") || savedFont;
+  if (savedFont === "manrope") {
+    savedFont = "poppins";
+    localStorage.setItem("adsum_font", savedFont);
+  }
 } catch (_) {}
 applyFontPreference(savedFont);
 if (fontPreferenceSelect) {
@@ -3126,7 +3130,7 @@ if (openSettingsBtn && settingsModal) {
       settingsMatricInput.value = currentUser.matric || "";
     if (settingsLevelInput) settingsLevelInput.value = currentUser.level || ""; // NEW
     applyFontPreference(
-      (fontPreferenceSelect && fontPreferenceSelect.value) || "kalam",
+      (fontPreferenceSelect && fontPreferenceSelect.value) || "nunito",
     );
 
     settingsModal.classList.add("show");
@@ -3906,7 +3910,7 @@ function renderManualRequestQueue(requests) {
   pending.forEach((request) => {
     const card = document.createElement("div");
     card.style.cssText =
-      "background: var(--card-bg); padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #fd7e14;";
+      "background: var(--card-bg); padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--accent);";
     const whenText =
       request.requestedAt && request.requestedAt.toDate
         ? request.requestedAt.toDate().toLocaleTimeString()
@@ -3920,7 +3924,7 @@ function renderManualRequestQueue(requests) {
           placeholder="Reason (optional — shown to the student)"
           style="margin-top: 8px; width: 100%; font-size: 0.75rem; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
         <div class="manual-request-actions" style="margin-top: 8px;">
-          <button data-approve-uid="${request.id}" class="btn" style="background: #28a745; font-size: 0.78rem; padding: 6px 12px; width: auto;">✅ Approve (I can see them)</button>
+          <button data-approve-uid="${request.id}" class="btn" style="background: var(--teal); font-size: 0.78rem; padding: 6px 12px; width: auto;">✅ Approve (I can see them)</button>
           <button data-reject-uid="${request.id}" class="btn" style="background: var(--danger); font-size: 0.78rem; padding: 6px 12px; width: auto;">🚩 Reject</button>
         </div>
       `;
@@ -4137,17 +4141,17 @@ function startMyManualRequestListener(courseId) {
       }
       statusEl.classList.remove("hidden");
       if (data.status === "pending") {
-        statusEl.style.background = "rgba(253, 126, 20, 0.1)";
-        statusEl.style.color = "#fd7e14";
+        statusEl.style.background = "var(--accent-glow)";
+        statusEl.style.color = "var(--accent-ink)";
         statusEl.textContent =
           "⏳ Request sent — waiting for your Rep to verify you.";
       } else if (data.status === "approved") {
-        statusEl.style.background = "rgba(40, 167, 69, 0.1)";
-        statusEl.style.color = "#28a745";
+        statusEl.style.background = "var(--success-glow)";
+        statusEl.style.color = "var(--success-ink)";
         statusEl.textContent = "✅ Your Rep verified you. Attendance recorded!";
       } else if (data.status === "rejected") {
-        statusEl.style.background = "rgba(220, 53, 69, 0.1)";
-        statusEl.style.color = "#dc3545";
+        statusEl.style.background = "var(--danger-glow)";
+        statusEl.style.color = "var(--danger)";
         statusEl.textContent = data.rejectedReason
           ? `❌ Your Rep could not verify you for this session. The decision is final. Reason: "${data.rejectedReason}"`
           : "❌ Your Rep could not verify you for this session. The decision is final.";
@@ -4640,7 +4644,7 @@ function renderAuditSection() {
 
   container.innerHTML = `
       ${removals.length ? `<h4 style="font-size: 0.85rem; color: var(--navy); margin: 8px 0 4px;">Removed Students (${removals.length})</h4><ul style="list-style: none; padding-left: 0; margin: 0 0 10px;">${removalRows}</ul>` : ""}
-      ${flags.length ? `<h4 style="font-size: 0.85rem; color: #dc3545; margin: 8px 0 4px;">Absent Flags (${flags.length})</h4><ul style="list-style: none; padding-left: 0; margin: 0;">${flagRows}</ul>` : ""}
+      ${flags.length ? `<h4 style="font-size: 0.85rem; color: var(--danger); margin: 8px 0 4px;">Absent Flags (${flags.length})</h4><ul style="list-style: none; padding-left: 0; margin: 0;">${flagRows}</ul>` : ""}
     `;
 }
 
@@ -5757,8 +5761,8 @@ async function renderClassReports() {
         const pc = r.physicalHeadcount;
         const headcountLine = Number.isInteger(pc)
           ? pc === present
-            ? `<span style="color:#28a745;">✔ Headcount ${pc} matches system ${present}</span>`
-            : `<span style="color:#fd7e14;">⚠️ Physical headcount ${pc} vs system ${present}</span>`
+            ? `<span style="color:var(--success-ink);">✔ Headcount ${pc} matches system ${present}</span>`
+            : `<span style="color:var(--accent-ink);">⚠️ Physical headcount ${pc} vs system ${present}</span>`
           : `<span style="color:var(--muted);">No headcount taken</span>`;
         const flags = (r.flaggedAbsent || []).length;
         const auto =
@@ -6242,7 +6246,7 @@ function renderHotspotOptions() {
     const label = document.createElement("label");
     label.style.cssText =
       "display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; font-size: 0.82rem; color: var(--text); cursor: pointer;";
-    label.innerHTML = `<input type="checkbox" value="${escapeHTML(matric)}" data-hotspot-check style="accent-color: var(--teal); width: 16px; height: 16px;"><span><strong>${escapeHTML(matric)}</strong>${member.name ? ` · ${escapeHTML(member.name)}` : ""} <span style="color: #28a745; font-size: 0.7rem;">✅ checked in</span></span>`;
+    label.innerHTML = `<input type="checkbox" value="${escapeHTML(matric)}" data-hotspot-check style="accent-color: var(--teal); width: 16px; height: 16px;"><span><strong>${escapeHTML(matric)}</strong>${member.name ? ` · ${escapeHTML(member.name)}` : ""} <span style="color: var(--success-ink); font-size: 0.7rem;">✅ checked in</span></span>`;
     list.appendChild(label);
   });
 }
@@ -6613,7 +6617,7 @@ function renderAssistantDropdownAndList() {
       const isSession =
         memberRecord && memberRecord.role === "session_assistant";
       const scopeBadge = isSession
-        ? `<span style="background: #fd7e14; color: white; padding: 2px 4px; border-radius: 3px; font-size: 0.6rem; margin-left: 4px;">SESSION</span>`
+        ? `<span style="background: var(--accent); color: var(--on-accent); padding: 2px 4px; border-radius: 3px; font-size: 0.6rem; margin-left: 4px;">SESSION</span>`
         : `<span style="background: var(--teal); color: white; padding: 2px 4px; border-radius: 3px; font-size: 0.6rem; margin-left: 4px;">PERMANENT</span>`;
 
       const li = document.createElement("li");
@@ -7052,7 +7056,7 @@ if (setLocationBtn) {
 
       if (setLocationStatus) {
         setLocationStatus.style.display = "block";
-        setLocationStatus.style.color = "#28a745";
+        setLocationStatus.style.color = "var(--success-ink)";
         setLocationStatus.textContent = `✅ Location locked (±${Math.round(accuracy)}m accuracy). Ready to start session.`;
       }
 
@@ -7109,7 +7113,7 @@ if (captureHallGpsBtn) {
         if (lonInput) lonInput.value = pos.coords.longitude.toFixed(6);
         if (captureStatus) {
           captureStatus.style.display = "block";
-          captureStatus.style.color = "#28a745";
+          captureStatus.style.color = "var(--success-ink)";
           captureStatus.textContent = `✅ GPS locked with ±${Math.round(pos.coords.accuracy)}m accuracy!`;
         }
         toast.success(
@@ -7892,16 +7896,16 @@ function syncHeadcountUI() {
   const diff = systemCount - physical;
   comparisonEl.classList.remove("hidden");
   if (diff === 0) {
-    comparisonEl.style.background = "rgba(40, 167, 69, 0.1)";
-    comparisonEl.style.color = "#28a745";
+    comparisonEl.style.background = "var(--success-glow)";
+    comparisonEl.style.color = "var(--success-ink)";
     comparisonEl.textContent = `🧍 Physical: ${physical} | 💻 System: ${systemCount} — perfect match. Close class to archive.`;
   } else if (diff > 0) {
-    comparisonEl.style.background = "rgba(220, 53, 69, 0.08)";
-    comparisonEl.style.color = "#dc3545";
+    comparisonEl.style.background = "var(--danger-glow)";
+    comparisonEl.style.color = "var(--danger)";
     comparisonEl.textContent = `🧍 Physical: ${physical} | 💻 System: ${systemCount} — ${diff} ghost check-in(s). Spot the empty seat on the roster and 🚩 Flag Absent.`;
   } else {
-    comparisonEl.style.background = "rgba(253, 126, 20, 0.1)";
-    comparisonEl.style.color = "#fd7e14";
+    comparisonEl.style.background = "var(--accent-glow)";
+    comparisonEl.style.color = "var(--accent-ink)";
     comparisonEl.textContent = `🧍 Physical: ${physical} | 💻 System: ${systemCount} — ${Math.abs(diff)} body(ies) may not have checked in. Point them to the manual override (3 failed attempts) or approve them from the manual requests queue.`;
   }
 }
@@ -8252,11 +8256,11 @@ function renderPortalState() {
   if (isSessionActive) {
     if (sessionBanner) {
       sessionBanner.classList.remove("hidden");
-      sessionBanner.style.borderColor = "#28a745";
-      sessionBanner.style.background = "rgba(40, 167, 69, 0.1)";
+      sessionBanner.style.borderColor = "var(--success)";
+      sessionBanner.style.background = "var(--success-glow)";
       if (bannerTitle) {
         bannerTitle.textContent = "🔴 ATTENDANCE SESSION LIVE";
-        bannerTitle.style.color = "#28a745";
+        bannerTitle.style.color = "var(--success-ink)";
       }
       if (bannerText) {
         const deadline =
@@ -8323,11 +8327,11 @@ function renderPortalState() {
     if (sessionBanner) {
       if (session && session.expired) {
         sessionBanner.classList.remove("hidden");
-        sessionBanner.style.borderColor = "#dc3545";
-        sessionBanner.style.background = "rgba(220, 53, 69, 0.1)";
+        sessionBanner.style.borderColor = "var(--danger)";
+        sessionBanner.style.background = "var(--danger-glow)";
         if (bannerTitle) {
           bannerTitle.textContent = "⏹️ ATTENDANCE SESSION CLOSED";
-          bannerTitle.style.color = "#dc3545";
+          bannerTitle.style.color = "var(--danger)";
         }
         if (bannerText) {
           if (isRep || isAssistant) {
@@ -8497,8 +8501,8 @@ function renderPortalState() {
           (!currentExpiresAt || f.sessionExpiresAt === currentExpiresAt),
       );
       const statusHTML = flagRecord
-        ? `<span style="color: #dc3545; font-weight: bold;">🚩 Flagged Absent</span>`
-        : `<span style="color: #28a745; font-weight: bold;">Present ✅</span>`;
+        ? `<span style="color: var(--danger); font-weight: bold;">🚩 Flagged Absent</span>`
+        : `<span style="color: var(--success-ink); font-weight: bold;">Present ✅</span>`;
       const groupInfo = (activeCourse.groups || []).find((g) =>
         (g.members || []).map(normalizeMatric).includes(normalizedM),
       );
@@ -8510,7 +8514,7 @@ function renderPortalState() {
         !flagRecord &&
         !(isRepAttendee || attendeeRole === "rep") &&
         !(memberRecord && memberRecord.pendingRegistration)
-          ? `<button data-matric="${escapeHTML(matric)}" class="flag-absent-btn" title="Empty seat linked to this check-in? Flag it — the student gets an emergency alert and cannot be quietly deleted" style="background: transparent; border: 1px solid #dc3545; color: #dc3545; border-radius: 6px; cursor: pointer; font-size: 0.72rem; font-weight: bold; padding: 3px 8px; margin-left: 8px;">🚩 Flag Absent</button>`
+          ? `<button data-matric="${escapeHTML(matric)}" class="flag-absent-btn" title="Empty seat linked to this check-in? Flag it — the student gets an emergency alert and cannot be quietly deleted" style="background: transparent; border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; cursor: pointer; font-size: 0.72rem; font-weight: bold; padding: 3px 8px; margin-left: 8px;">🚩 Flag Absent</button>`
           : "";
 
       const li = document.createElement("li");
@@ -8561,7 +8565,7 @@ function renderPortalState() {
             : "";
         const flagsBadgeHTML =
           sessionRecord.flaggedAbsent && sessionRecord.flaggedAbsent.length
-            ? `<span style="font-size: 0.8rem; background: #dc3545; color: white; padding: 2px 6px; border-radius: 4px;">🚩 ${sessionRecord.flaggedAbsent.length} Flagged</span>`
+            ? `<span style="font-size: 0.8rem; background: var(--danger); color: var(--on-danger); padding: 2px 6px; border-radius: 4px;">🚩 ${sessionRecord.flaggedAbsent.length} Flagged</span>`
             : "";
 
         archiveCard.innerHTML = `
@@ -8634,9 +8638,9 @@ function renderPortalState() {
             : "Just now";
           const hotspotBadge =
             dg.attemptedMatrics.length > 1
-              ? `<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">🔁 MULTI-ACCOUNT: ${dg.attemptedMatrics.length} matrics on ONE device</span>`
+              ? `<span style="background: var(--danger); color: var(--on-danger); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">🔁 MULTI-ACCOUNT: ${dg.attemptedMatrics.length} matrics on ONE device</span>`
               : dg.group.length > 1
-                ? `<span style="background: #fd7e14; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">🔁 ${dg.group.length} hotspot attempts</span>`
+                ? `<span style="background: var(--accent); color: var(--on-accent); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">🔁 ${dg.group.length} hotspot attempts</span>`
                 : "";
           const matricList = dg.attemptedMatrics
             .map((m) => `<strong>${escapeHTML(m)}</strong>`)
@@ -8694,11 +8698,11 @@ function renderPortalState() {
       if (hasExemption) excusedCount++;
 
       let statusText = wasPresent ? "Present ✅" : "Absent ❌";
-      let statusColor = wasPresent ? "#28a745" : "#dc3545";
+      let statusColor = wasPresent ? "var(--success-ink)" : "var(--danger)";
 
       if (!wasPresent && hasExemption) {
         statusText = "Excused 🛡️";
-        statusColor = "#fd7e14";
+        statusColor = "var(--accent-ink)";
       }
 
       historyListHTML += `
@@ -8754,11 +8758,11 @@ function renderPortalState() {
         let projectionHTML = `<div style="display: flex; flex-direction: column; gap: 8px;">`;
 
         if (percentage >= 80) {
-          projectionHTML += `<div style="color: #28a745; font-weight: 600;">🎉 Excellent! You're on track for 80%+ attendance.</div>`;
+          projectionHTML += `<div style="color: var(--success-ink); font-weight: 600;">🎉 Excellent! You're on track for 80%+ attendance.</div>`;
         } else if (percentage >= 70) {
-          projectionHTML += `<div style="color: #28a745; font-weight: 600;">✅ You meet the 70% threshold. Aim higher!</div>`;
+          projectionHTML += `<div style="color: var(--success-ink); font-weight: 600;">✅ You meet the 70% threshold. Aim higher!</div>`;
         } else {
-          projectionHTML += `<div style="color: #dc3545; font-weight: 600;">⚠️ Below 70% threshold. You need to attend ${neededToReach70} more classes.</div>`;
+          projectionHTML += `<div style="color: var(--danger); font-weight: 600;">⚠️ Below 70% threshold. You need to attend ${neededToReach70} more classes.</div>`;
         }
 
         projectionHTML += `<div style="font-size: 0.8rem; color: var(--muted); margin-top: 8px;">`;
@@ -8794,13 +8798,13 @@ function renderPortalState() {
         "⏳ No archived classes yet. Analytics will update as classes are held.";
     } else if (percentage >= 70) {
       eligibilityBanner.style.background = "rgba(40, 167, 69, 0.1)";
-      eligibilityBanner.style.color = "#28a745";
+      eligibilityBanner.style.color = "var(--success-ink)";
       const exemptionNote =
         excusedCount > 0 ? ` (${excusedCount} excused)` : "";
       eligibilityBanner.textContent = `✅ ELIGIBLE: You meet the 70% attendance threshold (${percentage}%${exemptionNote}).`;
     } else {
       eligibilityBanner.style.background = "rgba(220, 53, 69, 0.1)";
-      eligibilityBanner.style.color = "#dc3545";
+      eligibilityBanner.style.color = "var(--danger)";
       const exemptionNote =
         excusedCount > 0 ? ` (${excusedCount} excused)` : "";
       eligibilityBanner.textContent = `⚠️ WARNING: Your attendance is at ${percentage}%${exemptionNote}. You are below the 70% exam eligibility requirement!`;

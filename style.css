@@ -1,55 +1,48 @@
-@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Nunito:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Nunito:wght@400;500;600;700&family=Lora:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap');
 
-/* --- DESIGN TOKENS ---
-   THE PALETTE IS SAMPLED FROM THE LOGO, NOT GUESSED.
-   Reading brand/adsum-logo-full.png pixel-by-pixel, the lockup is one
-   continuous gradient running left→right:
-
-     cyan  #2BAEC2  →  mint #5FE0CE  →  violet #6E4DD0
-
-   Every accent below is a THEME-ADAPTED DERIVATION of those three stops.
-   The raw logo stops are artwork values: they are tuned to sit on the
-   transparent navy plate, and several are unreadable as UI text — the mint
-   scores just 1.61:1 against white. So the hue is kept and the lightness is
-   re-solved per theme for contrast. The brand is preserved; legibility is not
-   negotiable.
-
-   Two token families, because "this colour as a FILL carrying white text"
-   and "this colour as TEXT on a card" are different problems:
-     --teal / --violet      → fills, gradients, glows, borders
-     --teal-ink / --violet-ink → the same hue re-solved to be readable as
-                                text and to carry white label text          */
+/* --- ADSUM COLOR SYSTEM --- */
 :root {
-  --bg-base: #F5F3FF;
-  --bg-base-2: #E2E8F0;
-  --bg: #F8FAFC;
-  --card-bg: #FFFFFF;
-  --card-border: rgba(15, 23, 42, 0.08);
-  --border: rgba(15, 23, 42, 0.12);
+  --bg-base: #E6ECEC;
+  --bg-base-2: #D1DCDD;
+  --bg: #EDF2F2;
+  --card-bg: #F4F7F7;
+  --card-border: #D1DCDD;
+  --border: #D1DCDD;
 
-  --text-primary: #0F172A;
-  --text-muted: #5A6782;
-  --muted: #5A6782;
-  --navy: #1E293B;
+  --text-primary: #16252B;
+  --text-muted: #64748B;
+  --muted: #64748B;
+  --navy: #16252B;
 
-  /* ── Adsum brand ramp (light derivation) ─────────────────────────────── */
-  --cyan: #0F7A87;          /* logo stop 1, darkened: 5.06:1 on white */
-  --teal: #0C8074;          /* logo stop 2 (mint) as a FILL: white on it 4.82:1 */
-  --teal-ink: #0C8074;      /* …as TEXT on a light card: 4.82:1 */
-  --violet: #5B3FD4;        /* logo stop 3 as a FILL: white on it 6.76:1 */
-  --violet-2: #7C5AE8;
-  --violet-ink: #5B3FD4;    /* …as TEXT on a light card: 6.76:1 */
+  --primary: #087F78;
+  --secondary: #2F6F9F;
+  --accent: #E4A84A;
+  --accent-ink: #825A18;
+  --on-accent: #16252B;
+  --on-danger: #FFFFFF;
+  --on-success: #16252B;
 
-  --teal-glow: rgba(12, 128, 116, 0.16);
-  --accent-glow: rgba(91, 63, 212, 0.22);
+  /* Legacy aliases remain so existing components keep a single source. */
+  --cyan: #087F78;
+  --teal: #087F78;
+  --teal-ink: #087F78;
+  --violet: #2F6F9F;
+  --violet-2: #E4A84A;
+  --violet-ink: #2F6F9F;
+
+  --teal-glow: rgba(8, 127, 120, 0.14);
+  --accent-glow: rgba(228, 168, 74, 0.18);
   --danger: #DC2626;
-  --success: #0F9D6E;
+  --danger-glow: rgba(220, 38, 38, 0.08);
+  --success: #10B981;
+  --success-ink: #087A56;
+  --success-glow: rgba(16, 185, 129, 0.1);
 
-  --shadow: 0 20px 45px -18px rgba(31, 22, 90, 0.22);
+  --shadow: 0 20px 45px -18px rgba(22, 37, 43, 0.18);
   --glass-blur: blur(18px);
 
-  --font-display: 'Kalam', cursive;
-  --font-body: 'Kalam', cursive;
+  --font-display: 'Nunito', sans-serif;
+  --font-body: 'Nunito', sans-serif;
 
   /* Motion tokens — centralized so the whole app eases the same way */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -60,36 +53,42 @@
 }
 
 [data-theme="dark"] {
-  --bg-base: #0A0B14;
-  --bg-base-2: #15182B;
-  --bg: #111424;
-  --card-bg: #181B2E;
-  --card-border: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.12);
+  --bg-base: #101A1D;
+  --bg-base-2: #2A3D42;
+  --bg: #142125;
+  --card-bg: #19272B;
+  --card-border: #2A3D42;
+  --border: #2A3D42;
 
-  --text-primary: #FFFFFF;
+  --text-primary: #F3F7F6;
   --text-muted: #94A3B8;
   --muted: #94A3B8;
-  --navy: #E2E8F0;
+  --navy: #F3F7F6;
 
-  /* ── Adsum brand ramp (dark derivation) ────────────────────────────────
-     On a dark card the logo stops can be used almost verbatim, because the
-     problem inverts: they are now too BRIGHT to carry white text. So the
-     fill tokens take the deeper pair and the ink tokens take the raw logo
-     hues (mint 10.56:1, cyan 8.00:1, violet ink 7.14:1 on #181B2E). */
-  --cyan: #38C3D0;
-  --teal: #0F7D6E;          /* deeper: carries white label text (5.03:1) */
-  --teal-ink: #5FE0CE;      /* the logo's own mint, as text: 10.56:1 */
-  --violet: #6D51E0;        /* deeper: carries white label text (5.38:1) */
-  --violet-2: #9C8BFF;
-  --violet-ink: #A99BFF;    /* lightened: readable as text, 7.14:1 */
+  --primary: #53C7B5;
+  --secondary: #8EAAD6;
+  --accent: #F1BD67;
+  --accent-ink: #F1BD67;
+  --on-accent: #16252B;
+  --on-danger: #101A1D;
+  --on-success: #101A1D;
 
-  --teal-glow: rgba(95, 224, 206, 0.16);
-  --accent-glow: rgba(109, 81, 224, 0.30);
-  --danger: #F05252;
+  --cyan: #53C7B5;
+  --teal: #087F78;
+  --teal-ink: #53C7B5;
+  --violet: #2F6F9F;
+  --violet-2: #8EAAD6;
+  --violet-ink: #8EAAD6;
+
+  --teal-glow: rgba(83, 199, 181, 0.16);
+  --accent-glow: rgba(241, 189, 103, 0.18);
+  --danger: #F87171;
+  --danger-glow: rgba(248, 113, 113, 0.12);
   --success: #34D399;
+  --success-ink: #34D399;
+  --success-glow: rgba(52, 211, 153, 0.12);
 
-  --shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65);
+  --shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.48);
 }
 
 /* --- AURORA BACKGROUND MESH (light theme only, very subtle) --- */
@@ -1570,7 +1569,7 @@ input:focus::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(91, 63, 212, 0.12);
+  background: rgba(47, 111, 159, 0.12);
   color: var(--violet-ink);
   font-size: 0.75rem;
   font-weight: 600;
@@ -2338,12 +2337,12 @@ input:focus::placeholder {
   100% {
     box-shadow:
       0 4px 14px rgba(11, 13, 23, 0.35),
-      0 0 0 0 rgba(139, 92, 246, 0.55);
+      0 0 0 0 rgba(241, 189, 103, 0.5);
   }
   50% {
     box-shadow:
       0 4px 14px rgba(11, 13, 23, 0.35),
-      0 0 0 9px rgba(139, 92, 246, 0);
+      0 0 0 9px rgba(241, 189, 103, 0);
   }
 }
 .drawer-tab .tab-glyph {
