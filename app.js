@@ -2848,6 +2848,16 @@ const removeModal = {
   confirmLabel: document.getElementById("removeConfirmLabel"),
 };
 
+// ── IMPORTED STUDENTS MODAL (adviser-only) ──────────────────────────────
+// Shows the full list of students imported via the level roster. Opened by
+// clicking the "Students imported" stat on the adviser dashboard.
+// 🛑 Declared here (before initAdviserDashboard runs) to avoid TDZ errors.
+const importedStudentsModal = {
+  el: document.getElementById("importedStudentsModal"),
+  list: document.getElementById("importedStudentsList"),
+  count: document.getElementById("importedStudentsCount"),
+};
+
 /** Matrics ticked in the open modal. */
 let removeSelected = new Set();
 
@@ -9805,15 +9815,6 @@ function initAdviserDashboard() {
       if (e.target === importedStudentsModal.el) closeImportedStudentsModal();
     });
   }
-
-// ── IMPORTED STUDENTS MODAL (adviser-only) ──────────────────────────────
-// Shows the full list of students imported via the level roster. Opened by
-// clicking the "Students imported" stat on the adviser dashboard.
-const importedStudentsModal = {
-  el: document.getElementById("importedStudentsModal"),
-  list: document.getElementById("importedStudentsList"),
-  count: document.getElementById("importedStudentsCount"),
-};
 
 function openImportedStudentsModal() {
   if (!importedStudentsModal.el) return;
