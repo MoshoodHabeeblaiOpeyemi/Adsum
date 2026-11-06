@@ -8169,6 +8169,37 @@ window.downloadAttendance = function (index) {
   document.body.removeChild(link);
 };
 
+window.downloadSessionPdf = function (index) {
+  if (
+    !activeCourse ||
+    !activeCourse.attendanceHistory ||
+    !activeCourse.attendanceHistory[index]
+  )
+    return;
+  const session = activeCourse.attendanceHistory[index];
+  if (typeof sessionPrintHtml !== "function") {
+    toast.warning("PDF export is not available.");
+    return;
+  }
+  const win = window.open("", "_blank");
+  if (!win) {
+    toast.warning(
+      "Allow pop-ups for this site to save a PDF, or use Download CSV instead.",
+    );
+    return;
+  }
+  win.document.write(
+    sessionPrintHtml(session, activeCourse || {}, activeCourse.members || []),
+  );
+  win.document.close();
+  setTimeout(() => {
+    try {
+      win.focus();
+      win.print();
+    } catch (_) {}
+  }, 350);
+};
+
 function renderPortalState() {
   if (!activeCourse) return;
 
@@ -8576,6 +8607,7 @@ function renderPortalState() {
               ${headcountBadgeHTML}
               ${flagsBadgeHTML}
               <button onclick="downloadAttendance(${archiveIndex})" class="btn" style="padding: 4px 10px; font-size: 0.75rem; width: auto;" title="Download CSV">📥 CSV</button>
+               <button onclick="downloadSessionPdf(${archiveIndex})" class="btn btn-outline" style="padding: 4px 10px; font-size: 0.75rem; width: auto;" title="Save as PDF">📄 PDF</button>
             </div>
           </div>
           <details style="font-size: 0.85rem; color: var(--muted); cursor: pointer; margin-top: 5px;">
@@ -9759,6 +9791,61 @@ function initAdviserDashboard() {
   if (el.endSession)
     el.endSession.addEventListener("click", endAdviserAcademicSession);
 
+  // ── Imported students modal wiring ──
+  const rosterCountBtn = document.getElementById("adviserRosterCountBtn");
+  if (rosterCountBtn) {
+    rosterCountBtn.addEventListener("click", openImportedStudentsModal);
+  }
+  const importedCloseBtn = document.getElementById("importedStudentsClose");
+  if (importedCloseBtn) {
+    importedCloseBtn.addEventListener("click", closeImportedStudentsModal);
+  }
+  if (importedStudentsModal.el) {
+    importedStudentsModal.el.addEventListener("click", (e) => {
+      if (e.target === importedStudentsModal.el) closeImportedStudentsModal();
+    });
+  }
+
+// ── IMPORTED STUDENTS MODAL (adviser-only) ──────────────────────────────
+// Shows the full list of students imported via the level roster. Opened by
+// clicking the "Students imported" stat on the adviser dashboard.
+const importedStudentsModal = {
+  el: document.getElementById("importedStudentsModal"),
+  list: document.getElementById("importedStudentsList"),
+  count: document.getElementById("importedStudentsCount"),
+};
+
+function openImportedStudentsModal() {
+  if (!importedStudentsModal.el) return;
+  const students = (adviserRoster && Array.isArray(adviserRoster.students)) ? adviserRoster.students : [];
+  if (importedStudentsModal.count) {
+    importedStudentsModal.count.textContent = `${students.length} student${students.length === 1 ? "" : "s"}`;
+  }
+  if (importedStudentsModal.list) {
+    if (!students.length) {
+      importedStudentsModal.list.innerHTML = '<p class="remove-list-empty">No students imported yet.</p>';
+    } else {
+      importedStudentsModal.list.innerHTML = students
+        .map((s) => {
+          const isRep = adviserRoster.chosenRepMatric === s.matric;
+          const tag = isRep ? '<span class="adviser-rep-tag">Course rep</span>' : "";
+          return `<div class="remove-student-row">
+            <span class="remove-student-name">${escapeHTML(s.name || s.matric)}</span>
+            <span class="remove-student-matric">${escapeHTML(s.matric)}${tag}</span>
+          </div>`;
+        })
+        .join("");
+    }
+  }
+  importedStudentsModal.el.classList.add("show");
+  if (typeof refreshIcons === "function") refreshIcons();
+}
+
+function closeImportedStudentsModal() {
+  if (importedStudentsModal.el) importedStudentsModal.el.classList.remove("show");
+}
+
+
   // ── Remove-students modal wiring ──
   // The card's course picker launches the modal. The <select> underneath is
   // pointer-events:none so the OS dropdown never opens on top of it.
@@ -9928,7 +10015,7 @@ function renderAdviserIdentity() {
 // Loaded by index.html as a classic script before app.js runs, because the
 // app imports Firebase from CDN URLs and so cannot use a bare-specifier
 // import for a local module. See utils/report.js for the dual export.
-const { buildSemesterReport, semesterCsv, semesterPrintHtml } =
+const { buildSemesterReport, semesterCsv, semesterPrintHtml, sessionPrintHtml } =
   globalThis.VeriReport || {};
 let lastSemesterReport = null;
 

@@ -52,9 +52,10 @@ async function sendVerificationCode({
         text:
           `Hi ${greetingName},\n\n` +
           `Your Adsum verification code is ${code}.\n\n` +
+          (isAdviser ? `Rank: Level Adviser\n` : `Rank: Normal student\n`) +
           (isAdviser ? `Level: ${scope || "your department"}\n` : "") +
           `It expires in 10 minutes. Enter it in the app to verify your\n` +
-          `${isAdviser ? "Level Adviser" : "Adsum"} account.\n\n` +
+          `${isAdviser ? "Level Adviser" : "Normal student"} account.\n\n` +
           `If you did not request this, ignore this email — nothing happens\n` +
           `until the code is entered.`,
       }),

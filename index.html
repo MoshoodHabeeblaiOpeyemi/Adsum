@@ -1100,10 +1100,10 @@
       </div>
 
       <div class="adviser-stats">
-        <div class="adviser-stat">
+        <button type="button" class="adviser-stat adviser-stat-btn" id="adviserRosterCountBtn">
           <span class="adviser-stat-label">Students imported</span>
           <strong class="adviser-stat-value" id="adviserRosterCount">0</strong>
-        </div>
+        </button>
         <div class="adviser-stat">
           <span class="adviser-stat-label">Course Rep</span>
           <strong class="adviser-stat-value" id="rosterRep">Not chosen</strong>
@@ -1111,44 +1111,6 @@
         <div class="adviser-stat">
           <span class="adviser-stat-label">Last import</span>
           <strong class="adviser-stat-value" id="rosterImported">Never</strong>
-        </div>
-      </div>
-
-      <div class="adviser-card">
-        <h3 class="adviser-card-h3"><i data-lucide="user-x"></i> Remove Students From a Class</h3>
-        <p class="adviser-card-p">This is the only way to take someone off a course roster — the course
-          rep cannot do it. Use it when a student joined a course code but should not be in the class.
-          Their attendance history is kept, every removal is written to a permanent audit log, and they
-          can rejoin with the course code at any time.
-        </p>
-
-        <!-- 🎯 THE CARD IS JUST A LAUNCHER.
-             The <select> below holds the currently-targeted course and is still a
-             real <select> (so it is announced and focusable), but it is covered by
-             a transparent button: tapping it opens the student-picker modal instead
-             of the native dropdown. Letting the OS dropdown open would put a second,
-             competing list of courses on screen for a control whose only job is to
-             pick WHICH course the modal is about. -->
-        <div class="course-picker">
-          <select id="adviserCourseSelect" class="adviser-select" disabled>
-            <option value="">Loading your courses…</option>
-          </select>
-          <button type="button" id="adviserCoursePickBtn" class="course-picker-hit" aria-haspopup="dialog"
-            aria-controls="removeStudentsModal" disabled>
-          </button>
-        </div>
-        <div class="adviser-msg hidden" id="adviserRemoveMsg"></div>
-      </div>
-
-      <div class="adviser-card">
-        <h3 class="adviser-card-h3"><i data-lucide="calendar-range"></i> End Academic Session</h3>
-        <p class="adviser-card-p">An academic session covers two semesters. Ending it clears only this level's imported
-          student list so you can prepare the next session. The selected course rep and all course attendance records
-          are kept.
-        </p>
-        <div class="adviser-row">
-          <button type="button" class="btn btn-outline" id="endAcademicSessionBtn">
-            <i data-lucide="archive-restore"></i> End academic session</button>
         </div>
       </div>
 
@@ -1187,6 +1149,44 @@
           <summary>Rep change history</summary>
           <ul class="adviser-log-list" id="repLog"></ul>
         </details>
+      </div>
+
+      <div class="adviser-card">
+        <h3 class="adviser-card-h3"><i data-lucide="user-x"></i> Remove Students From a Class</h3>
+        <p class="adviser-card-p">This is the only way to take someone off a course roster — the course
+          rep cannot do it. Use it when a student joined a course code but should not be in the class.
+          Their attendance history is kept, every removal is written to a permanent audit log, and they
+          can rejoin with the course code at any time.
+        </p>
+
+        <!-- 🎯 THE CARD IS JUST A LAUNCHER.
+             The <select> below holds the currently-targeted course and is still a
+             real <select> (so it is announced and focusable), but it is covered by
+             a transparent button: tapping it opens the student-picker modal instead
+             of the native dropdown. Letting the OS dropdown open would put a second,
+             competing list of courses on screen for a control whose only job is to
+             pick WHICH course the modal is about. -->
+        <div class="course-picker">
+          <select id="adviserCourseSelect" class="adviser-select" disabled>
+            <option value="">Loading your courses…</option>
+          </select>
+          <button type="button" id="adviserCoursePickBtn" class="course-picker-hit" aria-haspopup="dialog"
+            aria-controls="removeStudentsModal" disabled>
+          </button>
+        </div>
+        <div class="adviser-msg hidden" id="adviserRemoveMsg"></div>
+      </div>
+
+      <div class="adviser-card" style="border-color: var(--danger);">
+        <h3 class="adviser-card-h3" style="color: var(--danger);"><i data-lucide="archive-restore"></i> End Academic Session</h3>
+        <p class="adviser-card-p">An academic session covers two semesters. Ending it clears only this level's imported
+          student list so you can prepare the next session. The selected course rep and all course attendance records
+          are kept.
+        </p>
+        <div class="adviser-row">
+          <button type="button" class="btn btn-danger-solid" id="endAcademicSessionBtn">
+            <i data-lucide="archive-restore"></i> End academic session</button>
+        </div>
       </div>
 
       <p class="adviser-foot">Re-import when the level roster changes or at the start of a new academic session.
@@ -1243,6 +1243,28 @@
       </div>
     </div>
   </div>
+<!-- MODAL: IMPORTED STUDENTS (adviser) ------------------------------
+     Shows the full list of students imported via the level roster. -->
+  <div id="importedStudentsModal" class="modal">
+    <div class="modal-card remove-modal-card">
+      <h3><i data-lucide="users"></i> Imported Students</h3>
+      <p class="remove-modal-note">
+        All students imported via the level roster for this level.
+      </p>
+
+      <div id="importedStudentsList" class="remove-student-list">
+        <p class="remove-list-empty">Loading students…</p>
+      </div>
+
+      <div class="remove-modal-foot">
+        <span id="importedStudentsCount" class="remove-count">0 students</span>
+        <div class="modal-actions remove-modal-actions">
+          <button type="button" class="btn btn-outline close-modal" id="importedStudentsClose">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- MODAL: FORGOT PASSWORD -->
   <div id="forgotModal" class="modal">
