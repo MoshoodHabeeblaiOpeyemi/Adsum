@@ -1470,12 +1470,14 @@ function startCourseListener() {
               uid: memberSnap.id,
               ...memberSnap.data(),
             }));
+            // Only set up a live member listener if we successfully read
+            // members — advisers cannot listen to members they aren't enrolled
+            // in, and the onSnapshot would fire permission errors forever.
+            startMemberListener(docSnap.id);
           } catch (_) {
             // Not permitted to list this course's members (e.g. adviser).
             members = [];
           }
-          // Start a live listener for this course's members subcollection
-          startMemberListener(docSnap.id);
           return {
             ...course,
             members,
