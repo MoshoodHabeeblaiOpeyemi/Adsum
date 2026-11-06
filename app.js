@@ -3152,7 +3152,7 @@ if (openSettingsBtn && settingsModal) {
       currentUser.role === "adviser" || currentUser.role === "level_anchor";
 
     if (settingsProfileSection)
-      settingsProfileSection.classList.toggle("hidden", isAdviserAccount);
+      settingsProfileSection.classList.toggle("hidden", !isAdviserAccount);
     if (settingsNameInput) settingsNameInput.value = currentUser.name || "";
     if (settingsMatricInput)
       settingsMatricInput.value = currentUser.matric || "";
