@@ -6274,7 +6274,7 @@ async function loadExemptions() {
 // rotating QR from their own phones. Reuse the existing session_assistant
 // machinery: role auto-revokes at session close, secret listener keeps
 // every hotspot's QR in perfect sync with the rep's rotation clock.
-const HOTSPOTS_MAX = 5;
+const HOTSPOTS_MAX = 10;
 
 function openHotspotPicker() {
   const modal = document.getElementById("hotspotPickerModal");

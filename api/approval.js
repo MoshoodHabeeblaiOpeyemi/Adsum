@@ -380,7 +380,7 @@ async function handleGrantHotspot(req, res, decoded) {
         const grantCount = Number.isInteger(currentSecret.hotspotGrantCount)
           ? currentSecret.hotspotGrantCount
           : legacyCount;
-        if (grantCount >= 5) throw new Error("HOTSPOT_LIMIT");
+        if (grantCount >= 10) throw new Error("HOTSPOT_LIMIT");
 
         tx.update(secretRef, { hotspotGrantCount: grantCount + 1 });
         tx.update(targetRef, { role: "session_assistant" });
@@ -405,7 +405,7 @@ async function handleGrantHotspot(req, res, decoded) {
         ],
         NOT_CHECKED_IN: [403, "Target student has not checked in yet."],
         ALREADY_STAFF: [409, "This student already has course staff access."],
-        HOTSPOT_LIMIT: [403, "Hotspot limit reached (max 5 per session)."],
+        HOTSPOT_LIMIT: [403, "Hotspot limit reached (max 10 per session)."],
       };
       const response = responses[error.message];
       if (response) return res.status(response[0]).json({ error: response[1] });
