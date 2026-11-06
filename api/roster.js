@@ -1027,7 +1027,19 @@ async function handleChangeLevel(req, res, decoded) {
       });
     }
 
+    // ── Collect every matric being migrated, BEFORE any roster doc is deleted ──
+    const matricsBeingMigrated = new Set();
+    for (const docSnap of matching) {
+      const oldRoster = docSnap.data();
+      if (norm(oldRoster.level || "") === newLevelNorm) continue;
+      const oldStudents = Array.isArray(oldRoster.students)
+        ? oldRoster.students
+        : [];
+      for (const s of oldStudents) matricsBeingMigrated.add(norm(s.matric));
+    }
+
     let totalMigrated = 0;
+    let totalUnenrolled = 0;
 
     for (const docSnap of matching) {
       const oldRoster = docSnap.data();
@@ -1082,13 +1094,61 @@ async function handleChangeLevel(req, res, decoded) {
       await docSnap.ref.delete();
     }
 
+    // ── UNENROLL every migrated student from ALL courses they joined ──
+    // Course documents stay intact (so the rep can still see them, close the
+    // semester, or delete them). Only the matric is stripped from enrolled[].
+    if (matricsBeingMigrated.size > 0) {
+      const matricsArray = Array.from(matricsBeingMigrated);
+      // Firestore array-contains-any supports up to 30 values per query.
+      const CHUNK = 30;
+      for (let i = 0; i < matricsArray.length; i += CHUNK) {
+        const chunk = matricsArray.slice(i, i + CHUNK);
+        const coursesSnap = await db
+          .collection("courses")
+          .where("enrolled", "array-contains-any", chunk)
+          .get();
+        for (const courseDoc of coursesSnap.docs) {
+          const course = courseDoc.data();
+          const courseEnrolled = Array.isArray(course.enrolled)
+            ? course.enrolled.map((m) => norm(m))
+            : [];
+          const courseAssistants = Array.isArray(course.assistants)
+            ? course.assistants.map((m) => norm(m))
+            : [];
+
+          const removeSet = new Set(chunk.map((m) => norm(m)));
+          const keepEnrolled = courseEnrolled.filter((m) => !removeSet.has(m));
+          const keepAssistants = courseAssistants.filter(
+            (m) => !removeSet.has(m),
+          );
+
+          if (
+            keepEnrolled.length !== courseEnrolled.length ||
+            keepAssistants.length !== courseAssistants.length
+          ) {
+            await courseDoc.ref.update({
+              enrolled: keepEnrolled.length
+                ? keepEnrolled
+                : FieldValue.delete(),
+              assistants: keepAssistants.length
+                ? keepAssistants
+                : FieldValue.delete(),
+            });
+            totalUnenrolled +=
+              courseEnrolled.length - keepEnrolled.length;
+          }
+        }
+      }
+    }
+
     await db.collection("users").doc(uid).update({ level: newLevelNorm });
 
     return res.status(200).json({
       success: true,
-      message: `Level changed from ${scope.level} to ${newLevelNorm}.`,
+      message: `Level changed from ${scope.level} to ${newLevelNorm}. ${totalMigrated} students migrated; ${totalUnenrolled} unenrolled from old courses.`,
       level: newLevelNorm,
       migratedStudents: totalMigrated,
+      unenrolledStudents: totalUnenrolled,
     });
   } catch (error) {
     console.error("changeLevel error:", error);

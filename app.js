@@ -3313,7 +3313,7 @@ if (settingsForm) {
       settingsModal.classList.remove("show");
       toast.success(
         levelChanged && isAdviserAccount
-          ? `Level changed to ${newLevel}. Students migrated.`
+          ? `Level changed to ${newLevel}. Students migrated and unenrolled from old courses.`
           : "Your profile has been updated.",
         "Profile Saved",
       );
