@@ -1457,14 +1457,23 @@ function startCourseListener() {
             };
           }
 
-          // First time seeing this course — do the initial members read
-          const membersSnap = await getDocs(
-            collection(db, "courses", docSnap.id, "members"),
-          );
-          const members = membersSnap.docs.map((memberSnap) => ({
-            uid: memberSnap.id,
-            ...memberSnap.data(),
-          }));
+          // First time seeing this course — do the initial members read.
+          // Advisers are not course members (they own the level roster, not
+          // individual classes), so they cannot list members of courses they
+          // aren't enrolled in. Fail closed to empty lists rather than throw.
+          let members = [];
+          try {
+            const membersSnap = await getDocs(
+              collection(db, "courses", docSnap.id, "members"),
+            );
+            members = membersSnap.docs.map((memberSnap) => ({
+              uid: memberSnap.id,
+              ...memberSnap.data(),
+            }));
+          } catch (_) {
+            // Not permitted to list this course's members (e.g. adviser).
+            members = [];
+          }
           // Start a live listener for this course's members subcollection
           startMemberListener(docSnap.id);
           return {
