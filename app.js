@@ -2981,6 +2981,11 @@ document
         await showConfirm({
           title: "Delete Account",
           message:
+            (currentUser &&
+            (currentUser.role === "adviser" ||
+              currentUser.role === "level_anchor")
+              ? "⚠️ You are a Level Adviser. Your imported student roster is preserved — your adviser link is removed but the roster document stays. A new adviser for your department+level can pick up where you left off. "
+              : "") +
             "This deletes your sign-in and removes your name and email from current course rosters. Attendance and audit history stay for university reference under your matric; courses without a rep are archived. This cannot be undone.",
           okText: "Yes, Delete",
           cancelText: "Keep Account",
@@ -3141,6 +3146,8 @@ if (openSettingsBtn && settingsModal) {
     const settingsNameInput = document.getElementById("settingsName");
     const settingsMatricInput = document.getElementById("settingsMatric");
     const settingsLevelInput = document.getElementById("settingsLevel"); // NEW
+    const settingsLevelNotice = document.getElementById("settingsLevelNotice"); // NEW
+    const settingsDeptNotice = document.getElementById("settingsDeptNotice"); // NEW
     const isAdviserAccount =
       currentUser.role === "adviser" || currentUser.role === "level_anchor";
 
@@ -3150,6 +3157,13 @@ if (openSettingsBtn && settingsModal) {
     if (settingsMatricInput)
       settingsMatricInput.value = currentUser.matric || "";
     if (settingsLevelInput) settingsLevelInput.value = currentUser.level || ""; // NEW
+
+    // Adviser-only notices (level migration + department change warning)
+    if (settingsLevelNotice)
+      settingsLevelNotice.classList.toggle("hidden", !isAdviserAccount);
+    if (settingsDeptNotice)
+      settingsDeptNotice.classList.toggle("hidden", !isAdviserAccount);
+
     applyFontPreference(
       (fontPreferenceSelect && fontPreferenceSelect.value) || "nunito",
     );
@@ -3195,10 +3209,40 @@ if (settingsForm) {
       return;
     }
 
+    // 🔄 LEVEL CHANGE for advisers: delegate to backend so all imported
+    // students migrate to the new level roster. Students cannot change level
+    // here (their level is set at signup and locked).
+    let levelChanged = false;
+    if (
+      isAdviserAccount &&
+      newLevel &&
+      newLevel !== currentUser.level
+    ) {
+      const confirmed = await showConfirm({
+        title: "Change your academic level?",
+        message:
+          `This will move all students you imported from ${currentUser.level} to ${newLevel}. ` +
+          `Use this at the start of a new session when you're moving up with your students. ` +
+          `Your chosen course rep is kept.`,
+        okText: "Change level",
+        cancelText: "Keep current level",
+        icon: "arrow-right-left",
+      });
+      if (!confirmed) {
+        // Abort the whole save — user doesn't want to change level.
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Save Changes 💾";
+        return;
+      }
+      levelChanged = true;
+    }
+
     try {
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = "Saving... ⏳";
+        submitBtn.textContent = levelChanged
+          ? "Moving students… ⏳"
+          : "Saving... ⏳";
       }
 
       const oldMatric = normalizeMatric(currentUser.matric);
@@ -3208,9 +3252,33 @@ if (settingsForm) {
       // `matric` is only sent for accounts that actually have one. Advisers
       // store `null`, and writing `""` over it would violate the rules'
       // `matric == resource.data.matric` pin and fail the entire update.
-      const profilePatch = { name: newName, level: newLevel };
-      if (newMatric) profilePatch.matric = newMatric;
-      await updateDoc(doc(db, "users", uid), profilePatch);
+      if (levelChanged && isAdviserAccount) {
+        // Delegate level change + roster migration to the backend.
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch(
+          "/api/roster?action=changeLevel",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ newLevel }),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Unable to change level.");
+        }
+        // Also update name (and matric if present) on the profile.
+        const namePatch = { name: newName };
+        if (newMatric) namePatch.matric = newMatric;
+        await updateDoc(doc(db, "users", uid), namePatch);
+      } else {
+        const profilePatch = { name: newName, level: newLevel };
+        if (newMatric) profilePatch.matric = newMatric;
+        await updateDoc(doc(db, "users", uid), profilePatch);
+      }
 
       // Note: matric changes no longer propagate into courses' enrolled[]/
       // assistants[] arrays here. Tonight's rules rewrite restricts course
@@ -3243,7 +3311,12 @@ if (settingsForm) {
       }
 
       settingsModal.classList.remove("show");
-      toast.success("Your profile has been updated.", "Profile Saved");
+      toast.success(
+        levelChanged && isAdviserAccount
+          ? `Level changed to ${newLevel}. Students migrated.`
+          : "Your profile has been updated.",
+        "Profile Saved",
+      );
     } catch (error) {
       console.error("Settings update error:", error);
       toast.error(error.message, "Something went wrong");

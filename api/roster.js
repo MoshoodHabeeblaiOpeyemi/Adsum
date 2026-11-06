@@ -968,6 +968,136 @@ async function handleEndAcademicSession(req, res, decoded) {
   }
 }
 
+/**
+ * Change a verified Level Adviser's level and migrate all their imported
+ * students to the new level roster. Used for new-session transitions where
+ * the adviser moves up a level (e.g., 100 → 200) and takes their roster with
+ * them.
+ *
+ * The adviser's profile level is updated, then every departmentRosters doc
+ * they own at (institution, department) is relocated to the new level key.
+ * Students are deduplicated by matric so no student appears twice.
+ */
+async function handleChangeLevel(req, res, decoded) {
+  try {
+    const scope = await loadAdviserScope(decoded.uid);
+    if (scope.error)
+      return res.status(scope.error.status).json(scope.error.body);
+
+    const { newLevel } = req.body || {};
+    if (!newLevel || typeof newLevel !== "string")
+      return res.status(400).json({
+        error: "newLevel is required.",
+        code: "MISSING_NEW_LEVEL",
+      });
+
+    const newLevelNorm = norm(newLevel);
+    if (newLevelNorm === scope.level)
+      return res.status(200).json({
+        success: true,
+        message: "Level unchanged.",
+        level: scope.level,
+      });
+
+    const uid = decoded.uid;
+    const institution = scope.institution;
+    const department = scope.department;
+
+    // Find every roster this adviser owns at their institution+department.
+    const rostersSnap = await db
+      .collection("departmentRosters")
+      .where("adviserUid", "==", uid)
+      .get();
+
+    const matching = rostersSnap.docs.filter((d) => {
+      const data = d.data();
+      return (
+        norm(data.institution) === institution &&
+        norm(data.department) === department
+      );
+    });
+
+    if (matching.length === 0) {
+      await db.collection("users").doc(uid).update({ level: newLevelNorm });
+      return res.status(200).json({
+        success: true,
+        message: "Level updated. No rosters to migrate.",
+        level: newLevelNorm,
+        migratedStudents: 0,
+      });
+    }
+
+    let totalMigrated = 0;
+
+    for (const docSnap of matching) {
+      const oldRoster = docSnap.data();
+      if (norm(oldRoster.level || "") === newLevelNorm) continue;
+
+      const newDocId = rosterDocId(institution, department, newLevelNorm);
+      const newRef = db.collection("departmentRosters").doc(newDocId);
+
+      const newSnap = await newRef.get();
+      const existingStudents = newSnap.exists
+        ? Array.isArray(newSnap.data().students)
+          ? newSnap.data().students
+          : []
+        : [];
+      const existingMatrics = new Set(
+        existingStudents.map((s) => norm(s.matric)),
+      );
+
+      const oldStudents = Array.isArray(oldRoster.students)
+        ? oldRoster.students
+        : [];
+      const newStudents = oldStudents.filter(
+        (s) => !existingMatrics.has(norm(s.matric)),
+      );
+
+      totalMigrated += newStudents.length;
+
+      const mergedStudents = [...existingStudents, ...newStudents];
+      const mergedMatrics = mergedStudents.map((s) => norm(s.matric));
+
+      await newRef.set(
+        {
+          institution,
+          department,
+          level: newLevelNorm,
+          adviserUid: uid,
+          students: mergedStudents,
+          matrics: mergedMatrics,
+          count: mergedStudents.length,
+          importedAt: oldRoster.importedAt || FieldValue.serverTimestamp(),
+          rosterClearedAt: null,
+          chosenRepMatric: oldRoster.chosenRepMatric || null,
+          chosenRepName: oldRoster.chosenRepName || null,
+          chosenRepUid: oldRoster.chosenRepUid || null,
+          repChanges: Array.isArray(oldRoster.repChanges)
+            ? oldRoster.repChanges.slice(-50)
+            : [],
+        },
+        { merge: true },
+      );
+
+      await docSnap.ref.delete();
+    }
+
+    await db.collection("users").doc(uid).update({ level: newLevelNorm });
+
+    return res.status(200).json({
+      success: true,
+      message: `Level changed from ${scope.level} to ${newLevelNorm}.`,
+      level: newLevelNorm,
+      migratedStudents: totalMigrated,
+    });
+  } catch (error) {
+    console.error("changeLevel error:", error);
+    return res.status(500).json({
+      error: "Unable to change adviser level.",
+    });
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
@@ -994,6 +1124,8 @@ module.exports = async (req, res) => {
         return handleListCourseStudents(req, res, decoded);
       case "endAcademicSession":
         return handleEndAcademicSession(req, res, decoded);
+      case "changeLevel":
+        return handleChangeLevel(req, res, decoded);
       default:
         return res.status(400).json({
           error:

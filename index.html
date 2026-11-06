@@ -1550,6 +1550,19 @@
             <button type="button" class="btn btn-outline close-modal">Cancel</button>
             <button type="submit" class="btn"><i data-lucide="save"></i> Save Changes</button>
           </div>
+
+          <!-- 🔄 LEVEL CHANGE NOTICE (advisers only) -->
+          <div id="settingsLevelNotice" class="hidden" style="margin-top: 16px; padding: 12px; background: var(--accent-glow); border: 1px solid var(--accent); border-radius: 10px; font-size: 0.85rem; color: var(--accent-ink);">
+            <strong style="display: block; margin-bottom: 4px;"><i data-lucide="arrow-right-left"></i> Changing your level?</strong>
+            Changing your academic level moves all students you imported to the new level roster. Use this at the start of a new session when you're moving up with your students.
+          </div>
+
+          <!-- 🏢 DEPARTMENT CHANGE WARNING (advisers only) -->
+          <div id="settingsDeptNotice" class="hidden" style="margin-top: 12px; padding: 12px; background: var(--danger-glow); border: 1px solid var(--danger); border-radius: 10px; font-size: 0.85rem; color: var(--danger);">
+            <strong style="display: block; margin-bottom: 4px;"><i data-lucide="alert-triangle"></i> Changing department?</strong>
+            Your imported students are tied to your department. If you change department, please <strong>delete your account</strong> and create a new one for the new department. Your student roster will be preserved — the next adviser for your old department+level can pick up where you left off.
+          </div>
+
           <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); text-align: center;">
             <button id="enablePushBtn" type="button"
               style="background: transparent; border: none; color: var(--accent-ink); font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: underline; margin-left: 16px;">
